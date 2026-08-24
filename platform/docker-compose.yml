@@ -49,6 +49,8 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-sk-ant-placeholder}
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-litellm-master}
+      # 成本计量与虚拟密钥持久化（依赖 postgres 服务）
+      - DATABASE_URL=postgresql://platform:platform@postgres:5432/litellm
       # Langfuse 观测（自托管见 docker-compose.observability.yml 与 scripts/setup_langfuse_demo.py）
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
       - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}

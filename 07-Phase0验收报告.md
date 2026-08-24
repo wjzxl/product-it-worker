@@ -30,10 +30,11 @@
 
 ## 3. 基础设施实测记录
 
-### 3.1 LiteLLM 网关（真实链路，mock 后端）
-- chat completions / embeddings 经网关转发返回 ✓；`/spend/logs` 计量条目落库 ✓；
-- 演示 `--gateway` 模式：Agent 起草 PRD 的 LLM 调用完整走网关 ✓；
-- 知识库 `EMBEDDING_DIM=8` + `mock-embed` 经网关 × 真实 Qdrant 检索 ✓。
+### 3.1 LiteLLM 网关（真实模型 + 计量实测）
+- **真实模型**：接入 DeepSeek（`deepseek-chat`，Key 经环境变量注入不落库）；经网关调用实测成功，**端到端演示 `DEMO_LLM_MODEL=deepseek-chat --gateway --pg` 10/10 通过**（PRD 由真实模型起草）；
+- **成本计量**：网关接入 PostgreSQL（`LiteLLM_SpendLogs` 表），实测调用落库：`deepseek/deepseek-chat` spend=6.6e-06 USD、prompt_tokens=12、completion_tokens=1；
+- **观测**：Langfuse 记录 `deepseek/deepseek-chat` observation（经网关自动上报）；
+- chat/embeddings 网关转发链路（mock 后端）与知识库 `EMBEDDING_DIM` 链路亦已实测。
 
 ### 3.2 观测（Langfuse 自托管）✅ 实测通过
 - `docker compose -f docker-compose.observability.yml up -d` 拉起 Langfuse v2（http://localhost:3000，账号 demo@local.dev / phase0-demo-pass）；
@@ -49,11 +50,10 @@
 
 | 事项 | 需要的资源 | 提供后的动作 |
 |---|---|---|
-| 真实模型调用 | 任一供应商 API Key | 配入 LiteLLM env，`DEMO_LLM_MODEL=<真实模型>` 重跑演示 |
-| 真实 GitLab 验收 | sandbox 测试仓库 + 项目 Token（api 权限） | `--real-gitlab` 模式跑演示 + 注册 webhook |
+| 真实 GitLab 验收 | sandbox 测试仓库 + 项目 Token（api 权限） | `--real-gitlab` 模式跑演示 + 注册 webhook（指南见 platform/README） |
 | 真实飞书推送 | 测试群自定义机器人 webhook | approval-gateway 配 `FEISHU_WEBHOOK_URL` 后卡片推送到群 |
 
-（观测链路已用自托管 Langfuse 闭环，无需外部密钥。）
+（LLM 真实模型、成本计量、Langfuse 观测均已闭环；DeepSeek Key 已接入并实测。）
 
 ## 5. 结论与签核建议
 

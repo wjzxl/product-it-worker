@@ -234,7 +234,7 @@ def main(gateway: bool = False, pg: bool = False, real_gitlab: bool = False) -> 
             "requirement_text": "用户想要一个可以导出报表的功能，支持按日期筛选",
             "title": "报表导出功能", "task_ref": ref, "project_id": DEMO_PROJECT,
         },
-        timeout=30,
+        timeout=120,
     )
     run = r.json()
     check(
@@ -257,7 +257,7 @@ def main(gateway: bool = False, pg: bool = False, real_gitlab: bool = False) -> 
     r = httpx.post(
         f"http://127.0.0.1:{PORTS['agent-runtime']}/runs/{run['thread_id']}/resume",
         json={"decision": "approve", "comment": ""},
-        timeout=30,
+        timeout=120,
     )
     done = r.json()
     check("6. 恢复执行 → 建 Issue 完成（经 GitLab API）", r.status_code == 200 and done["status"] == "done", f"iid={done.get('issue', {}).get('iid')}")
