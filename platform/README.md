@@ -8,23 +8,16 @@
 ```
 platform/
 ├── docker-compose.yml        # 本地开发环境：PG / Qdrant / n8n / LiteLLM
+├── litellm-config.yaml       # LLM 网关配置（强/弱模型分层路由）
 ├── contracts/                # 接口合约（与语言无关，先行定义）
 │   ├── events.md             #   事件总线消息契约
 │   ├── approval-request.schema.json  # 审批请求 JSON Schema
 │   └── sop-example.yaml      #   SOP DSL 草案示例（含 G1 Gate）
 └── services/
-    └── approval-gateway/     # 审批网关（Phase 0 核心自研件，最小可运行版）
-        ├── pyproject.toml
-        ├── app/
-        │   ├── main.py       #   FastAPI 入口
-        │   ├── db.py         #   SQLAlchemy（默认 SQLite，可切 PG）
-        │   ├── models.py     #   ApprovalRequest / Decision
-        │   ├── schemas.py    #   Pydantic 模型
-        │   ├── router.py     #   API 路由 + IM 卡片回调
-        │   ├── notifier.py   #   通知适配器（日志桩 + 飞书接口位）
-        │   └── policies.py   #   超时/升级策略
-        └── tests/
-            └── test_api.py
+    ├── approval-gateway/     # 审批网关（T0.4 后端已完成：状态机+三要素校验+超时策略+事件发布）
+    │   └── app/              #   main/db/models/schemas/router/notifier/policies/events
+    └── gitlab-bridge/        # GitLab 双向集成桥（T0.2：webhook 归一化 + API 客户端 + 事件扇出）
+        └── app/              #   main/client/normalize/events
 ```
 
 ## 快速开始
@@ -64,7 +57,19 @@ API 文档：http://localhost:8000/docs
 | POST | `/callbacks/im/card` | IM 交互卡片回调（卡片按钮 → 决策） |
 | GET | `/health` | 健康检查 |
 
-### 3. 环境变量
+### 3. GitLab 集成桥
+
+```bash
+cd services/gitlab-bridge
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+WEBHOOK_SECRET=xxx GITLAB_TOKEN=yyy uvicorn app.main:app --reload --port 8001
+pytest
+```
+
+webhook 注册与事件映射见 [gitlab-bridge/README.md](services/gitlab-bridge/README.md)。
+
+### 4. 环境变量（审批网关）
 
 | 变量 | 默认 | 说明 |
 |---|---|---|

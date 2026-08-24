@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .db import get_db
+from .events import new_event, publisher_from_env
 from .models import ApprovalRequest, Decision, utcnow
 from .notifier import get_notifier
 from .policies import is_overdue
@@ -27,6 +28,16 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 STATUS_TERMINAL = {"approved", "rejected"}
+
+
+def _publish_targets() -> list:
+    import os
+
+    raw = os.getenv("PUBLISH_TARGETS", "")
+    return [t.strip() for t in raw.split(",") if t.strip()]
+
+
+_publisher = publisher_from_env(_publish_targets() or None)
 
 
 def _get_or_404(db: Session, approval_id: str) -> ApprovalRequest:
@@ -63,7 +74,22 @@ def create_approval(payload: ApprovalRequestCreate, db: Session = Depends(get_db
 
     # 推送审批卡片（Web/IM 双通道；Phase 0 日志桩）
     get_notifier().send(req)
-    # TODO(T0.4): 发布 approval.requested 事件（见 contracts/events.md）
+    # 发布 approval.requested 事件（契约 contracts/events.md），驱动工作流扇出
+    _publisher.publish(
+        new_event(
+            "approval.requested",
+            {
+                "approval_id": req.id,
+                "gate": req.type,
+                "stage": req.stage,
+                "task_ref": req.task_ref,
+                "requester": req.requester,
+                "deadline": req.deadline.isoformat(),
+                "version": req.version,
+            },
+            "approval-gateway",
+        )
+    )
     logger.info("approval.requested id=%s stage=%s", req.id, req.stage)
     return req
 
@@ -111,7 +137,20 @@ def decide(
 
     db.commit()
     db.refresh(decision)
-    # TODO(T0.4): 发布 approval.decided 事件，驱动工作流恢复/回退
+    # 发布 approval.decided 事件（契约 contracts/events.md），驱动工作流恢复/回退
+    _publisher.publish(
+        new_event(
+            "approval.decided",
+            {
+                "approval_id": req.id,
+                "decision": decision.decision,
+                "decided_by": decision.decided_by,
+                "comment": decision.comment,
+                "version": req.version,
+            },
+            "approval-gateway",
+        )
+    )
     logger.info(
         "approval.decided id=%s decision=%s by=%s comment=%s",
         req.id, decision.decision, decision.decided_by, decision.comment,
@@ -138,6 +177,21 @@ def resubmit(
     db.commit()
     db.refresh(req)
     get_notifier().send(req)
+    _publisher.publish(
+        new_event(
+            "approval.requested",
+            {
+                "approval_id": req.id,
+                "gate": req.type,
+                "stage": req.stage,
+                "task_ref": req.task_ref,
+                "requester": req.requester,
+                "deadline": req.deadline.isoformat(),
+                "version": req.version,
+            },
+            "approval-gateway",
+        )
+    )
     return req
 
 
@@ -163,6 +217,20 @@ async def im_card_callback(payload: ImCardCallback, request: Request, db: Sessio
         req.status = "revised"
     db.commit()
     db.refresh(decision)
+    _publisher.publish(
+        new_event(
+            "approval.decided",
+            {
+                "approval_id": req.id,
+                "decision": decision.decision,
+                "decided_by": decision.decided_by,
+                "comment": decision.comment,
+                "channel": "im",
+                "version": req.version,
+            },
+            "approval-gateway",
+        )
+    )
     logger.info(
         "approval.decided(im) id=%s decision=%s by=%s", req.id, decision.decision, decision.decided_by
     )
