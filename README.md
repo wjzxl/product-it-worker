@@ -28,12 +28,12 @@
 | 阶段 | 进度 |
 |---|---|
 | 设计（文档 01~06） | ✅ 完成，6 个 Gate 已评审确认 |
-| **Phase 0 地基** | 🔨 进行中（T0.1 ✅ / T0.2 ✅ / T0.4 后端 ✅，其余待实施） |
+| **Phase 0 地基** | ✅ **开发完成**：5 个微服务 + 端到端演示 10/10 通过 + docker 组件栈验证；真实环境验收（真 GitLab/飞书/LLM Key）待外部资源 |
 | Phase 1 产品+研发闭环 MVP | ⏳ 未开始 |
 | Phase 2 测试+运维域 | ⏳ 未开始 |
 | Phase 3 自进化 | ⏳ 未开始 |
 
-已可本地运行：审批网关（`platform/services/approval-gateway`，8 测试通过）、GitLab 双向集成桥（`platform/services/gitlab-bridge`，14 测试通过）。
+**已可运行**：审批网关（16 测试）、GitLab 集成桥（14）、任务中心（8）、Agent 运行时（6）、知识库（4），共 48 测试；一键演示：`platform/services/agent-runtime/.venv/bin/python platform/scripts/demo_phase0.py`。
 
 ## 文档导航
 

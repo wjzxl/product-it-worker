@@ -1,24 +1,29 @@
 # platform · 产品研发智能化平台代码仓库
 
 > 自研层只做三件事：**连接（集成胶水）、审批（人审网关）、度量**。重量级能力全部组装成熟组件。
-> 设计文档见仓库根目录 `01`～`06`，本目录是 Phase 0 起实施的代码骨架。
+> 设计文档见仓库根目录 `01`～`06`。当前进度：Phase 0 开发完成，本地端到端演示 10/10 通过。
 
 ## 目录结构
 
 ```
 platform/
-├── docker-compose.yml        # 本地开发环境：PG / Qdrant / n8n / LiteLLM
+├── docker-compose.yml        # 本地开发环境：PG / Qdrant / n8n / LiteLLM（已验证可启动）
 ├── litellm-config.yaml       # LLM 网关配置（强/弱模型分层路由）
-├── contracts/                # 接口合约（与语言无关，先行定义）
+├── contracts/                # 接口合约（与语言无关）
 │   ├── events.md             #   事件总线消息契约
-│   ├── approval-request.schema.json  # 审批请求 JSON Schema
+│   ├── approval-request.schema.json  # 审批请求 JSON Schema（三要素强校验）
 │   └── sop-example.yaml      #   SOP DSL 草案示例（含 G1 Gate）
-└── services/
-    ├── approval-gateway/     # 审批网关（T0.4 后端已完成：状态机+三要素校验+超时策略+事件发布）
-    │   └── app/              #   main/db/models/schemas/router/notifier/policies/events
-    └── gitlab-bridge/        # GitLab 双向集成桥（T0.2：webhook 归一化 + API 客户端 + 事件扇出）
-        └── app/              #   main/client/normalize/events
+├── scripts/
+│   └── demo_phase0.py        # Phase 0 端到端演示（10 项检查，一键运行）
+└── services/                 # 五个微服务（Python 3.9+ / FastAPI）
+    ├── approval-gateway/     # 人审网关：审批状态机 + 三要素校验 + 超时扫描 + 飞书卡片 + Web 审批台
+    ├── gitlab-bridge/        # GitLab 双向集成桥：webhook 归一化 + API 客户端 + 事件扇出
+    ├── task-center/          # 任务中心：状态机 + 时间线 + 平台事件接入（幂等收件箱）
+    ├── agent-runtime/        # Agent 运行时：LangGraph 状态图 + G1 挂起/恢复（T0.7）
+    └── knowledge-base/       # 知识库 v0：分块 → 向量化 → Qdrant → 带来源检索（T0.6）
 ```
+
+各服务测试：approval-gateway 16 · gitlab-bridge 14 · task-center 8 · agent-runtime 6 · knowledge-base 4，共 **48 个测试**。
 
 ## 快速开始
 
@@ -29,55 +34,59 @@ cd platform
 docker compose up -d          # PG(5432) Qdrant(6333) n8n(5678) LiteLLM(4000)
 ```
 
-组件说明：
-- **PostgreSQL**：业务状态（审批、任务）；本地默认库 `platform`，用户/密码见 compose；
-- **Qdrant**：向量库（Phase 0 知识库检索验证）；
-- **n8n**：演示流编排（访问 http://localhost:5678，初始账号见容器日志）；
-- **LiteLLM**：多模型网关（Phase 0 起所有 LLM 调用必须经它，配置见 compose 环境变量）。
+- **PostgreSQL**：业务状态（`platform/platform`）；
+- **Qdrant**：知识库向量存储；
+- **n8n**：http://localhost:5678（Phase 1 起承载流程编排，Phase 0 用 demo 脚本编排）；
+- **LiteLLM**：http://localhost:4000，所有 LLM 调用必经网关（配置见 `litellm-config.yaml`，Key 用环境变量注入不落库）。
 
-### 2. 审批网关
-
-```bash
-cd services/approval-gateway
-python3 -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-uvicorn app.main:app --reload            # http://localhost:8000
-pytest                                    # 运行测试
-```
-
-API 文档：http://localhost:8000/docs
-
-核心端点：
-
-| 方法 | 路径 | 说明 |
-|---|---|---|
-| POST | `/approvals` | 创建工作流发来的审批请求（校验"三要素"齐备） |
-| GET | `/approvals/{id}` | 查看审批请求与决策历史 |
-| POST | `/approvals/{id}/decision` | 人做决策：approve / reject / revise（附意见） |
-| POST | `/callbacks/im/card` | IM 交互卡片回调（卡片按钮 → 决策） |
-| GET | `/health` | 健康检查 |
-
-### 3. GitLab 集成桥
+### 2. 启动服务（各目录均有 README）
 
 ```bash
-cd services/gitlab-bridge
-python3 -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-WEBHOOK_SECRET=xxx GITLAB_TOKEN=yyy uvicorn app.main:app --reload --port 8001
-pytest
+cd services/approval-gateway && source .venv/bin/activate && uvicorn app.main:app --port 8000   # 审批网关 + Web 审批台 http://localhost:8000
+# gitlab-bridge → 8001（README 有 webhook 注册说明）
+# task-center   → 8002
+# agent-runtime → 8003
+# knowledge-base→ 8004
 ```
 
-webhook 注册与事件映射见 [gitlab-bridge/README.md](services/gitlab-bridge/README.md)。
+### 3. 端到端演示（Phase 0 验收，10 项检查）
 
-### 4. 环境变量（审批网关）
+```bash
+cd platform
+services/agent-runtime/.venv/bin/python scripts/demo_phase0.py
+```
 
-| 变量 | 默认 | 说明 |
+自动完成：启动四服务 + GitLab 桩 → 模拟 Issue webhook → 事件扇出建任务 → Agent 起草 PRD →
+G1 挂起 → 人审批准 → 事件回流 → 恢复执行 → 经 GitLab API 建 Issue → 全链路时间线与审计输出。
+真实环境替换：真 GitLab（给 gitlab-bridge 配 `GITLAB_URL/GITLAB_TOKEN`）、真飞书
+（approval-gateway 配 `FEISHU_WEBHOOK_URL/APPROVAL_WEB_BASE_URL`）、真模型（各服务配 `LLM_API_KEY`）。
+
+## 服务间协作方式
+
+```
+GitLab webhook ──> gitlab-bridge ──事件扇出(PUBLISH_TARGETS)──> task-center（任务/时间线）
+                                                                     ▲
+agent-runtime（LangGraph）──发起审批──> approval-gateway ──事件扇出──┘
+     ▲                                        │
+     └──────────── 人审决策后 resume（Phase 1 起由 n8n/Temporal 自动驱动）┘
+knowledge-base ──检索──> agent-runtime（PRD 依据，Phase 0 为占位）
+```
+
+## 环境变量速查
+
+| 变量 | 服务 | 说明 |
 |---|---|---|
-| `DATABASE_URL` | `sqlite:///./approval.db` | 可切 `postgresql+psycopg://...` |
-| `FEISHU_WEBHOOK_URL` | 空 | 配置后启用飞书卡片推送；为空时用日志桩 |
+| `DATABASE_URL` | approval/task-center | 默认 SQLite，生产切 PG |
+| `PUBLISH_TARGETS` | bridge/approval | 事件扇出目标（逗号分隔，指向 task-center `/events`） |
+| `WEBHOOK_SECRET` / `GITLAB_URL` / `GITLAB_TOKEN` | gitlab-bridge | webhook 校验与 API 认证 |
+| `FEISHU_WEBHOOK_URL` / `APPROVAL_WEB_BASE_URL` | approval-gateway | 飞书卡片推送与审批台跳转 |
+| `SWEEP_INTERVAL_SECONDS` | approval-gateway | 超时扫描周期（0=关闭；或 POST /admin/sweep） |
+| `LLM_API_KEY` / `LLM_BASE_URL` / `LLM_MODEL` | agent-runtime/knowledge-base | 为空时用离线桩，配置后走 LiteLLM |
+| `QDRANT_URL` / `KB_COLLECTION` | knowledge-base | Qdrant 地址与 collection |
 
 ## 与整体方案的关系
 
 - 审批请求模型对齐 [03-人机协作与治理](../../03-人机协作与治理.md) §3.1；
 - 任务状态机对齐 [02-核心SOP流程设计](../../02-核心SOP流程设计.md) §0；
-- 事件契约见 `contracts/events.md`，是集成胶水（T0.2）的实现依据。
+- 事件契约见 `contracts/events.md`；
+- 实施进度见 [06-Phase0实施任务清单](../../06-Phase0实施任务清单.md) §7。

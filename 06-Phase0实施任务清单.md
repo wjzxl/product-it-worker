@@ -83,12 +83,18 @@
 
 | # | 任务 | 状态 |
 |---|---|---|
-| T0.1 | 仓库脚手架与本地开发环境 | ✅ 完成（compose 已就绪，待实际拉镜像验证） |
-| T0.2 | GitLab 双向集成适配器 | ✅ 完成（`platform/services/gitlab-bridge`，webhook 归一化 + API 客户端，14 测试通过） |
-| T0.3 | LLM 网关接入与观测 | ⏳ 未开始 |
-| T0.4 | 审批网关 v0 | 🔨 后端完成（8 测试通过，事件发布已接通）；待：飞书卡片真接、超时定时器、Web 审批台前端 |
-| T0.5 | 任务中心骨架 | ⏳ 未开始 |
-| T0.6 | 知识库 v0 | ⏳ 未开始 |
-| T0.7 | Agent 运行时最小验证 | ⏳ 未开始 |
-| T0.8 | 演示流串接 | ⏳ 未开始 |
-| T0.9 | 验收与演示 | ⏳ 未开始 |
+| T0.1 | 仓库脚手架与本地开发环境 | ✅ 完成（compose 已验证：PG/Qdrant/n8n/LiteLLM 全部启动健康） |
+| T0.2 | GitLab 双向集成适配器 | ✅ 完成（`services/gitlab-bridge`，14 测试；webhook 归一化 + API 客户端 + 事件扇出） |
+| T0.3 | LLM 网关接入与观测 | 🔨 代码就绪（LiteLLM 容器健康、各服务 LLM 客户端/网关配置完成）；**待用户 LLM Key + Langfuse Cloud 配置后做真实调用验证** |
+| T0.4 | 审批网关 v0 | ✅ 完成（16 测试：状态机/三要素/超时扫描/L3 强制拒绝/飞书卡片/Web 审批台/事件发布）；真实飞书推送待配 `FEISHU_WEBHOOK_URL` |
+| T0.5 | 任务中心骨架 | ✅ 完成（`services/task-center`，8 测试：状态机/时间线/幂等收件箱/审批联动） |
+| T0.6 | 知识库 v0 | ✅ 完成（`services/knowledge-base`，4 测试 + 真实 Qdrant 冒烟通过；选型收敛为 Qdrant+LiteLLM，RAGFlow 留作 Phase 1 升级） |
+| T0.7 | Agent 运行时最小验证 | ✅ 完成（`services/agent-runtime`，6 测试：LangGraph G1 挂起/恢复/退回修订/否决） |
+| T0.8 | 演示流串接 | ✅ 完成（`scripts/demo_phase0.py`，端到端 10/10 通过） |
+| T0.9 | 验收与演示 | 🔨 本地验收通过（10 项检查含全链路时间线/审批审计）；**真实环境验收待外部资源**：真实 GitLab 测试仓库、飞书机器人 webhook、LLM Key |
+
+### 待用户提供的外部资源（完成 T0.9 真实环境验收）
+
+1. **GitLab**：sandbox 测试仓库 + 项目 Token（`api` 权限），把 gitlab-bridge 的 webhook 注册上去；
+2. **飞书**：测试群自定义机器人 webhook（用于真实卡片推送）；
+3. **LLM**：LiteLLM 网关环境变量 `OPENAI_API_KEY`/`ANTHROPIC_API_KEY`（或任一供应商 Key）+ Langfuse Cloud 密钥（观测验收）。

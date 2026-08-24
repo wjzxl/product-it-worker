@@ -143,6 +143,7 @@ def decide(
             "approval.decided",
             {
                 "approval_id": req.id,
+                "task_ref": req.task_ref,
                 "decision": decision.decision,
                 "decided_by": decision.decided_by,
                 "comment": decision.comment,
@@ -222,6 +223,7 @@ async def im_card_callback(payload: ImCardCallback, request: Request, db: Sessio
             "approval.decided",
             {
                 "approval_id": req.id,
+                "task_ref": req.task_ref,
                 "decision": decision.decision,
                 "decided_by": decision.decided_by,
                 "comment": decision.comment,
@@ -235,3 +237,12 @@ async def im_card_callback(payload: ImCardCallback, request: Request, db: Sessio
         "approval.decided(im) id=%s decision=%s by=%s", req.id, decision.decision, decision.decided_by
     )
     return decision
+
+
+@router.post("/admin/sweep")
+def admin_sweep(db: Session = Depends(get_db)) -> dict:
+    """手动触发超时扫描（等价于 python -m app.sweep）。"""
+    from .sweeper import sweep
+
+    handled = sweep(db)
+    return {"handled": len(handled), "items": handled}

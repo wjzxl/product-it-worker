@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>平台审批台</title>
+  <style>
+    :root { --bg:#f5f6f8; --card:#fff; --border:#e3e5e8; --primary:#2f6fed; --danger:#d54941; --warn:#e6a23c; --text:#1f2329; --muted:#8a919f; }
+    * { box-sizing: border-box; margin: 0; }
+    body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); }
+    header { background: var(--card); border-bottom: 1px solid var(--border); padding: 14px 24px; display: flex; align-items: center; gap: 12px; }
+    header h1 { font-size: 18px; }
+    .badge { background: var(--primary); color: #fff; border-radius: 10px; padding: 2px 10px; font-size: 12px; }
+    main { max-width: 1080px; margin: 24px auto; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 0 16px; }
+    .panel { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+    .panel h2 { font-size: 15px; margin-bottom: 12px; }
+    .row { padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 8px; cursor: pointer; }
+    .row:hover { border-color: var(--primary); }
+    .row.active { border-color: var(--primary); background: #f0f5ff; }
+    .row .stage { font-weight: 600; font-size: 14px; }
+    .row .meta { color: var(--muted); font-size: 12px; margin-top: 4px; }
+    .field { margin-bottom: 12px; }
+    .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+    .field pre { white-space: pre-wrap; font-size: 13px; background: #f7f8fa; padding: 10px; border-radius: 6px; font-family: inherit; }
+    .actions { display: flex; gap: 10px; margin-top: 8px; }
+    button { padding: 8px 16px; border-radius: 6px; border: 1px solid var(--border); background: #fff; cursor: pointer; font-size: 14px; }
+    button.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+    button.warn { background: var(--warn); color: #fff; border-color: var(--warn); }
+    button.danger { background: var(--danger); color: #fff; border-color: var(--danger); }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .empty { color: var(--muted); text-align: center; padding: 30px 0; }
+    #toast { position: fixed; top: 16px; right: 16px; background: #30353d; color: #fff; padding: 10px 16px; border-radius: 6px; display: none; }
+  </style>
+</head>
+<body>
+  <header><h1>平台审批台</h1><span class="badge">Phase 0</span><span id="version" style="color:var(--muted);font-size:12px"></span></header>
+  <main>
+    <section class="panel">
+      <h2>待审批（<span id="count">0</span>）</h2>
+      <div id="list"><div class="empty">加载中…</div></div>
+    </section>
+    <section class="panel">
+      <h2>审批详情</h2>
+      <div id="detail"><div class="empty">点击左侧审批单查看</div></div>
+    </section>
+  </main>
+  <div id="toast"></div>
+  <script>
+    const API = "";
+    let current = null;
+
+    function toast(msg) {
+      const t = document.getElementById("toast");
+      t.textContent = msg; t.style.display = "block";
+      setTimeout(() => t.style.display = "none", 2500);
+    }
+
+    async function loadList(selectId) {
+      const res = await fetch(API + "/approvals?status=pending");
+      const items = await res.json();
+      document.getElementById("count").textContent = items.length;
+      const list = document.getElementById("list");
+      if (!items.length) { list.innerHTML = '<div class="empty">暂无待审批事项 🎉</div>'; return; }
+      list.innerHTML = items.map(a => `
+        <div class="row ${selectId === a.id ? 'active' : ''}" onclick="openDetail('${a.id}')">
+          <div class="stage">${a.stage} <span style="color:var(--muted);font-weight:400">#${a.id}</span></div>
+          <div class="meta">风险：${a.context_snapshot.risk.level}（${a.context_snapshot.risk.score}分）· 截止 ${new Date(a.deadline).toLocaleString()}</div>
+        </div>`).join("");
+      if (selectId) openDetail(selectId);
+    }
+
+    async function openDetail(id) {
+      const res = await fetch(API + "/approvals/" + id);
+      if (!res.ok) { toast("审批单不存在或已处理"); return; }
+      current = await res.json();
+      document.querySelectorAll(".row").forEach(r => r.classList.remove("active"));
+      document.querySelectorAll(".row").forEach(r => { if (r.onclick.toString().includes(id)) r.classList.add("active"); });
+      const ctx = current.context_snapshot;
+      document.getElementById("detail").innerHTML = `
+        <div class="field"><label>阶段 / 发起者</label><pre>${current.stage} · ${current.requester} · v${current.version}</pre></div>
+        <div class="field"><label>① 做了什么</label><pre>${ctx.diff_summary}</pre></div>
+        <div class="field"><label>② 依据</label><pre>${(ctx.evidence || []).join("\n")}</pre></div>
+        <div class="field"><label>③ 风险自评</label><pre>${ctx.risk.level}（${ctx.risk.score} 分）${(ctx.risk.factors || []).join("，")}</pre></div>
+        ${ctx.self_review ? `<div class="field"><label>AI 自审</label><pre>${ctx.self_review}</pre></div>` : ""}
+        <div class="field"><label>产物</label><pre>${ctx.artifact_ref}</pre></div>
+        <div class="actions">
+          <button class="primary" onclick="decide('approve')">批准</button>
+          <button class="warn" onclick="decideWithComment('revise')">退回修订</button>
+          <button class="danger" onclick="decideWithComment('reject')">拒绝</button>
+        </div>`;
+    }
+
+    async function decideWithComment(action) {
+      const comment = prompt(action === "revise" ? "退回原因（必填，将进入反馈闭环）：" : "拒绝原因（必填，将进入反馈闭环）：");
+      if (comment === null) return;
+      decide(action, comment);
+    }
+
+    async function decide(action, comment = "") {
+      if (!current) return;
+      if ((action === "revise" || action === "reject") && !comment.trim()) { toast("必须填写原因"); return; }
+      const res = await fetch(API + `/approvals/${current.id}/decision`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ decision: action, decided_by: prompt("您的姓名/账号（留痕）：") || "审批人", comment })
+      });
+      if (res.ok) { toast("已提交 ✓"); current = null; loadList(); }
+      else { const err = await res.json().catch(() => ({})); toast("操作失败：" + (err.detail || res.status)); }
+    }
+
+    fetch(API + "/health").then(r => r.json()).then(h => document.getElementById("version").textContent = "v" + h.version).catch(() => {});
+    const params = new URLSearchParams(location.search);
+    loadList(params.get("approval_id"));
+  </script>
+</body>
+</html>

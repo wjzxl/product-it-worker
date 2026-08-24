@@ -1,9 +1,20 @@
-"""通知适配器：IM 卡片推送。Phase 0 提供日志桩，配好 FEISHU_WEBHOOK_URL 即启用飞书。"""
+"""通知适配器：IM 审批卡片推送。
+
+Phase 0 通道策略：
+- LogNotifier：默认桩，本地开发跑通全流程；
+- FeishuNotifier：飞书自定义机器人 webhook 真实推送（interactive 卡片）。
+  自定义机器人只能"推送"，按钮回调需要正式应用（callback 模式）；
+  Phase 0 采用 URL 模式：卡片按钮跳转 Web 审批台（APPROVAL_WEB_BASE_URL）。
+"""
+from __future__ import annotations
+
 import json
 import logging
 import os
 from abc import ABC, abstractmethod
 from typing import Any
+
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -11,14 +22,12 @@ logger = logging.getLogger(__name__)
 class Notifier(ABC):
     @abstractmethod
     def send(self, approval: Any) -> str:
-        """推送审批卡片，返回外部消息 ID（用于回调关联）。"""
+        """推送审批卡片，返回消息 ID（失败返回空串，不阻断审批主流程）。"""
 
 
 class LogNotifier(Notifier):
-    """默认桩：把卡片内容打到日志，保证本地开发可跑通全流程。"""
-
     def send(self, approval: Any) -> str:
-        card = build_card(approval)
+        card = build_card(approval, os.getenv("APPROVAL_WEB_BASE_URL", ""))
         logger.info(
             "[LogNotifier] 审批卡片(未配置真实 IM)：approval_id=%s\n%s",
             approval.id,
@@ -28,61 +37,75 @@ class LogNotifier(Notifier):
 
 
 class FeishuNotifier(Notifier):
-    """飞书交互卡片（接口位）。
+    """飞书自定义机器人（webhook 推送）。"""
 
-    TODO(T0.4): 实现飞书卡片 JSON 构造与回调绑定——
-      1. 使用测试群自定义机器人 webhook 起步；
-      2. 卡片按钮回调指向平台 /callbacks/im/card；
-      3. 回调签名校验（timestamp + sign）防伪造。
-    """
-
-    def __init__(self, webhook_url: str):
+    def __init__(self, webhook_url: str, client: httpx.Client | None = None):
         self.webhook_url = webhook_url
+        self._client = client
 
     def send(self, approval: Any) -> str:
-        import httpx
+        card = build_card(approval, os.getenv("APPROVAL_WEB_BASE_URL", ""))
+        try:
+            client = self._client or httpx.Client(timeout=10)
+            resp = client.post(self.webhook_url, json={"msg_type": "interactive", "card": card})
+            resp.raise_for_status()
+            return approval.id
+        except httpx.HTTPError as exc:
+            logger.error("[FeishuNotifier] 推送失败 approval=%s: %s", approval.id, exc)
+            return ""
 
-        card = build_card(approval)
-        resp = httpx.post(self.webhook_url, json={"msg_type": "interactive", "card": card}, timeout=10)
-        resp.raise_for_status()
-        return approval.id
 
-
-def build_card(approval: Any) -> dict:
-    """审批卡片内容（对齐 03 §3.2：摘要 + 三按钮）。"""
+def build_card(approval: Any, web_base_url: str = "") -> dict:
+    """构造飞书 interactive 卡片（对齐 03 §3.2：摘要 + 三要素 + 处理入口）。"""
     ctx = approval.context_snapshot or {}
-    risk = ctx.get("risk", {})
-    return {
-        "header": {"title": f"[待审批] {approval.stage}", "template": "red"},
-        "elements": [
-            {"tag": "div", "text": {"content": f"**做什么**\n{ctx.get('diff_summary', '')}"}},
-            {
-                "tag": "div",
-                "text": {
-                    "content": "\n".join(
-                        [f"**依据**"] + [f"- {e}" for e in ctx.get("evidence", [])]
-                    )
-                },
+    risk = ctx.get("risk") or {}
+    factors = "、".join(risk.get("factors") or [])
+
+    elements: list[dict] = [
+        {"tag": "div", "text": {"tag": "lark_md", "content": f"**做什么**\n{ctx.get('diff_summary', '')}"}},
+        {
+            "tag": "div",
+            "text": {
+                "tag": "lark_md",
+                "content": "**依据**\n" + "\n".join(f"- {e}" for e in ctx.get("evidence", [])),
             },
-            {
-                "tag": "div",
-                "text": {
-                    "content": (
-                        f"**风险自评**：{risk.get('level', '?')}（{risk.get('score', '?')} 分）"
-                        f"{' | ' + '、'.join(risk.get('factors', [])) if risk.get('factors') else ''}"
-                    )
-                },
+        },
+        {
+            "tag": "div",
+            "text": {
+                "tag": "lark_md",
+                "content": f"**风险自评**：{risk.get('level', '?')}（{risk.get('score', '?')} 分）"
+                + (f"，{factors}" if factors else ""),
             },
-            {"tag": "hr"},
+        },
+        {
+            "tag": "note",
+            "elements": [
+                {"tag": "plain_text", "content": f"审批单 {approval.id} · 截止 {approval.deadline.isoformat()}"}
+            ],
+        },
+    ]
+    if web_base_url:
+        elements.append(
             {
                 "tag": "action",
                 "actions": [
-                    {"tag": "button", "text": {"content": "批准"}, "type": "primary", "value": {"action": "approve"}},
-                    {"tag": "button", "text": {"content": "退回"}, "type": "default", "value": {"action": "revise"}},
-                    {"tag": "button", "text": {"content": "拒绝"}, "type": "danger", "value": {"action": "reject"}},
+                    {
+                        "tag": "button",
+                        "text": {"tag": "plain_text", "content": "去审批台处理"},
+                        "type": "primary",
+                        "url": f"{web_base_url.rstrip('/')}/?approval_id={approval.id}",
+                    }
                 ],
-            },
-        ],
+            }
+        )
+    return {
+        "config": {"wide_screen_mode": True},
+        "header": {
+            "title": {"tag": "plain_text", "content": f"[待审批] {approval.stage}"},
+            "template": "red",
+        },
+        "elements": elements,
     }
 
 
