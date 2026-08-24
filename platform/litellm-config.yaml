@@ -15,6 +15,11 @@ model_list:
     litellm_params:
       model: claude-sonnet-4
       api_key: os.environ/ANTHROPIC_API_KEY
+  # DeepSeek（OpenAI 兼容，https://api.deepseek.com）
+  - model_name: deepseek-chat
+    litellm_params:
+      model: deepseek/deepseek-chat
+      api_key: os.environ/DEEPSEEK_API_KEY
 
   # Mock 模型：真实 Key 未就绪时验证网关全链路（后端 = scripts/mock_llm_server.py）
   # 使用方式：python3 platform/scripts/mock_llm_server.py 后，网关内即可调用 mock-gpt / mock-embed

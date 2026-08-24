@@ -43,6 +43,8 @@ PORTS = {
 STUB_PORT = 8099
 WEBHOOK_SECRET = "s3cret-demo"
 TMP = tempfile.mkdtemp(prefix="phase0-demo-")
+# 真实 GitLab 模式下的目标项目路径（组/项目），可用环境变量覆盖
+DEMO_PROJECT = os.getenv("DEMO_PROJECT", "sandbox/prodesgin")
 
 results: list[str] = []
 procs: list[subprocess.Popen] = []
@@ -197,7 +199,7 @@ def main(gateway: bool = False, pg: bool = False, real_gitlab: bool = False) -> 
         headers={"X-Gitlab-Token": WEBHOOK_SECRET, "X-Gitlab-Event-UUID": f"demo-uuid-{iid}"},
         json={
             "object_kind": "issue",
-            "project": {"id": 42, "path_with_namespace": "sandbox/prodesgin"},
+            "project": {"id": 42, "path_with_namespace": DEMO_PROJECT},
             "object_attributes": {
                 "iid": iid, "title": "报表导出功能",
                 "description": "用户想要导出报表，支持按日期筛选", "state": "opened",
@@ -230,7 +232,7 @@ def main(gateway: bool = False, pg: bool = False, real_gitlab: bool = False) -> 
         f"http://127.0.0.1:{PORTS['agent-runtime']}/runs",
         json={
             "requirement_text": "用户想要一个可以导出报表的功能，支持按日期筛选",
-            "title": "报表导出功能", "task_ref": ref, "project_id": "sandbox/prodesgin",
+            "title": "报表导出功能", "task_ref": ref, "project_id": DEMO_PROJECT,
         },
         timeout=30,
     )

@@ -67,6 +67,23 @@ G1 挂起 → 人审批准 → 事件回流 → 恢复执行 → 建 Issue → �
 `--gateway` 使 LLM 调用走 LiteLLM 网关（默认 mock-gpt，配真实 Key 后改 `DEMO_LLM_MODEL` 即可切换真实模型）。
 `--pg` 使审批/任务中心落 PostgreSQL，可在 pgAdmin/psql 中直接查看审计数据。
 
+## 真实 GitLab 接入指南（T0.9 真实环境验收）
+
+1. **建 sandbox 仓库**：在你的 GitLab（gitlab.com 或自建实例）创建组 `sandbox` 和空项目（如 `sandbox/prodesgin-demo`）；
+2. **取 Token**：项目 → Settings → Access Tokens → 名称随意、Role 选 Maintainer、Scope 勾选 **api**、有效期建议 30 天 → Create → 复制 `glpat-...`（只显示一次）；
+3. **注册 webhook**：项目 → Settings → Webhooks → URL 填 `http://<GitLab 可达的平台地址>:8001/webhooks/gitlab`、Secret token 填你自定的 `WEBHOOK_SECRET`、勾选 Issues/Merge requests/Pipelines。
+   ⚠️ gitlab.com（云）访问不到你本机 localhost，需 ngrok 等内网穿透（`ngrok http 8001`）或把平台部署到云服务器；内网自建 GitLab 直接填内网 IP；
+4. **跑验收演示**：
+   ```bash
+   export GITLAB_URL="https://gitlab.com"        # 自建则填实例地址
+   export GITLAB_TOKEN="glpat-..."                # 第 2 步的 token
+   export WEBHOOK_SECRET="你自定的随机串"
+   export DEMO_PROJECT="sandbox/prodesgin-demo"   # 你的项目路径（组/项目）
+   cd platform
+   services/agent-runtime/.venv/bin/python scripts/demo_phase0.py --gateway --pg --real-gitlab
+   ```
+   Token 只放 shell 环境变量，不入库、不入 git。
+
 ## 服务间协作方式
 
 ```

@@ -47,6 +47,7 @@ services:
       # 在 litellm/config.yaml 或环境变量中配置各供应商 Key，仓库不落 Key
       - OPENAI_API_KEY=${OPENAI_API_KEY:-sk-placeholder}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-sk-ant-placeholder}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-litellm-master}
       # Langfuse 观测（自托管见 docker-compose.observability.yml 与 scripts/setup_langfuse_demo.py）
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
