@@ -1,0 +1,57 @@
+# SOP DSL 草案示例（Phase 0 仅作契约，实现于 T0.5/T0.7）
+#
+# 对齐 02-核心SOP流程设计.md 的产品域 SOP 与 G1 Gate。
+# 引擎负责：步骤调度、状态持久化、Gate 挂起/恢复、超时升级。
+# Agent 步骤只声明"角色 + 动作 + 输入输出"，不写具体 prompt（prompt 属知识层，版本化管理）。
+
+sop: product-domain/prd-flow
+version: "0.1"
+description: 产品域：想法 → 可执行 Issue（含 G1 需求评审）
+
+trigger:
+  on: chat.intake
+  params:
+    requirement_text: string        # 来自聊天入口的原始需求
+
+steps:
+  - id: clarify
+    agent: product
+    action: clarify_requirement     # 多轮澄清，收敛需求（上限 2 轮）
+    tool:
+      - knowledge_search            # 检索历史需求/竞品知识库
+    outputs: [structured_requirement]
+
+  - id: draft_prd
+    agent: product
+    action: draft_prd               # 起草 PRD：用户故事 + EARS 验收标准
+    inputs: [clarify.outputs.structured_requirement]
+    outputs: [prd_doc]
+    quality_gate:
+      - check: ears_complete        # 验收标准必须 EARS 化且可测
+      - check: evidence_linked      # 每条关键主张必须有来源链接
+
+  - id: g1
+    type: gate
+    gate: G1_REQUIREMENT_REVIEW
+    after: draft_prd
+    approver_role: product_owner    # 决策者：产品负责人
+    context:
+      required: [diff_summary, evidence, risk]   # 三要素强制
+      artifact_ref: draft_prd.outputs.prd_doc
+    trust:
+      default_level: L2             # 小需求可降 L1（Phase 2 风险分计算后自动判定）
+    escalation:
+      remind_after_hours: 24
+      escalate_to: team_lead
+      timeout_action: reject        # 默认拒绝，绝不静默放行
+
+  - id: create_issues
+    agent: product
+    action: create_gitlab_issues    # 拆解 Epic/Issue 写入 GitLab，注册验收标准
+    inputs: [draft_prd.outputs.prd_doc, g1.decision]
+    outputs: [epic_ref, issue_refs]
+
+# 决策回流：g1.decision = approve | reject | revise
+# - approve → 继续 create_issues
+# - revise  → 回退 draft_prd，携带人审意见重新起草（重进 g1）
+# - reject  → 任务关闭，原因结构化入反馈闭环库

@@ -1,1 +1,18 @@
 .DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# 本地数据与密钥（严禁入库）
+*.db
+.env
+*.local
+
+# Node（未来 Web 控制台）
+node_modules/
+dist/

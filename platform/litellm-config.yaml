@@ -1,0 +1,28 @@
+# LiteLLM 网关配置（Phase 0 最小版）
+# 完整配置见 https://docs.litellm.ai/docs/proxy/configs
+model_list:
+  # 强模型：方案起草 / 审查 / 编码
+  - model_name: gpt-4o
+    litellm_params:
+      model: gpt-4o
+      api_key: os.environ/OPENAI_API_KEY
+  # 便宜模型：摘要 / 分类 / 琐碎步骤
+  - model_name: gpt-4o-mini
+    litellm_params:
+      model: gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: claude-sonnet-4
+    litellm_params:
+      model: claude-sonnet-4
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+# 成本与预算（Phase 0 起步）
+litellm_settings:
+  request_timeout: 120
+  set_verbose: false
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  # 每模型月度预算（美元），超限熔断降级
+  # budget_duration: 30d
+  # max_budget: 100

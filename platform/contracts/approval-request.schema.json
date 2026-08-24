@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://prodesgin.local/contracts/approval-request.schema.json",
+  "title": "ApprovalRequest",
+  "description": "统一审批请求模型，对齐设计文档 03 §3.1。三要素（done/evidence/risk）缺一不可。",
+  "type": "object",
+  "required": [
+    "type",
+    "stage",
+    "requester",
+    "context_snapshot",
+    "options",
+    "deadline",
+    "escalation_policy"
+  ],
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": [
+        "GATE_REQUIREMENT_REVIEW",
+        "GATE_TECH_DESIGN_REVIEW",
+        "GATE_PR_REVIEW",
+        "GATE_RELEASE_DECISION",
+        "GATE_CHANGE_APPROVAL",
+        "GATE_POSTMORTEM_REVIEW"
+      ]
+    },
+    "stage": { "type": "string", "description": "流程位置，如 研发域 G3" },
+    "requester": { "type": "string", "description": "发起者，如 研发Agent@issue-1234" },
+    "task_ref": { "type": "string", "description": "关联任务引用（GitLab Issue 等）" },
+    "context_snapshot": {
+      "type": "object",
+      "description": "决策上下文快照：审批人看到的一致视图，创建后不可变",
+      "required": ["artifact_ref", "diff_summary", "evidence", "risk"],
+      "properties": {
+        "artifact_ref": { "type": "string", "description": "待审产物引用，如 MR !45 / PRD v3" },
+        "diff_summary": { "type": "string", "description": "三要素① 做了什么：30 秒可读懂的变更摘要" },
+        "evidence": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "description": "三要素② 依据：PRD/代码/数据来源链接"
+        },
+        "risk": {
+          "type": "object",
+          "description": "三要素③ 风险自评",
+          "required": ["score", "level", "factors"],
+          "properties": {
+            "score": { "type": "integer", "minimum": 0, "maximum": 100 },
+            "level": { "type": "string", "enum": ["L1", "L2", "L3"] },
+            "factors": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "如 [影响面:预发, 不可逆:可回滚]"
+            }
+          }
+        },
+        "self_review": { "type": "string", "description": "AI 自审结论与未尽事项" }
+      }
+    },
+    "options": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["approve", "reject", "revise"] },
+      "minItems": 1
+    },
+    "deadline": { "type": "string", "format": "date-time" },
+    "escalation_policy": {
+      "type": "object",
+      "required": ["remind_after_hours", "escalate_to", "timeout_action"],
+      "properties": {
+        "remind_after_hours": { "type": "number", "minimum": 0 },
+        "escalate_to": { "type": "string", "description": "升级对象（角色或人）" },
+        "timeout_action": { "type": "string", "enum": ["reject", "auto_approve_l1_only"] }
+      }
+    }
+  }
+}

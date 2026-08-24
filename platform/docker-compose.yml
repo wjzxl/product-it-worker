@@ -1,0 +1,64 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: platform-pg
+    environment:
+      POSTGRES_USER: platform
+      POSTGRES_PASSWORD: platform
+      POSTGRES_DB: platform
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U platform"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: platform-qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: platform-n8n
+    ports:
+      - "5678:5678"
+    environment:
+      - GENERIC_TIMEZONE=Asia/Shanghai
+      - TZ=Asia/Shanghai
+      - N8N_SECURE_COOKIE=false
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+  # LLM 网关：所有 LLM 调用必须经此（多模型路由/降级/成本计量）
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: platform-litellm
+    ports:
+      - "4000:4000"
+    environment:
+      # 在 litellm/config.yaml 或环境变量中配置各供应商 Key，仓库不落 Key
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-sk-placeholder}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-sk-ant-placeholder}
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-litellm-master}
+    volumes:
+      - ./litellm-config.yaml:/app/config.yaml:ro
+    command: ["--config", "/app/config.yaml"]
+
+  # Langfuse v3 自托管依赖 ClickHouse，较重；Phase 0 建议先用 Cloud 免费版：
+  # 去掉下方注释并按官方 compose 补全 clickhouse 即可自托管。
+  # langfuse:
+  #   image: langfuse/langfuse:3
+  #   ...
+
+volumes:
+  pg_data:
+  qdrant_data:
+  n8n_data:
