@@ -16,6 +16,19 @@ model_list:
       model: claude-sonnet-4
       api_key: os.environ/ANTHROPIC_API_KEY
 
+  # Mock 模型：真实 Key 未就绪时验证网关全链路（后端 = scripts/mock_llm_server.py）
+  # 使用方式：python3 platform/scripts/mock_llm_server.py 后，网关内即可调用 mock-gpt / mock-embed
+  - model_name: mock-gpt
+    litellm_params:
+      model: openai/mock-gpt
+      api_base: http://host.docker.internal:8098/v1
+      api_key: mock-key
+  - model_name: mock-embed
+    litellm_params:
+      model: openai/mock-embed
+      api_base: http://host.docker.internal:8098/v1
+      api_key: mock-key
+
 # 成本与预算（Phase 0 起步）
 litellm_settings:
   request_timeout: 120

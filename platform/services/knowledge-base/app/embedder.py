@@ -8,7 +8,7 @@ import httpx
 
 
 class LiteLLMEmbedder:
-    """OpenAI 兼容 /embeddings（目标：LiteLLM 网关）。"""
+    """OpenAI 兼容 /embeddings（目标：LiteLLM 网关）。维度由 EMBEDDING_DIM 指定。"""
 
     def __init__(
         self,
@@ -20,6 +20,7 @@ class LiteLLMEmbedder:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.model = model
+        self.dim = int(os.getenv("EMBEDDING_DIM", "1536"))
         self._client = httpx.Client(timeout=60, transport=transport)
 
     def embed(self, texts: list[str]) -> list[list[float]]:

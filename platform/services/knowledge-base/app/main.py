@@ -41,11 +41,12 @@ def create_app(store=None, embedder=None) -> FastAPI:
     if store is None:
         qdrant_url = os.getenv("QDRANT_URL", "http://localhost:6333")
         collection = os.getenv("KB_COLLECTION", "platform_kb")
+        dim = getattr(embedder, "dim", 1536)
         try:
-            store = QdrantStore(qdrant_url, collection, dim=getattr(embedder, "dim", 1536))
+            store = QdrantStore(qdrant_url, collection, dim=dim)
         except Exception as exc:  # Qdrant 不可达 → 降级内存桩，保证离线可跑
             logging.getLogger(__name__).warning("Qdrant 不可达，降级内存桩: %s", exc)
-            store = MemoryStore(dim=getattr(embedder, "dim", 1536))
+            store = MemoryStore(dim=dim)
 
     app = FastAPI(
         title="knowledge-base",

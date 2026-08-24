@@ -23,7 +23,7 @@ platform/
     └── knowledge-base/       # 知识库 v0：分块 → 向量化 → Qdrant → 带来源检索（T0.6）
 ```
 
-各服务测试：approval-gateway 16 · gitlab-bridge 14 · task-center 8 · agent-runtime 6 · knowledge-base 4，共 **48 个测试**。
+各服务测试：approval-gateway 16 · gitlab-bridge 14 · task-center 8 · agent-runtime 6 · knowledge-base 4，共 **48 个测试**；推送后由 [.github/workflows/ci.yml](../.github/workflows/ci.yml) 自动回归（Python 3.9 矩阵）。
 
 ## 快速开始
 
@@ -53,13 +53,17 @@ cd services/approval-gateway && source .venv/bin/activate && uvicorn app.main:ap
 
 ```bash
 cd platform
-services/agent-runtime/.venv/bin/python scripts/demo_phase0.py
+services/agent-runtime/.venv/bin/python scripts/demo_phase0.py              # 基础模式（离线桩）
+python3 scripts/mock_llm_server.py &                                        # （可选）mock 模型后端
+services/agent-runtime/.venv/bin/python scripts/demo_phase0.py --gateway --pg   # 真实 LiteLLM 网关 + PostgreSQL
+GITLAB_URL=... GITLAB_TOKEN=... WEBHOOK_SECRET=... \
+  services/agent-runtime/.venv/bin/python scripts/demo_phase0.py --gateway --pg --real-gitlab   # 接入真实 GitLab
 ```
 
-自动完成：启动四服务 + GitLab 桩 → 模拟 Issue webhook → 事件扇出建任务 → Agent 起草 PRD →
-G1 挂起 → 人审批准 → 事件回流 → 恢复执行 → 经 GitLab API 建 Issue → 全链路时间线与审计输出。
-真实环境替换：真 GitLab（给 gitlab-bridge 配 `GITLAB_URL/GITLAB_TOKEN`）、真飞书
-（approval-gateway 配 `FEISHU_WEBHOOK_URL/APPROVAL_WEB_BASE_URL`）、真模型（各服务配 `LLM_API_KEY`）。
+自动完成：启动四服务（+GitLab 桩）→ 模拟 Issue webhook → 事件扇出建任务 → Agent 起草 PRD →
+G1 挂起 → 人审批准 → 事件回流 → 恢复执行 → 建 Issue → 全链路时间线与审计输出。
+`--gateway` 使 LLM 调用走 LiteLLM 网关（默认 mock-gpt，配真实 Key 后改 `DEMO_LLM_MODEL` 即可切换真实模型）。
+`--pg` 使审批/任务中心落 PostgreSQL，可在 pgAdmin/psql 中直接查看审计数据。
 
 ## 服务间协作方式
 

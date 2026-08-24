@@ -17,8 +17,10 @@
 """
 from __future__ import annotations
 
+import argparse
 import json
 import os
+import random
 import subprocess
 import sys
 import tempfile
@@ -89,9 +91,12 @@ def service_python(name: str) -> str:
     return venv if os.path.exists(venv) else sys.executable
 
 
-def start_services() -> None:
+PG_URL = "postgresql+psycopg://platform:platform@127.0.0.1:5432/platform"
+
+
+def start_services(gateway: bool = False, pg: bool = False, real_gitlab: bool = False) -> None:
     env = dict(os.environ)
-    env["DATABASE_URL"] = f"sqlite:///{TMP}/approval.db"
+    env["DATABASE_URL"] = PG_URL if pg else f"sqlite:///{TMP}/approval.db"
     env["PUBLISH_TARGETS"] = f"http://127.0.0.1:{PORTS['task-center']}/events"
     procs.append(subprocess.Popen(
         [service_python("approval-gateway"), "-m", "uvicorn", "app.main:app", "--port", str(PORTS["approval-gateway"])],
@@ -100,7 +105,7 @@ def start_services() -> None:
     ))
 
     env = dict(os.environ)
-    env["DATABASE_URL"] = f"sqlite:///{TMP}/taskcenter.db"
+    env["DATABASE_URL"] = PG_URL if pg else f"sqlite:///{TMP}/taskcenter.db"
     procs.append(subprocess.Popen(
         [service_python("task-center"), "-m", "uvicorn", "app.main:app", "--port", str(PORTS["task-center"])],
         cwd=os.path.join(SERVICES, "task-center"), env=env,
@@ -108,12 +113,19 @@ def start_services() -> None:
     ))
 
     env = dict(os.environ)
-    env.update({
-        "WEBHOOK_SECRET": WEBHOOK_SECRET,
-        "GITLAB_URL": f"http://127.0.0.1:{STUB_PORT}",
-        "GITLAB_TOKEN": "demo-token",
-        "PUBLISH_TARGETS": f"http://127.0.0.1:{PORTS['task-center']}/events",
-    })
+    if real_gitlab:
+        env.update({
+            "WEBHOOK_SECRET": os.getenv("WEBHOOK_SECRET", WEBHOOK_SECRET),
+            "GITLAB_URL": os.getenv("GITLAB_URL", ""),
+            "GITLAB_TOKEN": os.getenv("GITLAB_TOKEN", ""),
+        })
+    else:
+        env.update({
+            "WEBHOOK_SECRET": WEBHOOK_SECRET,
+            "GITLAB_URL": f"http://127.0.0.1:{STUB_PORT}",
+            "GITLAB_TOKEN": "demo-token",
+        })
+    env["PUBLISH_TARGETS"] = f"http://127.0.0.1:{PORTS['task-center']}/events"
     procs.append(subprocess.Popen(
         [service_python("gitlab-bridge"), "-m", "uvicorn", "app.main:app", "--port", str(PORTS["gitlab-bridge"])],
         cwd=os.path.join(SERVICES, "gitlab-bridge"), env=env,
@@ -126,6 +138,12 @@ def start_services() -> None:
         "GITLAB_BRIDGE_URL": f"http://127.0.0.1:{PORTS['gitlab-bridge']}",
         "PUBLISH_TARGETS": f"http://127.0.0.1:{PORTS['task-center']}/events",
     })
+    if gateway:
+        env.update({
+            "LLM_API_KEY": "sk-litellm-master",
+            "LLM_BASE_URL": f"http://127.0.0.1:4000/v1",
+            "LLM_MODEL": os.getenv("DEMO_LLM_MODEL", "mock-gpt"),
+        })
     procs.append(subprocess.Popen(
         [service_python("agent-runtime"), "-m", "uvicorn", "app.main:app", "--port", str(PORTS["agent-runtime"])],
         cwd=os.path.join(SERVICES, "agent-runtime"), env=env,
@@ -157,10 +175,18 @@ def dump_log(name: str) -> str:
         return f.read()[-1500:]
 
 
-def main() -> int:
-    stub = start_stub()
-    start_services()
-    print("服务启动中…")
+def main(gateway: bool = False, pg: bool = False, real_gitlab: bool = False) -> int:
+    # 每次运行用随机 iid，保证外部引用唯一（PG 持久化下可重复运行）
+    iid = random.randint(1000, 9999)
+    ref = f"42#{iid}"
+
+    if real_gitlab:
+        stub = None
+        print("【真实 GitLab 模式】GITLAB_URL/GITLAB_TOKEN 来自环境变量")
+    else:
+        stub = start_stub()
+    start_services(gateway=gateway, pg=pg, real_gitlab=real_gitlab)
+    print(f"服务启动中…（mode: gateway={'on' if gateway else 'off'}, pg={'on' if pg else 'off'}, iid={iid}）")
     if not wait_healthy():
         return 1
     check("四个服务健康 + GitLab 桩就绪", True)
@@ -168,12 +194,12 @@ def main() -> int:
     # 1. 模拟 GitLab webhook：新建 Issue
     r = httpx.post(
         f"http://127.0.0.1:{PORTS['gitlab-bridge']}/webhooks/gitlab",
-        headers={"X-Gitlab-Token": WEBHOOK_SECRET, "X-Gitlab-Event-UUID": "demo-uuid-1"},
+        headers={"X-Gitlab-Token": WEBHOOK_SECRET, "X-Gitlab-Event-UUID": f"demo-uuid-{iid}"},
         json={
             "object_kind": "issue",
             "project": {"id": 42, "path_with_namespace": "sandbox/prodesgin"},
             "object_attributes": {
-                "iid": 12, "title": "报表导出功能",
+                "iid": iid, "title": "报表导出功能",
                 "description": "用户想要导出报表，支持按日期筛选", "state": "opened",
                 "action": "open", "labels": [{"title": "product"}],
             },
@@ -183,10 +209,10 @@ def main() -> int:
     check("1. GitLab webhook 入站 → 归一化为 gitlab.issue.opened", r.status_code == 200 and "gitlab.issue.opened" in r.json()["events"], str(r.json()))
     time.sleep(1)  # 等待事件扇出
 
-    # 2. 任务中心应有任务 42#12
+    # 2. 任务中心应有任务
     tasks = httpx.get(f"http://127.0.0.1:{PORTS['task-center']}/tasks", timeout=10).json()
-    task = next((t for t in tasks if t["external_ref"] == "42#12"), None)
-    check("2. 事件扇出 → 任务中心自动建任务 42#12", task is not None)
+    task = next((t for t in tasks if t["external_ref"] == ref), None)
+    check(f"2. 事件扇出 → 任务中心自动建任务 {ref}", task is not None)
     if task is None:
         print(dump_log("bridge"))
         return 1
@@ -204,7 +230,7 @@ def main() -> int:
         f"http://127.0.0.1:{PORTS['agent-runtime']}/runs",
         json={
             "requirement_text": "用户想要一个可以导出报表的功能，支持按日期筛选",
-            "title": "报表导出功能", "task_ref": "42#12", "project_id": "sandbox/prodesgin",
+            "title": "报表导出功能", "task_ref": ref, "project_id": "sandbox/prodesgin",
         },
         timeout=30,
     )
@@ -246,8 +272,11 @@ def main() -> int:
     apv = httpx.get(f"http://127.0.0.1:{PORTS['approval-gateway']}/approvals/{approval_id}", timeout=10).json()
     check("8. 审批审计：谁、何时、批了什么、理由", apv["decisions"][0]["decided_by"] == "产品负责人@Alice" and apv["decisions"][0]["comment"])
 
-    # 9. GitLab 桩收到建 Issue 请求（真环境即真实 Issue）
-    check("9. GitLab API 收到建 Issue 请求（含 G1-passed 标签）", any(p["labels"] == "product,G1-passed" for _, p in GitLabStub.requests))
+    # 9. 建 Issue 验证（真实模式看返回值，桩模式看请求记录）
+    if real_gitlab:
+        check("9. GitLab 真实 API 建 Issue 完成", done.get("issue", {}).get("iid") is not None, str(done.get("issue")))
+    else:
+        check("9. GitLab API 收到建 Issue 请求（含 G1-passed 标签）", any(p["labels"] == "product,G1-passed" for _, p in GitLabStub.requests))
 
     passed = all(ok for _, ok, _ in results)
     print(f"\n{'=' * 44}\n演示结果: {passed and '全部通过 🎉' or '存在失败 ❌'}（{sum(1 for _, ok, _ in results if ok)}/{len(results)}）")
@@ -258,8 +287,13 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Phase 0 端到端演示")
+    parser.add_argument("--gateway", action="store_true", help="LLM 走 LiteLLM 网关（需 mock_llm_server.py 或真实 Key）")
+    parser.add_argument("--pg", action="store_true", help="审批/任务中心使用 PostgreSQL（docker compose 已含）")
+    parser.add_argument("--real-gitlab", action="store_true", help="使用真实 GitLab（环境变量 GITLAB_URL/GITLAB_TOKEN）")
+    args = parser.parse_args()
     try:
-        code = main()
+        code = main(gateway=args.gateway, pg=args.pg, real_gitlab=args.real_gitlab)
     finally:
         for p in procs:
             p.terminate()
