@@ -91,11 +91,10 @@
 | T0.6 | 知识库 v0 | ✅ 完成（`services/knowledge-base`，4 测试 + 真实 Qdrant 冒烟通过；选型收敛为 Qdrant+LiteLLM，RAGFlow 留作 Phase 1 升级） |
 | T0.7 | Agent 运行时最小验证 | ✅ 完成（`services/agent-runtime`，6 测试：LangGraph G1 挂起/恢复/退回修订/否决） |
 | T0.8 | 演示流串接 | ✅ 完成（`scripts/demo_phase0.py`，端到端 10/10 通过） |
-| T0.9 | 验收与演示 | 🔨 本地验收通过：演示 10/10（含 `--gateway` 真实网关链路 + `--pg` PostgreSQL 持久化路径实测）；**真实环境验收待外部资源**：真实 GitLab 测试仓库、飞书机器人 webhook、LLM Key |
+| T0.9 | 验收与演示 | 🔨 **真实 GitLab 验收通过**（`sandbox6853335/prodesgin-demo#1` 真实 Issue + 演示 10/10）；**仅剩飞书真实推送**待 webhook |
 
-### 待用户提供的外部资源（完成 T0.9 真实环境验收）
+### 待用户提供的外部资源（完成 T0.9 最终验收）
 
-1. **GitLab**：sandbox 测试仓库 + 项目 Token（`api` 权限），把 gitlab-bridge 的 webhook 注册上去（配置指南见 platform/README）；
-2. **飞书**：测试群自定义机器人 webhook（用于真实卡片推送）。
+1. **飞书**：测试群自定义机器人 webhook（用于真实卡片推送）——这是 Phase 0 唯一剩余项。
 
-（LLM 真实模型/计量/观测已闭环，无需再提供。）
+（真实 GitLab 已验收通过：`sandbox6853335/prodesgin-demo#1`；LLM 真实模型/计量/观测已闭环。）

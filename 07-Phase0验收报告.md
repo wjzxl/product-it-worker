@@ -46,14 +46,14 @@
 - 审批/任务中心 `DATABASE_URL=postgresql+psycopg://platform:platform@127.0.0.1:5432/platform`；
 - 实测：任务、审批单、决策审计全部落 PG，psql 可查（演示 iid=7324 记录）。
 
-## 4. 剩余事项（真实环境验收，需外部资源，开发侧已无可做）
+## 4. 剩余事项（真实环境验收）
 
-| 事项 | 需要的资源 | 提供后的动作 |
-|---|---|---|
-| 真实 GitLab 验收 | sandbox 测试仓库 + 项目 Token（api 权限） | `--real-gitlab` 模式跑演示 + 注册 webhook（指南见 platform/README） |
-| 真实飞书推送 | 测试群自定义机器人 webhook | approval-gateway 配 `FEISHU_WEBHOOK_URL` 后卡片推送到群 |
+| 事项 | 状态 |
+|---|---|
+| 真实 GitLab 验收 | ✅ **通过**：`sandbox6853335/prodesgin-demo#1` 真实 Issue 已创建（标签 G1-passed+product，作者 facai2023money）；演示 `--real-gitlab --gateway --pg` 10/10。⚠️ 真实 webhook 回传（GitLab→平台）需平台有公网可达地址（ngrok/云部署），属部署期事项 |
+| 真实飞书推送 | ⏳ 待提供测试群自定义机器人 webhook 地址 |
 
-（LLM 真实模型、成本计量、Langfuse 观测均已闭环；DeepSeek Key 已接入并实测。）
+（LLM 真实模型、成本计量、Langfuse 观测均已闭环。）
 
 ## 5. 结论与签核建议
 

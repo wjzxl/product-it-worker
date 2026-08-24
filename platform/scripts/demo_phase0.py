@@ -193,10 +193,10 @@ def main(gateway: bool = False, pg: bool = False, real_gitlab: bool = False) -> 
         return 1
     check("四个服务健康 + GitLab 桩就绪", True)
 
-    # 1. 模拟 GitLab webhook：新建 Issue
+    # 1. 模拟 GitLab webhook：新建 Issue（token 与真实模式一致，取环境变量）
     r = httpx.post(
         f"http://127.0.0.1:{PORTS['gitlab-bridge']}/webhooks/gitlab",
-        headers={"X-Gitlab-Token": WEBHOOK_SECRET, "X-Gitlab-Event-UUID": f"demo-uuid-{iid}"},
+        headers={"X-Gitlab-Token": os.getenv("WEBHOOK_SECRET", WEBHOOK_SECRET), "X-Gitlab-Event-UUID": f"demo-uuid-{iid}"},
         json={
             "object_kind": "issue",
             "project": {"id": 42, "path_with_namespace": DEMO_PROJECT},
