@@ -32,6 +32,8 @@ platform/
 ```bash
 cd platform
 docker compose up -d          # PG(5432) Qdrant(6333) n8n(5678) LiteLLM(4000)
+docker compose -f docker-compose.observability.yml up -d   # 可选：Langfuse 观测(3000)
+services/approval-gateway/.venv/bin/python scripts/setup_langfuse_demo.py  # 初始化 Langfuse 并输出接入密钥
 ```
 
 - **PostgreSQL**：业务状态（`platform/platform`）；

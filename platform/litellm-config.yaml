@@ -33,6 +33,10 @@ model_list:
 litellm_settings:
   request_timeout: 120
   set_verbose: false
+  # 观测：Langfuse 回调（密钥经环境变量 LANGFUSE_* 注入；
+  # 未配置时回调为 no-op，不影响网关运行）
+  success_callback: ["langfuse"]
+  failure_callback: ["langfuse"]
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY

@@ -48,6 +48,12 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-sk-placeholder}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-sk-ant-placeholder}
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-litellm-master}
+      # Langfuse 观测（自托管见 docker-compose.observability.yml 与 scripts/setup_langfuse_demo.py）
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
+      - LANGFUSE_HOST=${LANGFUSE_HOST:-}
+      - LITELLM_SUCCESS_CALLBACK=${LITELLM_SUCCESS_CALLBACK:-}
+      - LITELLM_FAILURE_CALLBACK=${LITELLM_FAILURE_CALLBACK:-}
     volumes:
       - ./litellm-config.yaml:/app/config.yaml:ro
     command: ["--config", "/app/config.yaml"]

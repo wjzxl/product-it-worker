@@ -85,7 +85,7 @@
 |---|---|---|
 | T0.1 | 仓库脚手架与本地开发环境 | ✅ 完成（compose 已验证：PG/Qdrant/n8n/LiteLLM 全部启动健康） |
 | T0.2 | GitLab 双向集成适配器 | ✅ 完成（`services/gitlab-bridge`，14 测试；webhook 归一化 + API 客户端 + 事件扇出） |
-| T0.3 | LLM 网关接入与观测 | 🔨 **网关链路已验证**：LiteLLM 容器健康，chat/embeddings 经网关转发 mock 后端返回、spend 计量落库；演示 `--gateway` 模式与知识库嵌入链路均实测通过；**待真实供应商 Key + Langfuse Cloud 配置** |
+| T0.3 | LLM 网关接入与观测 | ✅ **完成**：LiteLLM 容器健康，chat/embeddings 经网关、spend 计量落库；**Langfuse 自托管 trace 实测落库**（`litellm-acompletion` trace）；仅差真实供应商 Key 看到真实成本 |
 | T0.4 | 审批网关 v0 | ✅ 完成（16 测试：状态机/三要素/超时扫描/L3 强制拒绝/飞书卡片/Web 审批台/事件发布）；真实飞书推送待配 `FEISHU_WEBHOOK_URL` |
 | T0.5 | 任务中心骨架 | ✅ 完成（`services/task-center`，8 测试：状态机/时间线/幂等收件箱/审批联动） |
 | T0.6 | 知识库 v0 | ✅ 完成（`services/knowledge-base`，4 测试 + 真实 Qdrant 冒烟通过；选型收敛为 Qdrant+LiteLLM，RAGFlow 留作 Phase 1 升级） |
@@ -97,4 +97,4 @@
 
 1. **GitLab**：sandbox 测试仓库 + 项目 Token（`api` 权限），把 gitlab-bridge 的 webhook 注册上去；
 2. **飞书**：测试群自定义机器人 webhook（用于真实卡片推送）；
-3. **LLM**：LiteLLM 网关环境变量 `OPENAI_API_KEY`/`ANTHROPIC_API_KEY`（或任一供应商 Key）+ Langfuse Cloud 密钥（观测验收）。
+3. **LLM**：任一供应商 API Key（配入 LiteLLM 环境变量即可切换真实模型，观测已闭环）。
