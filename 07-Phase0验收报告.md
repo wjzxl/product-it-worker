@@ -46,18 +46,14 @@
 - 审批/任务中心 `DATABASE_URL=postgresql+psycopg://platform:platform@127.0.0.1:5432/platform`；
 - 实测：任务、审批单、决策审计全部落 PG，psql 可查（演示 iid=7324 记录）。
 
-## 4. 剩余事项（真实环境验收）
+## 4. 验收结论
 
-| 事项 | 状态 |
+| 验收项 | 状态 |
 |---|---|
-| 真实 GitLab 验收 | ✅ **通过**：`sandbox6853335/prodesgin-demo#1` 真实 Issue 已创建（标签 G1-passed+product，作者 facai2023money）；演示 `--real-gitlab --gateway --pg` 10/10。⚠️ 真实 webhook 回传（GitLab→平台）需平台有公网可达地址（ngrok/云部署），属部署期事项 |
-| 真实飞书推送 | ⏳ 待提供测试群自定义机器人 webhook 地址 |
+| 真实 GitLab 验收 | ✅ 通过：`sandbox6853335/prodesgin-demo#1/#2` 真实 Issue（标签 G1-passed+product），演示 `--real-gitlab --gateway --pg` 10/10；⚠️ 真实 webhook 回传需公网可达地址（部署期事项） |
+| 真实飞书推送 | ✅ **通过**：G1 审批卡片真实推送到测试群（approval apv_c8ac40b739bb，网关日志 0 推送失败；webhook 直测 code=0） |
+| LLM 真实模型 / 成本计量 / Langfuse 观测 | ✅ 闭环（DeepSeek deepseek-chat 演示 10/10；LiteLLM_SpendLogs 实测；traces 落库） |
 
-（LLM 真实模型、成本计量、Langfuse 观测均已闭环。）
+**Phase 0 全部验收项通过 —— 签核建议：通过 ✅**
 
-## 5. 结论与签核建议
-
-- Phase 0 **开发与本地验收全部完成**，产物：5 个微服务、48 项测试、端到端演示脚本（3 种运行模式）、CI、完整文档链（01~07）；
-- 建议：由平台负责人按 §4 补齐外部资源后执行一次 `--real-gitlab` 演示，完成真实环境签核，随即进入 [Phase 1：产品+研发闭环 MVP](05-实施路线图与度量.md)。
-
-签核人：＿＿＿＿＿＿　日期：＿＿＿＿＿＿
+## 5. 签核

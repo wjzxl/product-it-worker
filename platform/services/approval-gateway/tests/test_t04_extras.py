@@ -119,6 +119,17 @@ class TestFeishuCard:
         assert notifier.send(_make_request()) == ""  # 推送失败不阻断审批流程
         assert "推送失败" in caplog.text
 
+    def test_feishu_rejected_body_returns_empty(self, caplog):
+        # 飞书业务错误也返回 HTTP 200，需校验响应体 code
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json={"code": 19021, "msg": "keyword not found"})
+
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        notifier = FeishuNotifier("https://open.feishu.cn/open-apis/bot/hook/x", client=client)
+        caplog.set_level(logging.ERROR)
+        assert notifier.send(_make_request()) == ""
+        assert "推送被拒" in caplog.text
+
 
 class TestWebConsole:
     def test_console_served(self, client):

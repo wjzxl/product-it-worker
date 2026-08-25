@@ -100,6 +100,11 @@ def start_services(gateway: bool = False, pg: bool = False, real_gitlab: bool = 
     env = dict(os.environ)
     env["DATABASE_URL"] = PG_URL if pg else f"sqlite:///{TMP}/approval.db"
     env["PUBLISH_TARGETS"] = f"http://127.0.0.1:{PORTS['task-center']}/events"
+    # 真实飞书推送（配置后 G1 审批卡片直达群聊）
+    env["FEISHU_WEBHOOK_URL"] = os.getenv("FEISHU_WEBHOOK_URL", "")
+    env["APPROVAL_WEB_BASE_URL"] = os.getenv(
+        "APPROVAL_WEB_BASE_URL", f"http://127.0.0.1:{PORTS['approval-gateway']}"
+    )
     procs.append(subprocess.Popen(
         [service_python("approval-gateway"), "-m", "uvicorn", "app.main:app", "--port", str(PORTS["approval-gateway"])],
         cwd=os.path.join(SERVICES, "approval-gateway"), env=env,

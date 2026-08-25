@@ -37,7 +37,11 @@ class LogNotifier(Notifier):
 
 
 class FeishuNotifier(Notifier):
-    """飞书自定义机器人（webhook 推送）。"""
+    """飞书自定义机器人（webhook 推送）。
+
+    飞书 webhook 对业务错误也返回 HTTP 200，需校验响应体
+    （code == 0 或 StatusCode == 0 才算成功）。
+    """
 
     def __init__(self, webhook_url: str, client: httpx.Client | None = None):
         self.webhook_url = webhook_url
@@ -49,8 +53,19 @@ class FeishuNotifier(Notifier):
             client = self._client or httpx.Client(timeout=10)
             resp = client.post(self.webhook_url, json={"msg_type": "interactive", "card": card})
             resp.raise_for_status()
+            body = resp.json()
+            # 老格式 {"StatusCode":0,...} / 新格式 {"code":0,...}；仅当响应码字段显式存在且为 0 才算成功
+            if "code" in body:
+                ok = body["code"] == 0
+            elif "StatusCode" in body:
+                ok = body["StatusCode"] == 0
+            else:
+                ok = False
+            if not ok:
+                logger.error("[FeishuNotifier] 推送被拒 approval=%s: %s", approval.id, body)
+                return ""
             return approval.id
-        except httpx.HTTPError as exc:
+        except (httpx.HTTPError, ValueError) as exc:
             logger.error("[FeishuNotifier] 推送失败 approval=%s: %s", approval.id, exc)
             return ""
 

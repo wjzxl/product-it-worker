@@ -91,10 +91,12 @@
 | T0.6 | 知识库 v0 | ✅ 完成（`services/knowledge-base`，4 测试 + 真实 Qdrant 冒烟通过；选型收敛为 Qdrant+LiteLLM，RAGFlow 留作 Phase 1 升级） |
 | T0.7 | Agent 运行时最小验证 | ✅ 完成（`services/agent-runtime`，6 测试：LangGraph G1 挂起/恢复/退回修订/否决） |
 | T0.8 | 演示流串接 | ✅ 完成（`scripts/demo_phase0.py`，端到端 10/10 通过） |
-| T0.9 | 验收与演示 | 🔨 **真实 GitLab 验收通过**（`sandbox6853335/prodesgin-demo#1` 真实 Issue + 演示 10/10）；**仅剩飞书真实推送**待 webhook |
+| T0.9 | 验收与演示 | ✅ **完成**：真实 GitLab（`sandbox6853335/prodesgin-demo#1/#2`）+ 真实飞书推送（G1 卡片到群，0 失败）+ 真实 DeepSeek 模型，演示 10/10；验收报告见 [07-Phase0验收报告](07-Phase0验收报告.md) |
 
-### 待用户提供的外部资源（完成 T0.9 最终验收）
+### 外部资源状态（全部到位 ✅）
 
-1. **飞书**：测试群自定义机器人 webhook（用于真实卡片推送）——这是 Phase 0 唯一剩余项。
+1. ~~**GitLab**~~ ✅ 真实验收通过：`sandbox6853335/prodesgin-demo#1/#2`；
+2. ~~**飞书**~~ ✅ 真实卡片推送验证通过（G1 审批卡片到群）；
+3. ~~**LLM**~~ ✅ DeepSeek `deepseek-chat` 已接入并实测。
 
-（真实 GitLab 已验收通过：`sandbox6853335/prodesgin-demo#1`；LLM 真实模型/计量/观测已闭环。）
+**Phase 0 全部完成。**
