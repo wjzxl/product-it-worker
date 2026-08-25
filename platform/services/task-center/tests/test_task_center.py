@@ -131,6 +131,42 @@ class TestEventIngestion:
         )
         assert r.json()["status"] == "ignored"
 
+    def test_auto_dev_label_triggers_runtime(self, client, monkeypatch):
+        """Issue 带 auto-dev 标签 → 自动调用 agent-runtime /runs（研发域 SOP）。"""
+        import httpx
+
+        captured = {}
+
+        def fake_post(url, json=None, timeout=None):
+            captured["url"] = url
+            captured["json"] = json
+            req = httpx.Request("POST", url, json=json)
+            return httpx.Response(200, json={"status": "waiting_approval"}, request=req)
+
+        monkeypatch.setenv("AGENT_RUNTIME_URL", "http://localhost:8003")
+        monkeypatch.setattr("httpx.post", fake_post)
+        r = client.post(
+            "/events",
+            json={
+                "event_id": "e-auto-1",
+                "event_type": "gitlab.issue.opened",
+                "source": "gitlab-webhook",
+                "payload": {
+                    "project_id": 85697055,
+                    "iid": 88,
+                    "title": "按类别汇总报表",
+                    "description": "## 验收标准\n- WHEN 传入数据 THEN 按类别聚合",
+                    "labels": ["auto-dev"],
+                },
+            },
+        )
+        assert r.status_code == 200 and r.json()["status"] == "created"
+        assert captured["url"].endswith("/runs")
+        body = captured["json"]
+        assert body["sop"] == "dev-domain/issue-to-merge"
+        assert body["task_ref"] == "85697055#88"
+        assert body["project_id"] == "85697055"
+
 
 class TestTimeline:
     def test_append_event(self, client):

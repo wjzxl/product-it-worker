@@ -29,7 +29,7 @@
 |---|---|
 | 设计（文档 01~08） | ✅ 完成，6 个 Gate 已评审确认 |
 | **Phase 0 地基** | ✅ 全部完成并验收通过（真实 GitLab/飞书/DeepSeek、成本计量与观测闭环、CI 55 测试） |
-| **Phase 1 产品+研发闭环 MVP** | 🔨 **研发域闭环已打通**：DeepSeek 技术方案→G2→AI 编码→pytest 门禁→MR→G3→合入，真实 GitLab MR #3 已合入，演示 12/12；剩余：批量试点 ≥10 issue + 质量指标运营 |
+| **Phase 1 产品+研发闭环 MVP** | ✅ **完成并验收**：研发域闭环（DeepSeek 编码+质量门禁+MR+G3+合入）+ 真实仓库 **10 个 Issue 端到端合入**（MR #4~#13，测试 2→95），试点报告见 [platform/reports/phase1-pilot-summary.md](platform/reports/phase1-pilot-summary.md) |
 | Phase 1 产品+研发闭环 MVP | ⏳ 未开始 |
 | Phase 2 测试+运维域 | ⏳ 未开始 |
 | Phase 3 自进化 | ⏳ 未开始 |

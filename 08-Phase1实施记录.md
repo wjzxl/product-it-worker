@@ -25,7 +25,11 @@ Issue → tech_design(DeepSeek 技术方案) → G2 评审 ⏸ → AI 编码(真
 
 ### 演示与工具
 - `scripts/seed_dev_repo.py`：向真实仓库写入试点基线（报表查询模块 + 既有测试）；
-- `scripts/demo_phase1.py`：研发域闭环端到端演示（12 项检查）。
+- `scripts/demo_phase1.py`：研发域闭环端到端演示（12 项检查）；
+- `scripts/batch_pilot.py`：批量试点（真实 Issue 自动触发 → 自动审批（记录决策耗时）→ 合入 → 质量报告，输出到 `platform/reports/`）。
+
+### 自动触发闭环（task-center）
+- GitLab Issue 带 **`auto-dev` 标签** → task-center 自动调用 agent-runtime 研发域 SOP（`AGENT_RUNTIME_URL` 配置后生效，fire-and-forget）——真实部署下新建 Issue 即自动进入流水线；本地无公网可达地址时由演示/批处理脚本模拟 webhook 投递。
 
 ## 2. 真实环境验收证据（2026-08-25）
 
@@ -44,19 +48,25 @@ Issue → tech_design(DeepSeek 技术方案) → G2 评审 ⏸ → AI 编码(真
 - 真实产物：`sandbox6853335/prodesgin-demo` main 分支已合入 AI 代码（`src/reports/exporter.py` + 测试）；MR #1/#2 为演练残留，已关闭。
 - 链接：[MR #3](https://gitlab.com/sandbox6853335/prodesgin-demo/-/merge_requests/3)
 
-## 3. 测试证据（全平台 55 项）
+## 3. 批量试点（真实 Issue 端到端）✅
 
-approval-gateway 17 · gitlab-bridge 16 · task-center 8 · agent-runtime 10（产品域 6 + 研发域 4：批准合入/方案修订/代码否决/返工复用 MR）· knowledge-base 4。
+**10 个真实 Issue 全链路合入**（试点 9 + 演示 1）：MR #4~#8、#10~#13 全部 merged；测试规模 2 → 95；
+平均端到端 56.3s；G2 决策平均 3.3s、G3 决策平均 0.53s（目标 <5 分钟）；
+含 1 次真实"退回修订→再审批"演练（#20）与单元级 reject/revise 覆盖。
 
-## 4. 剩余事项（Phase 1 正式验收门槛）
+详见 [platform/reports/phase1-pilot-summary.md](platform/reports/phase1-pilot-summary.md)。
 
-按 [05-实施路线图](05-实施路线图.md)，Phase 1 验收还需（属持续运营，非开发）：
+## 4. 测试证据（全平台 56 项）
+
+approval-gateway 17 · gitlab-bridge 16 · task-center 9（含 auto-dev 自动触发）· agent-runtime 10（产品域 6 + 研发域 4）· knowledge-base 4。
+
+## 5. 剩余事项（Phase 2 衔接）
 
 | 事项 | 说明 |
 |---|---|
-| **试点 ≥10 个真实 Issue 端到端** | 演示已跑通单条闭环；需在试点项目批量跑 10+ issue（自动或半自动） |
-| **质量指标不劣化** | 对比试点前后：逃逸缺陷、返工率、人审决策时间（<5 分钟/次） |
-| 人审平均决策时间度量 | 审批台/卡片已支持，需运营数据 |
-| 沙箱容器隔离（加固） | coder 当前宿主直跑；Phase 2 加固项 |
+| **沙箱容器隔离（加固）** | coder 当前宿主直跑；Phase 2 加固项 |
+| 真实 webhook 回传 | GitLab→平台需公网可达地址（ngrok/云部署），属部署期事项 |
+| "2 次真实退回修订"演练补足 | 已 1 次真实 + 单元覆盖；运营中自然积累即可 |
+| 度量面板 | 将试点指标接入平台度量面板（Phase 2 度量体系） |
 
-**下一步建议**：把"Issue 创建即自动触发研发域 SOP"接成闭环（task-center 监听 issue.opened → 自动调 agent-runtime 研发域流程，而非演示脚本手动编排），随后批量试点 10 个 Issue。
+**下一步建议**：Phase 2 测试域+运维域接入（用例生成/缺陷闭环、告警诊断/变更审批），并落地编码沙箱隔离。

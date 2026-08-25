@@ -8,18 +8,25 @@
 ```
 platform/
 ├── docker-compose.yml        # 本地开发环境：PG / Qdrant / n8n / LiteLLM（已验证可启动）
+├── docker-compose.observability.yml  # Langfuse 观测（可选）
 ├── litellm-config.yaml       # LLM 网关配置（强/弱模型分层路由）
 ├── contracts/                # 接口合约（与语言无关）
 │   ├── events.md             #   事件总线消息契约
 │   ├── approval-request.schema.json  # 审批请求 JSON Schema（三要素强校验）
 │   └── sop-example.yaml      #   SOP DSL 草案示例（含 G1 Gate）
+├── reports/                  # 批量试点质量报告（batch_pilot.py 产出）
 ├── scripts/
-│   └── demo_phase0.py        # Phase 0 端到端演示（10 项检查，一键运行）
+│   ├── demo_phase0.py        # Phase 0 端到端演示（产品域）
+│   ├── demo_phase1.py        # Phase 1 研发域闭环演示（12 项检查）
+│   ├── batch_pilot.py        # Phase 1 批量试点（真实 Issue → 合入 → 质量报告）
+│   ├── seed_dev_repo.py      # 试点仓库基线初始化
+│   ├── mock_llm_server.py    # 网关链路验证用 mock 后端
+│   └── setup_langfuse_demo.py# Langfuse 自托管初始化
 └── services/                 # 五个微服务（Python 3.9+ / FastAPI）
     ├── approval-gateway/     # 人审网关：审批状态机 + 三要素校验 + 超时扫描 + 飞书卡片 + Web 审批台
-    ├── gitlab-bridge/        # GitLab 双向集成桥：webhook 归一化 + API 客户端 + 事件扇出
-    ├── task-center/          # 任务中心：状态机 + 时间线 + 平台事件接入（幂等收件箱）
-    ├── agent-runtime/        # Agent 运行时：LangGraph 状态图 + G1 挂起/恢复（T0.7）
+    ├── gitlab-bridge/        # GitLab 双向集成桥：webhook 归一化 + API 客户端（Issue/MR/合入）+ 事件扇出
+    ├── task-center/          # 任务中心：状态机 + 时间线 + 平台事件接入 + auto-dev 自动触发研发域
+    ├── agent-runtime/        # Agent 运行时：产品域 PRD+G1 / 研发域 方案+编码+MR+G3（LangGraph）
     └── knowledge-base/       # 知识库 v0：分块 → 向量化 → Qdrant → 带来源检索（T0.6）
 ```
 

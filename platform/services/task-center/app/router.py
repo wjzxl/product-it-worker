@@ -47,6 +47,42 @@ def _record(db: Session, task: Task, event_type: str, by: str = "", detail: dict
     return ev
 
 
+def _maybe_auto_start_dev_sop(task: Task, payload: dict) -> None:
+    """Issue 带 auto-dev 标签 → 自动启动研发域 SOP（真实闭环触发点）。
+
+    fire-and-forget：失败仅记录日志，不影响事件消费（Phase 1 试点用；
+    Phase 2 由工作流引擎接管编排）。
+    """
+    import os
+
+    import httpx
+
+    labels = payload.get("labels") or []
+    if "auto-dev" not in labels:
+        return
+    url = os.getenv("AGENT_RUNTIME_URL", "")
+    if not url:
+        logger.warning("AGENT_RUNTIME_URL 未配置，跳过 auto-dev 自动触发 task=%s", task.id)
+        return
+    try:
+        resp = httpx.post(
+            f"{url}/runs",
+            json={
+                "sop": "dev-domain/issue-to-merge",
+                "requirement_text": payload.get("title", ""),
+                "title": payload.get("title", ""),
+                "task_ref": task.external_ref,
+                "project_id": str(payload.get("project_id", "")),
+                "prd_doc": payload.get("description", "") or payload.get("title", ""),
+            },
+            timeout=10,
+        )
+        resp.raise_for_status()
+        logger.info("auto-dev 触发研发域 SOP task=%s status=%s", task.id, resp.json().get("status"))
+    except (httpx.HTTPError, ValueError) as exc:
+        logger.warning("auto-dev 自动触发失败 task=%s: %s", task.id, exc)
+
+
 @router.post("/tasks", response_model=TaskOut, status_code=status.HTTP_201_CREATED)
 def create_task(payload: TaskCreate, db: Session = Depends(get_db)) -> Task:
     if payload.external_ref:
@@ -158,6 +194,7 @@ def ingest_event(envelope: EventEnvelope, db: Session = Depends(get_db)) -> dict
         _publisher.publish(
             new_event("task.created", {"task_id": task.id, "external_ref": ref}, "task-center", trace_id=envelope.trace_id)
         )
+        _maybe_auto_start_dev_sop(task, payload)
         return {"status": "created", "task_id": task.id}
 
     task_ref = payload.get("task_ref", "")

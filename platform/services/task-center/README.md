@@ -38,7 +38,7 @@ waiting_approval → rejected（否决关闭）
 
 | 入站事件 | 动作 |
 |---|---|
-| `gitlab.issue.opened` | 创建任务（external_ref = `project_id#iid`，sop = product-domain/prd-flow） |
+| `gitlab.issue.opened` | 创建任务（external_ref = `project_id#iid`，sop = product-domain/prd-flow）；**若带 `auto-dev` 标签 → 自动调用 agent-runtime 研发域 SOP**（`AGENT_RUNTIME_URL` 配置后生效，Phase 1 闭环触发点） |
 | `approval.requested`（含 task_ref） | 任务 running → waiting_approval |
 | `approval.decided`（含 task_ref） | approve/revise → running；reject → rejected；时间线留痕（含决策人与原因） |
 | 其他（含 task_ref） | 仅追加时间线 |
