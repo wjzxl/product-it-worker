@@ -1,7 +1,7 @@
-"""Agent 运行时入口：启动流程 / 人审后恢复 / 查询状态。
+"""Agent 运行时入口：产品域（PRD+G1）与研发域（方案+G2+编码+MR+G3+合入）两条 SOP。
 
-Phase 0 编排方式：演示脚本（scripts/）驱动"启动 → 人审 → 恢复"三步；
-Phase 1 起由工作流引擎（n8n/Temporal）消费 approval.decided 事件自动恢复。
+Phase 0/1 编排方式：演示脚本驱动"启动 → 人审 → 恢复"；
+Phase 2 起由工作流引擎（n8n/Temporal）消费 approval.decided 事件自动恢复。
 """
 from __future__ import annotations
 
@@ -14,19 +14,25 @@ from langgraph.types import Command
 from pydantic import BaseModel, Field
 
 from .apis import ApprovalAPI, GitLabAPI
+from .coder import Coder
 from .llm import llm_from_env
-from .sop import FlowContext, build_graph
+from .sop import FlowContext, build_dev_graph, build_graph
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger(__name__)
 
+SOP_PRODUCT = "product-domain/prd-flow"
+SOP_DEV = "dev-domain/issue-to-merge"
+
 
 class RunIn(BaseModel):
+    sop: str = SOP_PRODUCT
     requirement_text: str = Field(min_length=1)
     title: str = ""
     task_ref: str = ""
     project_id: str = "sandbox/prodesgin"
     path_with_namespace: str = ""
+    prd_doc: str = ""
 
 
 class ResumeIn(BaseModel):
@@ -34,123 +40,161 @@ class ResumeIn(BaseModel):
     comment: str = ""
 
 
-def _config(thread_id: str) -> dict:
-    return {"configurable": {"thread_id": thread_id}}
+def _config(thread_id: str, sop: str = SOP_PRODUCT) -> dict:
+    return {"configurable": {"thread_id": thread_id, "sop": sop}}
 
 
-def _status(graph, thread_id: str) -> dict:
-    snap = graph.get_state(_config(thread_id))
+def _status(graph, thread_id: str, sop: str) -> dict:
+    snap = graph.get_state(_config(thread_id, sop))
     values = snap.values or {}
     next_nodes = list(snap.next or [])
 
-    if "gate_g1" in next_nodes:
-        return {
+    gate = next((g for g in ("gate_g1", "gate_g2", "gate_g3") if g in next_nodes), None)
+    if gate:
+        aid_key = {"gate_g1": "approval_id", "gate_g2": "approval_id_g2", "gate_g3": "approval_id_g3"}[gate]
+        body = {
             "thread_id": thread_id,
+            "sop": sop,
             "status": "waiting_approval",
-            "approval_id": values.get("approval_id", ""),
-            "prd_version": values.get("version"),
-            "prd_doc": values.get("prd_doc", ""),
+            "gate": gate,
+            "approval_id": values.get(aid_key, ""),
             "logs": values.get("logs", []),
         }
+        if gate == "gate_g1":
+            body["prd_version"] = values.get("version")
+            body["prd_doc"] = values.get("prd_doc", "")
+        if gate == "gate_g2":
+            body["tech_design"] = values.get("tech_design", "")
+        if gate == "gate_g3":
+            body["mr_iid"] = values.get("mr_iid")
+            body["mr_url"] = values.get("mr_url", "")
+            body["branch"] = values.get("branch", "")
+            body["test_result"] = values.get("test_result", "")
+        return body
+
     if not next_nodes:
-        if values.get("gate_decision") == "reject":
+        if values.get("merged"):
             return {
-                "thread_id": thread_id,
-                "status": "rejected",
-                "comment": values.get("gate_comment", ""),
+                "thread_id": thread_id, "sop": sop, "status": "done",
+                "merged": True,
+                "mr_iid": values.get("mr_iid"), "mr_url": values.get("mr_url", ""),
+                "branch": values.get("branch", ""), "test_result": values.get("test_result", ""),
                 "logs": values.get("logs", []),
             }
-        return {
-            "thread_id": thread_id,
-            "status": "done",
-            "issue": values.get("issue"),
-            "prd_version": values.get("version"),
-            "logs": values.get("logs", []),
-        }
-    return {"thread_id": thread_id, "status": "running", "next": next_nodes}
+        if values.get("gate_decision") == "reject" or values.get("gate3_decision") == "reject" or values.get("gate2_decision") == "reject":
+            comment = values.get("gate3_comment") or values.get("gate2_comment") or values.get("gate_comment", "")
+            return {"thread_id": thread_id, "sop": sop, "status": "rejected", "comment": comment, "logs": values.get("logs", [])}
+        return {"thread_id": thread_id, "sop": sop, "status": "done", "issue": values.get("issue"), "logs": values.get("logs", [])}
+
+    return {"thread_id": thread_id, "sop": sop, "status": "running", "next": next_nodes}
 
 
 def create_app(
     approval_api=None,
     gitlab_api=None,
     llm=None,
+    coder=None,
 ) -> FastAPI:
+    llm = llm or llm_from_env()
     ctx = FlowContext(
-        llm=llm or llm_from_env(),
+        llm=llm,
         approval_api=approval_api or ApprovalAPI(os.getenv("APPROVAL_GATEWAY_URL", "http://localhost:8000")),
         gitlab_api=gitlab_api or GitLabAPI(os.getenv("GITLAB_BRIDGE_URL", "http://localhost:8001")),
+        coder=coder or Coder(
+            llm=llm,
+            gitlab_url=os.getenv("GITLAB_URL", "https://gitlab.com"),
+            gitlab_token=os.getenv("GITLAB_TOKEN", ""),
+            project_path=os.getenv("DEMO_PROJECT", "sandbox/prodesgin"),
+        ),
     )
-    graph = build_graph(ctx)
+    graphs = {
+        SOP_PRODUCT: build_graph(ctx),
+        SOP_DEV: build_dev_graph(ctx),
+    }
 
     app = FastAPI(
         title="agent-runtime",
-        description="Agent 运行时：LangGraph 状态图 + G1 人审挂起/恢复（设计文档 02 §1）",
-        version="0.1.0",
+        description="Agent 运行时：产品域 PRD+G1 / 研发域 方案+编码+MR+G3（设计文档 02 §1/§2）",
+        version="0.2.0",
     )
-    app.state.graph = graph
     app.state.ctx = ctx
+    app.state.graphs = graphs
 
     @app.post("/runs")
     def start_run(body: RunIn) -> dict:
+        if body.sop not in graphs:
+            raise HTTPException(status_code=422, detail=f"未知 sop: {body.sop}（可选 {list(graphs)}）")
+        graph = graphs[body.sop]
         # thread_id 需 URL 安全（task_ref 可能含 # / 等字符），做净化后用作幂等键
         thread_id = (
             body.task_ref.replace("#", "-").replace("/", "-")
             if body.task_ref
             else f"run_{uuid.uuid4().hex[:8]}"
         )
-        config = _config(thread_id)
+        config = _config(thread_id, body.sop)
+        init = {
+            "requirement": body.requirement_text,
+            "title": body.title,
+            "project_id": body.project_id,
+            "path_with_namespace": body.path_with_namespace,
+            "task_ref": body.task_ref,
+            "logs": [],
+        }
+        if body.sop == SOP_DEV:
+            init["prd_doc"] = body.prd_doc
         try:
-            graph.invoke(
-                {
-                    "requirement": body.requirement_text,
-                    "title": body.title,
-                    "project_id": body.project_id,
-                    "path_with_namespace": body.path_with_namespace,
-                    "task_ref": body.task_ref,
-                    "logs": [],
-                },
-                config,
-            )
-        except Exception as exc:  # GraphInterrupt 由引擎内部消化；此处兜底
+            graph.invoke(init, config)
+        except Exception as exc:
             if "GraphInterrupt" not in type(exc).__name__:
                 raise
-        return _status(graph, thread_id)
+        return _status(graph, thread_id, body.sop)
 
     @app.post("/runs/{thread_id}/resume")
     def resume_run(thread_id: str, body: ResumeIn) -> dict:
         if body.decision not in ("approve", "reject", "revise"):
             raise HTTPException(status_code=422, detail="decision 必须为 approve/reject/revise")
-        config = _config(thread_id)
+        # 从线程配置恢复 sop（兼容旧线程默认产品域）
+        sop = SOP_PRODUCT
+        graph = None
+        for name, g in graphs.items():
+            snap = g.get_state(_config(thread_id, name))
+            if snap.values or snap.next:
+                sop, graph = name, g
+                break
+        if graph is None:
+            raise HTTPException(status_code=404, detail=f"线程 {thread_id} 不存在")
+        config = _config(thread_id, sop)
         snap = graph.get_state(config)
-        if snap.next and "gate_g1" not in list(snap.next):
+        if snap.next and not any(g in list(snap.next) for g in ("gate_g1", "gate_g2", "gate_g3")):
             raise HTTPException(status_code=409, detail="当前流程不在人审挂起状态")
         try:
-            graph.invoke(
-                Command(resume={"decision": body.decision, "comment": body.comment}),
-                config,
-            )
+            graph.invoke(Command(resume={"decision": body.decision, "comment": body.comment}), config)
         except Exception as exc:
             if "GraphInterrupt" not in type(exc).__name__:
                 raise
-        return _status(graph, thread_id)
+        return _status(graph, thread_id, sop)
 
     @app.get("/runs/{thread_id}/state")
     def run_state(thread_id: str) -> dict:
-        snap = graph.get_state(_config(thread_id))
-        interrupts = []
-        for task in snap.tasks or []:
-            for i in task.interrupts or []:
-                interrupts.append(i.value)
-        return {
-            "thread_id": thread_id,
-            "next": list(snap.next or []),
-            "interrupts": interrupts,
-            "values": snap.values or {},
-        }
+        for name, g in graphs.items():
+            snap = g.get_state(_config(thread_id, name))
+            if snap.values or snap.next:
+                interrupts = []
+                for task in snap.tasks or []:
+                    for i in task.interrupts or []:
+                        interrupts.append(i.value)
+                return {
+                    "thread_id": thread_id,
+                    "sop": name,
+                    "next": list(snap.next or []),
+                    "interrupts": interrupts,
+                    "values": snap.values or {},
+                }
+        raise HTTPException(status_code=404, detail=f"线程 {thread_id} 不存在")
 
     @app.get("/health")
     def health() -> dict:
-        return {"status": "ok", "service": "agent-runtime", "version": "0.1.0"}
+        return {"status": "ok", "service": "agent-runtime", "version": "0.2.0"}
 
     return app
 

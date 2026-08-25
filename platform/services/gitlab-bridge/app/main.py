@@ -9,7 +9,7 @@ import logging
 import os
 import secrets
 from dataclasses import dataclass, field
-from typing import Union
+from typing import Optional, Union
 
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -51,6 +51,14 @@ class NoteIn(BaseModel):
     project_id: Union[str, int]
     mr_iid: int
     body: str = Field(min_length=1)
+
+
+class CreateMrIn(BaseModel):
+    project_id: Union[str, int]
+    source_branch: str = Field(min_length=1)
+    target_branch: str = "main"
+    title: str = Field(min_length=1)
+    description: str = ""
 
 
 def create_app(settings: Settings) -> FastAPI:
@@ -99,6 +107,31 @@ def create_app(settings: Settings) -> FastAPI:
     def comment_mr(body: NoteIn) -> dict:
         try:
             return app.state.gitlab.comment_mr(body.project_id, body.mr_iid, body.body)
+        except GitLabAPIError as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
+
+    @app.post("/gitlab/mrs")
+    def create_mr(body: CreateMrIn) -> dict:
+        try:
+            return app.state.gitlab.create_mr(
+                body.project_id, body.source_branch, body.target_branch, body.title, body.description
+            )
+        except GitLabAPIError as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
+
+    @app.get("/gitlab/mrs/{project_id}/{mr_iid}")
+    def get_mr(project_id: str, mr_iid: int) -> dict:
+        try:
+            return app.state.gitlab.get_mr(project_id, mr_iid)
+        except GitLabAPIError as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
+
+    @app.post("/gitlab/mrs/{project_id}/{mr_iid}/merge")
+    def merge_mr(project_id: str, mr_iid: int, payload: Optional[dict] = None) -> dict:
+        """合入 MR。GitLab 新版要求携带 sha（源分支头提交），由调用方先查 MR 获取。"""
+        try:
+            sha = (payload or {}).get("sha") or None
+            return app.state.gitlab.merge_mr(project_id, mr_iid, sha=sha)
         except GitLabAPIError as exc:
             raise HTTPException(status_code=502, detail=str(exc))
 

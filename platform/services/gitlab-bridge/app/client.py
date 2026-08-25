@@ -68,6 +68,33 @@ class GitLabClient:
             json={"body": body},
         )
 
+    def create_mr(
+        self, project_id, source_branch: str, target_branch: str, title: str, description: str = ""
+    ) -> dict:
+        return self._request(
+            "POST",
+            f"/api/v4/projects/{self._encode(project_id)}/merge_requests",
+            json={
+                "source_branch": source_branch,
+                "target_branch": target_branch,
+                "title": title,
+                "description": description,
+            },
+        )
+
+    def get_mr(self, project_id, mr_iid: int) -> dict:
+        return self._request(
+            "GET", f"/api/v4/projects/{self._encode(project_id)}/merge_requests/{mr_iid}"
+        )
+
+    def merge_mr(self, project_id, mr_iid: int, sha: str | None = None) -> dict:
+        payload = {"sha": sha} if sha else {}
+        return self._request(
+            "PUT",
+            f"/api/v4/projects/{self._encode(project_id)}/merge_requests/{mr_iid}/merge",
+            json=payload,
+        )
+
     # ---------- Pipeline ----------
     def get_pipeline(self, project_id, pipeline_id: int) -> dict:
         return self._request(

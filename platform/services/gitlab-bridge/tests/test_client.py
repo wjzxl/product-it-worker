@@ -44,6 +44,36 @@ def test_comment_mr():
     assert captured["url"].endswith("/api/v4/projects/42/merge_requests/45/notes")
 
 
+def test_create_mr():
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["json"] = json.loads(request.content)
+        captured["url"] = str(request.url)
+        return httpx.Response(201, json={"iid": 9, "web_url": "http://x/mr/9"})
+
+    client = GitLabClient("https://gitlab.example.com", "tok", transport=httpx.MockTransport(handler))
+    result = client.create_mr("sandbox/prodesgin", "feat/report", "main", "feat: 报表导出")
+    assert result["iid"] == 9
+    assert captured["url"].endswith("/api/v4/projects/sandbox%2Fprodesgin/merge_requests")
+    assert captured["json"] == {"source_branch": "feat/report", "target_branch": "main", "title": "feat: 报表导出", "description": ""}
+
+
+def test_merge_mr():
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["method"] = request.method
+        return httpx.Response(200, json={"state": "merged"})
+
+    client = GitLabClient("https://gitlab.example.com", "tok", transport=httpx.MockTransport(handler))
+    result = client.merge_mr(42, 9)
+    assert result["state"] == "merged"
+    assert captured["url"].endswith("/api/v4/projects/42/merge_requests/9/merge")
+    assert captured["method"] == "PUT"
+
+
 def test_api_error_raises():
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(404, json={"message": "404 Project Not Found"})
