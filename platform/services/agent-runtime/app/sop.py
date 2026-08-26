@@ -32,11 +32,12 @@ class FlowState(TypedDict, total=False):
 
 
 class FlowContext:
-    def __init__(self, llm, approval_api, gitlab_api, coder=None):
+    def __init__(self, llm, approval_api, gitlab_api, coder=None, tester=None):
         self.llm = llm
         self.approval_api = approval_api
         self.gitlab_api = gitlab_api
         self.coder = coder  # 研发域编码执行器（可选）
+        self.tester = tester  # 测试域执行引擎（可选）
 
 
 def _build_approval_payload(state: FlowState, version: int) -> dict:
@@ -321,6 +322,140 @@ def build_dev_graph(ctx: FlowContext):
         {"merge": "merge", "implement": "implement", "reject_end": "reject_end"},
     )
     builder.add_edge("merge", END)
+    builder.add_edge("reject_end", END)
+
+    return builder.compile(checkpointer=MemorySaver())
+
+
+# =====================================================================
+# 测试域 SOP：测试计划 → 独立用例生成 → 分层执行 → 缺陷闭环 → 测试报告 → G4 放行决策
+# =====================================================================
+
+
+class TestState(TypedDict, total=False):
+    requirement: str
+    prd_doc: str
+    title: str
+    project_id: str
+    path_with_namespace: str
+    task_ref: str
+    test_plan: str
+    test_files: list
+    test_result: str
+    defects: list
+    test_report: str
+    approval_id_g4: str
+    gate4_decision: str
+    gate4_comment: str
+    logs: Annotated[list[str], operator.add]
+
+
+def build_test_graph(ctx: FlowContext):
+    def plan(state: TestState) -> dict:
+        prompt = (
+            f"制定测试计划（测试策略/分层/重点风险）：\n标题：{state.get('title', '')}\n"
+            f"PRD：{state.get('prd_doc') or state.get('requirement', '')[:2000]}"
+        )
+        plan_text = ctx.llm.chat([{"role": "user", "content": prompt}])
+        return {"test_plan": plan_text, "logs": ["step:test_plan done"]}
+
+    def execute(state: TestState) -> dict:
+        if ctx.tester is None:
+            raise RuntimeError("未配置测试引擎（TestEngine）")
+        out = ctx.tester.run(
+            task={
+                "task_ref": state.get("task_ref", ""),
+                "title": state.get("title", ""),
+            },
+            prd=state.get("prd_doc") or state.get("requirement", ""),
+        )
+        result = out["result"]
+        defects = out["defects"]
+        return {
+            "test_files": out["test_files"],
+            "test_result": result["summary"],
+            "defects": defects,
+            "logs": [
+                f"step:execute {'✅' if result['ok'] else '❌'} {result['summary']} "
+                f"defects={len(defects)} files={len(out['test_files'])}"
+            ],
+        }
+
+    def report(state: TestState) -> dict:
+        defects = state.get("defects", [])
+        open_defects = [d for d in defects if not d.get("closed")]
+        prompt = (
+            f"生成测试报告（结果/覆盖评估/风险/放行建议）：\n"
+            f"测试计划：{state.get('test_plan', '')[:1500]}\n"
+            f"执行结果：{state.get('test_result', '')}\n"
+            f"缺陷：{defects}\n"
+            f"被测功能：{state.get('title', '')}"
+        )
+        report_text = ctx.llm.chat([{"role": "user", "content": prompt}])
+        approval = ctx.approval_api.create_approval(
+            {
+                "type": "GATE_RELEASE_DECISION",
+                "stage": "测试域 G4",
+                "requester": f"测试Agent@{state.get('task_ref', 'run')}",
+                "task_ref": state.get("task_ref", ""),
+                "context_snapshot": {
+                    "artifact_ref": f"测试报告-{state.get('title', '')[:20]}",
+                    "diff_summary": f"独立测试执行{'通过' if not open_defects else '存在未关闭缺陷'}：{state.get('test_result', '')}",
+                    "evidence": [
+                        f"测试文件：{len(state.get('test_files', []))} 个",
+                        f"缺陷单：{len(defects)} 个（未关闭 {len(open_defects)} 个）",
+                        "测试报告：见 artifact_ref",
+                    ],
+                    "risk": {"score": 55, "level": "L2", "factors": ["影响面:试点功能", "不可逆:可回滚"]},
+                    "self_review": "已按验收标准逐条生成独立用例；未关闭缺陷需人工确认",
+                },
+                "options": ["approve", "reject", "revise"],
+                "deadline": (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat(),
+                "escalation_policy": {
+                    "remind_after_hours": 24,
+                    "escalate_to": "release_lead",
+                    "timeout_action": "reject",
+                },
+            }
+        )
+        return {
+            "test_report": report_text,
+            "approval_id_g4": approval.get("id", ""),
+            "logs": [f"step:report done (approval={approval.get('id', '')})"],
+        }
+
+    def gate_g4(state: TestState) -> dict:
+        decision = interrupt({"gate": "G4_RELEASE_DECISION", "approval_id": state.get("approval_id_g4", "")}) or {}
+        return {
+            "gate4_decision": decision.get("decision", "reject"),
+            "gate4_comment": decision.get("comment", ""),
+            "logs": [f"gate:g4 decision={decision.get('decision')}"],
+        }
+
+    def route_g4(state: TestState) -> str:
+        return "done_end" if state.get("gate4_decision") == "approve" else "reject_end"
+
+    def done_end(state: TestState) -> dict:
+        return {"logs": ["step:release approved —— 交付运维域（Phase 2 运维域）"]}
+
+    def reject_end(state: TestState) -> dict:
+        return {"logs": [f"release rejected: {state.get('gate4_comment', '')}"]}
+
+    builder = StateGraph(TestState)
+    builder.add_node("plan", plan)
+    builder.add_node("execute", execute)
+    builder.add_node("report", report)
+    builder.add_node("gate_g4", gate_g4)
+    builder.add_node("done_end", done_end)
+    builder.add_node("reject_end", reject_end)
+    builder.add_edge(START, "plan")
+    builder.add_edge("plan", "execute")
+    builder.add_edge("execute", "report")
+    builder.add_edge("report", "gate_g4")
+    builder.add_conditional_edges(
+        "gate_g4", route_g4, {"done_end": "done_end", "reject_end": "reject_end"}
+    )
+    builder.add_edge("done_end", END)
     builder.add_edge("reject_end", END)
 
     return builder.compile(checkpointer=MemorySaver())

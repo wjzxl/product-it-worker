@@ -74,6 +74,9 @@ class GitLabClient:
             "PUT", f"/api/v4/projects/{self._encode(project_id)}/issues/{iid}", json=fields
         )
 
+    def close_issue(self, project_id, iid: int) -> dict:
+        return self.update_issue(project_id, iid, state_event="close")
+
     # ---------- Merge Request ----------
     def comment_mr(self, project_id, mr_iid: int, body: str) -> dict:
         return self._request(

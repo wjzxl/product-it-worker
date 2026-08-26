@@ -44,6 +44,11 @@ class GitLabAPI:
         resp.raise_for_status()
         return resp.json()
 
+    def close_issue(self, project_id: Any, iid: int) -> dict:
+        resp = self._client.post(f"{self.base_url}/gitlab/issues/{project_id}/{iid}/close")
+        resp.raise_for_status()
+        return resp.json()
+
     def create_mr(self, project_id: Any, source_branch: str, target_branch: str, title: str, description: str) -> dict:
         resp = self._client.post(
             f"{self.base_url}/gitlab/mrs",
@@ -104,11 +109,16 @@ class MockGitLabAPI:
         self.created: list[dict] = []
         self.created_mrs: list[dict] = []
         self.merged: list[dict] = []
+        self.closed_issues: list[int] = []
 
     def create_issue(self, project_id, title, description, labels) -> dict:
         item = {"project_id": project_id, "title": title, "description": description, "labels": labels, "iid": len(self.created) + 12}
         self.created.append(item)
         return item
+
+    def close_issue(self, project_id, iid) -> dict:
+        self.closed_issues.append(iid)
+        return {"iid": iid, "state": "closed"}
 
     def create_mr(self, project_id, source_branch, target_branch, title, description) -> dict:
         item = {

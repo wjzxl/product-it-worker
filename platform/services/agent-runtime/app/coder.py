@@ -56,12 +56,25 @@ class Coder:
         self.push = push
 
     # ---------- 对外主流程 ----------
-    def implement(self, task: dict, prd: str, tech_design: str, workdir: str | None = None, push: bool | None = None) -> dict:
+    def implement(
+        self,
+        task: dict,
+        prd: str,
+        tech_design: str,
+        workdir: str | None = None,
+        push: bool | None = None,
+        branch_prefix: str = "feat/issue-",
+        branch_suffix: str = "",
+        only_src: bool = False,
+        allowed_files: list[str] | None = None,
+    ) -> dict:
         issue_ref = task.get("task_ref") or task.get("issue_ref", "")
         iid = str(issue_ref).split("#")[-1] or "0"
-        branch = f"feat/issue-{iid}"
+        branch = f"{branch_prefix}{iid}{branch_suffix}"
         repo = workdir or self.workdir or tempfile.mkdtemp(prefix="coder-")
         push = self.push if push is None else push
+        self._only_src = only_src  # 缺陷修复模式：只允许改 src/（测试文件由测试域定义）
+        self._allowed_files = allowed_files  # 缺陷修复模式：仅允许修改这些文件（从失败测试反推）
 
         if os.path.isdir(os.path.join(repo, ".git")):
             # 复用既有 checkout（测试用），切新分支
@@ -81,7 +94,11 @@ class Coder:
             files = self._parse_files(raw)
             if files is None:
                 raise CodingError("LLM 输出无法解析为 JSON 文件清单")
-            self._apply_files(repo, files)
+            self._apply_files(
+                repo, files,
+                only_src=getattr(self, "_only_src", False),
+                allowed_files=getattr(self, "_allowed_files", None),
+            )
             changed = files
             test_result = self._run_tests(repo)
             if test_result["ok"]:
@@ -116,6 +133,12 @@ class Coder:
         self._git(repo, "checkout", "-b", branch)
 
     def _build_prompt(self, task: dict, prd: str, tech_design: str, repo_files: list[str], feedback: str) -> str:
+        rule = (
+            "\n# 约束（缺陷修复模式）\n测试文件已存在且由测试域定义，**禁止修改或新增 tests/ 下任何文件**；"
+            "只输出 src/ 下实现代码的修改。"
+            if getattr(self, "_only_src", False)
+            else ""
+        )
         return (
             f"# 任务\n标题：{task.get('title', '')}\n引用：{task.get('task_ref', '')}\n"
             f"项目路径：{self.project_path}\n\n"
@@ -123,6 +146,7 @@ class Coder:
             f"# 技术方案\n{tech_design[:4000]}\n\n"
             f"# 仓库现状文件\n{chr(10).join(repo_files)}\n\n"
             + (f"# 上一轮测试反馈（必须解决）\n{feedback}\n" if feedback else "")
+            + rule
             + "\n请输出实现（含测试）的文件清单 JSON。"
         )
 
@@ -157,13 +181,19 @@ class Coder:
         return cleaned
 
     @staticmethod
-    def _apply_files(repo: str, files: dict) -> None:
+    def _apply_files(repo: str, files: dict, only_src: bool = False, allowed_files: list[str] | None = None) -> None:
         # 保护关键配置文件：AI 不允许覆盖（否则会破坏构建/测试配置）
         protected = {".gitignore", "pyproject.toml", "setup.py", "setup.cfg", "tox.ini", ".gitlab-ci.yml", "README.md"}
         for rel, content in files.items():
             base = rel.split("/")[0]
             if rel in protected:
                 logger.warning("[coder] 跳过保护文件: %s", rel)
+                continue
+            if only_src and not rel.startswith("src/"):
+                logger.warning("[coder] 缺陷修复模式：跳过非 src 文件: %s", rel)
+                continue
+            if allowed_files is not None and rel not in allowed_files:
+                logger.warning("[coder] 缺陷修复模式：跳过非关联文件: %s", rel)
                 continue
             if base not in ("src", "tests") and rel in _existing(repo):
                 logger.warning("[coder] 不允许覆盖既有非代码文件: %s", rel)

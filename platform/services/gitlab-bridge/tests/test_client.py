@@ -74,6 +74,21 @@ def test_merge_mr():
     assert captured["method"] == "PUT"
 
 
+def test_close_issue():
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["json"] = json.loads(request.content)
+        return httpx.Response(200, json={"state": "closed"})
+
+    client = GitLabClient("https://gitlab.example.com", "tok", transport=httpx.MockTransport(handler))
+    result = client.close_issue(42, 7)
+    assert result["state"] == "closed"
+    assert captured["url"].endswith("/api/v4/projects/42/issues/7")
+    assert captured["json"] == {"state_event": "close"}
+
+
 def test_api_error_raises():
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(404, json={"message": "404 Project Not Found"})

@@ -1,4 +1,4 @@
-"""Agent 运行时入口：产品域（PRD+G1）与研发域（方案+G2+编码+MR+G3+合入）两条 SOP。
+"""Agent 运行时入口：产品域（PRD+G1）/ 研发域（方案+G2+编码+MR+G3+合入）/ 测试域（独立用例+G4 放行）。
 
 Phase 0/1 编排方式：演示脚本驱动"启动 → 人审 → 恢复"；
 Phase 2 起由工作流引擎（n8n/Temporal）消费 approval.decided 事件自动恢复。
@@ -16,13 +16,15 @@ from pydantic import BaseModel, Field
 from .apis import ApprovalAPI, GitLabAPI
 from .coder import Coder
 from .llm import llm_from_env
-from .sop import FlowContext, build_dev_graph, build_graph
+from .sop import FlowContext, build_dev_graph, build_graph, build_test_graph
+from .tester import TestEngine
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger(__name__)
 
 SOP_PRODUCT = "product-domain/prd-flow"
 SOP_DEV = "dev-domain/issue-to-merge"
+SOP_TEST = "test-domain/release-gate"
 
 
 class RunIn(BaseModel):
@@ -49,9 +51,14 @@ def _status(graph, thread_id: str, sop: str) -> dict:
     values = snap.values or {}
     next_nodes = list(snap.next or [])
 
-    gate = next((g for g in ("gate_g1", "gate_g2", "gate_g3") if g in next_nodes), None)
+    gate = next((g for g in ("gate_g1", "gate_g2", "gate_g3", "gate_g4") if g in next_nodes), None)
     if gate:
-        aid_key = {"gate_g1": "approval_id", "gate_g2": "approval_id_g2", "gate_g3": "approval_id_g3"}[gate]
+        aid_key = {
+            "gate_g1": "approval_id",
+            "gate_g2": "approval_id_g2",
+            "gate_g3": "approval_id_g3",
+            "gate_g4": "approval_id_g4",
+        }[gate]
         body = {
             "thread_id": thread_id,
             "sop": sop,
@@ -70,6 +77,10 @@ def _status(graph, thread_id: str, sop: str) -> dict:
             body["mr_url"] = values.get("mr_url", "")
             body["branch"] = values.get("branch", "")
             body["test_result"] = values.get("test_result", "")
+        if gate == "gate_g4":
+            body["test_result"] = values.get("test_result", "")
+            body["test_report"] = values.get("test_report", "")
+            body["defects"] = values.get("defects", [])
         return body
 
     if not next_nodes:
@@ -81,8 +92,18 @@ def _status(graph, thread_id: str, sop: str) -> dict:
                 "branch": values.get("branch", ""), "test_result": values.get("test_result", ""),
                 "logs": values.get("logs", []),
             }
-        if values.get("gate_decision") == "reject" or values.get("gate3_decision") == "reject" or values.get("gate2_decision") == "reject":
-            comment = values.get("gate3_comment") or values.get("gate2_comment") or values.get("gate_comment", "")
+        if (
+            values.get("gate_decision") == "reject"
+            or values.get("gate3_decision") == "reject"
+            or values.get("gate2_decision") == "reject"
+            or values.get("gate4_decision") == "reject"
+        ):
+            comment = (
+                values.get("gate4_comment")
+                or values.get("gate3_comment")
+                or values.get("gate2_comment")
+                or values.get("gate_comment", "")
+            )
             return {"thread_id": thread_id, "sop": sop, "status": "rejected", "comment": comment, "logs": values.get("logs", [])}
         return {"thread_id": thread_id, "sop": sop, "status": "done", "issue": values.get("issue"), "logs": values.get("logs", [])}
 
@@ -94,28 +115,41 @@ def create_app(
     gitlab_api=None,
     llm=None,
     coder=None,
+    tester=None,
 ) -> FastAPI:
     llm = llm or llm_from_env()
+    gitlab_api = gitlab_api or GitLabAPI(os.getenv("GITLAB_BRIDGE_URL", "http://localhost:8001"))
+    coder = coder or Coder(
+        llm=llm,
+        gitlab_url=os.getenv("GITLAB_URL", "https://gitlab.com"),
+        gitlab_token=os.getenv("GITLAB_TOKEN", ""),
+        project_path=os.getenv("DEMO_PROJECT", "sandbox/prodesgin"),
+    )
+    tester = tester or TestEngine(
+        llm=llm,
+        coder=coder,
+        gitlab_api=gitlab_api,
+        gitlab_url=os.getenv("GITLAB_URL", "https://gitlab.com"),
+        gitlab_token=os.getenv("GITLAB_TOKEN", ""),
+        project_path=os.getenv("DEMO_PROJECT", "sandbox/prodesgin"),
+    )
     ctx = FlowContext(
         llm=llm,
         approval_api=approval_api or ApprovalAPI(os.getenv("APPROVAL_GATEWAY_URL", "http://localhost:8000")),
-        gitlab_api=gitlab_api or GitLabAPI(os.getenv("GITLAB_BRIDGE_URL", "http://localhost:8001")),
-        coder=coder or Coder(
-            llm=llm,
-            gitlab_url=os.getenv("GITLAB_URL", "https://gitlab.com"),
-            gitlab_token=os.getenv("GITLAB_TOKEN", ""),
-            project_path=os.getenv("DEMO_PROJECT", "sandbox/prodesgin"),
-        ),
+        gitlab_api=gitlab_api,
+        coder=coder,
+        tester=tester,
     )
     graphs = {
         SOP_PRODUCT: build_graph(ctx),
         SOP_DEV: build_dev_graph(ctx),
+        SOP_TEST: build_test_graph(ctx),
     }
 
     app = FastAPI(
         title="agent-runtime",
-        description="Agent 运行时：产品域 PRD+G1 / 研发域 方案+编码+MR+G3（设计文档 02 §1/§2）",
-        version="0.2.0",
+        description="Agent 运行时：产品域 PRD+G1 / 研发域 方案+编码+MR+G3 / 测试域 独立用例+G4（设计文档 02）",
+        version="0.3.0",
     )
     app.state.ctx = ctx
     app.state.graphs = graphs
@@ -165,7 +199,7 @@ def create_app(
             raise HTTPException(status_code=404, detail=f"线程 {thread_id} 不存在")
         config = _config(thread_id, sop)
         snap = graph.get_state(config)
-        if snap.next and not any(g in list(snap.next) for g in ("gate_g1", "gate_g2", "gate_g3")):
+        if snap.next and not any(g in list(snap.next) for g in ("gate_g1", "gate_g2", "gate_g3", "gate_g4")):
             raise HTTPException(status_code=409, detail="当前流程不在人审挂起状态")
         try:
             graph.invoke(Command(resume={"decision": body.decision, "comment": body.comment}), config)

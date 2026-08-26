@@ -103,6 +103,14 @@ def create_app(settings: Settings) -> FastAPI:
         except GitLabAPIError as exc:
             raise HTTPException(status_code=502, detail=str(exc))
 
+    @app.post("/gitlab/issues/{project_id}/{iid}/close")
+    def close_issue(project_id: str, iid: int) -> dict:
+        """关闭 Issue（缺陷闭环：修复验证通过后关闭缺陷单）。"""
+        try:
+            return app.state.gitlab.close_issue(project_id, iid)
+        except GitLabAPIError as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
+
     @app.post("/gitlab/mrs/notes")
     def comment_mr(body: NoteIn) -> dict:
         try:
