@@ -459,3 +459,243 @@ def build_test_graph(ctx: FlowContext):
     builder.add_edge("reject_end", END)
 
     return builder.compile(checkpointer=MemorySaver())
+
+
+# =====================================================================
+# 运维域 SOP：告警诊断 → 分级处置 → G5 变更审批 → 变更执行 → 复盘文档 → G6 复盘审查
+# =====================================================================
+
+
+class OpsState(TypedDict, total=False):
+    project_id: str
+    path_with_namespace: str
+    task_ref: str
+    title: str
+    alert: dict
+    context: str          # 日志/指标摘要（诊断输入）
+    runbook: str          # Runbook 文本（MVP 由输入提供；后续接知识库 RAG）
+    diagnosis: str        # 诊断报告
+    change_type: str      # fix_code / operational
+    fix_branch: str
+    fix_result: str
+    fix_mr_iid: int
+    approval_id_g5: str
+    gate5_decision: str
+    gate5_comment: str
+    execution: str
+    change_issue_iid: int
+    postmortem: str
+    approval_id_g6: str
+    gate6_decision: str
+    gate6_comment: str
+    logs: Annotated[list[str], operator.add]
+
+
+def _parse_diag_json(raw: str) -> dict | None:
+    """宽松解析诊断 JSON（LLM 可能带围栏/注释）。"""
+    text = raw.strip()
+    if text.startswith("```"):
+        text = text.strip("`")
+        if text.startswith("json"):
+            text = text[4:]
+    start, end = text.find("{"), text.rfind("}")
+    if start < 0 or end <= start:
+        return None
+    try:
+        import json
+
+        data = json.loads(text[start : end + 1])
+        return data if isinstance(data, dict) else None
+    except json.JSONDecodeError:
+        return None
+
+
+def build_ops_graph(ctx: FlowContext):
+    def diagnose(state: OpsState) -> dict:
+        alert = state.get("alert") or {}
+        prompt = (
+            "你是运维域诊断 Agent。基于告警、上下文与 Runbook 输出诊断报告（JSON）：\n"
+            "{\"root_cause\": \"...\", \"impact\": \"...\", \"change_type\": \"fix_code|operational\", "
+            "\"change_summary\": \"建议变更...\", \"risk_level\": \"L2|L3\"}\n\n"
+            f"# 告警\n{alert}\n\n# 上下文（日志/指标）\n{state.get('context', '')[:3000]}\n\n"
+            f"# Runbook\n{state.get('runbook', '')[:2000]}\n"
+            "- fix_code：需要修改代码（走修复分支+MR）；operational：操作类处置（重启/回滚/扩容等）"
+        )
+        raw = ctx.llm.chat([{"role": "user", "content": prompt}])
+        diag = _parse_diag_json(raw) or {}
+        change_type = diag.get("change_type", "operational")
+        if change_type not in ("fix_code", "operational"):
+            change_type = "operational"
+        summary = (
+            f"根因：{diag.get('root_cause', raw[:200])}\n影响：{diag.get('impact', '待评估')}\n"
+            f"建议变更：{diag.get('change_summary', '待定')}"
+        )
+        return {
+            "diagnosis": summary,
+            "change_type": change_type,
+            "logs": [f"step:diagnose type={change_type} risk={diag.get('risk_level', 'L3')}"],
+        }
+
+    def change_prepare(state: OpsState) -> dict:
+        """按分级准备变更：fix_code → AI 生成修复（分支）；operational → 仅记录变更方案。"""
+        if state.get("change_type") == "fix_code":
+            if ctx.coder is None:
+                raise RuntimeError("未配置编码执行器（Coder）")
+            alert_id = str((state.get("alert") or {}).get("id", "alert"))
+            tech_design = (
+                f"{state.get('diagnosis', '')[:2500]}\n"
+                "约束：最小化修改——只改动必要的实现行，禁止重写整个文件，禁止改 exports 等无关模块。"
+            )
+            result = ctx.coder.implement(
+                task={"task_ref": alert_id, "title": (state.get("alert") or {}).get("title", "告警修复")},
+                prd=tech_design,
+                tech_design=tech_design,
+                branch_prefix="fix/alert-",
+                only_src=True,
+            )
+            return {"fix_branch": result["branch"], "fix_result": result["test_result"], "logs": [f"step:change_prepare fix {result['branch']}"]}
+        return {"logs": ["step:change_prepare operational（操作类变更）"]}
+
+    def g5_approval(state: OpsState) -> dict:
+        approval = ctx.approval_api.create_approval(
+            {
+                "type": "GATE_CHANGE_APPROVAL",
+                "stage": "运维域 G5",
+                "requester": f"运维Agent@{(state.get('alert') or {}).get('id', 'run')}",
+                "task_ref": str((state.get("alert") or {}).get("id", "")),
+                "context_snapshot": {
+                    "artifact_ref": f"变更方案-{state.get('change_type')}",
+                    "diff_summary": f"告警处置变更：{state.get('change_type')} — {state.get('diagnosis', '')[:200]}",
+                    "evidence": [
+                        f"告警：{(state.get('alert') or {}).get('title', '')}",
+                        "诊断报告：见 artifact_ref",
+                        f"修复分支：{state.get('fix_branch', '-')}（fix_code 时）",
+                    ],
+                    "risk": {"score": 70, "level": "L3", "factors": ["影响面:生产", "不可逆:需回滚预案"]},
+                    "self_review": "已按 Runbook 核对；生产变更强制审批",
+                },
+                "options": ["approve", "reject", "revise"],
+                "deadline": (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat(),
+                "escalation_policy": {
+                    "remind_after_hours": 12,
+                    "escalate_to": "ops_lead",
+                    "timeout_action": "reject",
+                },
+            }
+        )
+        return {"approval_id_g5": approval.get("id", ""), "logs": [f"step:g5_approval {approval.get('id', '')}"]}
+
+    def gate_g5(state: OpsState) -> dict:
+        decision = interrupt({"gate": "G5_CHANGE_APPROVAL", "approval_id": state.get("approval_id_g5", "")}) or {}
+        return {
+            "gate5_decision": decision.get("decision", "reject"),
+            "gate5_comment": decision.get("comment", ""),
+            "logs": [f"gate:g5 decision={decision.get('decision')}"],
+        }
+
+    def route_g5(state: OpsState) -> str:
+        return "execute" if state.get("gate5_decision") == "approve" else "reject_end"
+
+    def execute(state: OpsState) -> dict:
+        if state.get("change_type") == "fix_code" and state.get("fix_branch"):
+            # 真实合入修复（push 模式）；测试模式仅记录
+            mr = ctx.gitlab_api.create_mr(
+                state.get("project_id", "sandbox/prodesgin"),
+                state.get("fix_branch", ""), "main",
+                title=f"fix: 告警处置 {(state.get('alert') or {}).get('title', '')}",
+                description=state.get("diagnosis", "")[:2000],
+            )
+            mr_info = ctx.gitlab_api.get_mr(state.get("project_id", "sandbox/prodesgin"), mr.get("iid"))
+            ctx.gitlab_api.merge_mr(state.get("project_id", "sandbox/prodesgin"), mr.get("iid"), sha=mr_info.get("sha"))
+            return {
+                "execution": f"fix_code 已合入 MR !{mr.get('iid')}",
+                "fix_mr_iid": mr.get("iid"),
+                "logs": [f"step:execute merged !{mr.get('iid')}"],
+            }
+        # operational：记录执行 + 创建变更记录单
+        change_issue = ctx.gitlab_api.create_issue(
+            state.get("project_id", "sandbox/prodesgin"),
+            title=f"变更: {(state.get('alert') or {}).get('title', '')}",
+            description=f"操作类变更已执行（模拟）：\n{state.get('diagnosis', '')[:2000]}",
+            labels=["change", "auto-ops"],
+        )
+        return {
+            "execution": "operational 变更已执行（模拟：重启/扩容等操作）",
+            "change_issue_iid": change_issue.get("iid"),
+            "logs": [f"step:execute operational change #{change_issue.get('iid')}"],
+        }
+
+    def postmortem(state: OpsState) -> dict:
+        prompt = (
+            "生成故障复盘文档（时间线/根因/影响/改进项/跟进负责人）：\n"
+            f"告警：{state.get('alert')}\n诊断：{state.get('diagnosis', '')}\n"
+            f"处置：{state.get('execution', '')}\n变更类型：{state.get('change_type')}"
+        )
+        report = ctx.llm.chat([{"role": "user", "content": prompt}])
+        approval = ctx.approval_api.create_approval(
+            {
+                "type": "GATE_POSTMORTEM_REVIEW",
+                "stage": "运维域 G6",
+                "requester": f"运维Agent@{(state.get('alert') or {}).get('id', 'run')}",
+                "task_ref": str((state.get("alert") or {}).get("id", "")),
+                "context_snapshot": {
+                    "artifact_ref": f"复盘-{(state.get('alert') or {}).get('title', '')[:20]}",
+                    "diff_summary": f"复盘文档已生成：{state.get('execution', '')}",
+                    "evidence": [f"告警：{(state.get('alert') or {}).get('title', '')}", "诊断：见复盘文档"],
+                    "risk": {"score": 40, "level": "L2", "factors": ["复盘审查", "常规告警"]},
+                    "self_review": "复盘含根因与改进项；事故级需技术负责人审查",
+                },
+                "options": ["approve", "reject", "revise"],
+                "deadline": (datetime.now(timezone.utc) + timedelta(hours=48)).isoformat(),
+                "escalation_policy": {"remind_after_hours": 48, "escalate_to": "tech_lead", "timeout_action": "reject"},
+            }
+        )
+        return {
+            "postmortem": report,
+            "approval_id_g6": approval.get("id", ""),
+            "logs": [f"step:postmortem {approval.get('id', '')}"],
+        }
+
+    def gate_g6(state: OpsState) -> dict:
+        decision = interrupt({"gate": "G6_POSTMORTEM_REVIEW", "approval_id": state.get("approval_id_g6", "")}) or {}
+        return {
+            "gate6_decision": decision.get("decision", "reject"),
+            "gate6_comment": decision.get("comment", ""),
+            "logs": [f"gate:g6 decision={decision.get('decision')}"],
+        }
+
+    def route_g6(state: OpsState) -> str:
+        return "done_end" if state.get("gate6_decision") == "approve" else "reject_end"
+
+    def done_end(state: OpsState) -> dict:
+        return {"logs": ["step:ops closed —— 稳态"]}
+
+    def reject_end(state: OpsState) -> dict:
+        return {"logs": [f"ops rejected: {state.get('gate5_comment') or state.get('gate6_comment', '')}"]}
+
+    builder = StateGraph(OpsState)
+    builder.add_node("diagnose", diagnose)
+    builder.add_node("change_prepare", change_prepare)
+    builder.add_node("g5_approval", g5_approval)
+    builder.add_node("gate_g5", gate_g5)
+    builder.add_node("execute", execute)
+    builder.add_node("postmortem_doc", postmortem)
+    builder.add_node("gate_g6", gate_g6)
+    builder.add_node("done_end", done_end)
+    builder.add_node("reject_end", reject_end)
+    builder.add_edge(START, "diagnose")
+    builder.add_edge("diagnose", "change_prepare")
+    builder.add_edge("change_prepare", "g5_approval")
+    builder.add_edge("g5_approval", "gate_g5")
+    builder.add_conditional_edges(
+        "gate_g5", route_g5, {"execute": "execute", "reject_end": "reject_end"}
+    )
+    builder.add_edge("execute", "postmortem_doc")
+    builder.add_edge("postmortem_doc", "gate_g6")
+    builder.add_conditional_edges(
+        "gate_g6", route_g6, {"done_end": "done_end", "reject_end": "reject_end"}
+    )
+    builder.add_edge("done_end", END)
+    builder.add_edge("reject_end", END)
+
+    return builder.compile(checkpointer=MemorySaver())

@@ -73,6 +73,7 @@ class Coder:
         branch = f"{branch_prefix}{iid}{branch_suffix}"
         repo = workdir or self.workdir or tempfile.mkdtemp(prefix="coder-")
         push = self.push if push is None else push
+        self._repo = repo  # prompt 附带文件全文用
         self._only_src = only_src  # 缺陷修复模式：只允许改 src/（测试文件由测试域定义）
         self._allowed_files = allowed_files  # 缺陷修复模式：仅允许修改这些文件（从失败测试反推）
 
@@ -145,10 +146,32 @@ class Coder:
             f"# PRD（验收标准）\n{prd[:6000]}\n\n"
             f"# 技术方案\n{tech_design[:4000]}\n\n"
             f"# 仓库现状文件\n{chr(10).join(repo_files)}\n\n"
+            f"# 相关文件内容（外科手术式编辑：基于真实内容做最小修改，禁止用占位注释替换函数体）\n"
+            f"{self._related_sources(repo_files)}\n\n"
             + (f"# 上一轮测试反馈（必须解决）\n{feedback}\n" if feedback else "")
             + rule
             + "\n请输出实现（含测试）的文件清单 JSON。"
         )
+
+    def _related_sources(self, repo_files: list[str]) -> str:
+        """小仓库附带 src 文件全文，帮助模型做精确修改（总长受限）。"""
+        if getattr(self, "_repo", None) is None:
+            return "（无）"
+        parts: list[str] = []
+        total = 0
+        for rel in sorted(repo_files):
+            if not rel.startswith("src/") or not rel.endswith(".py"):
+                continue
+            path = os.path.join(self._repo, rel)
+            try:
+                content = open(path, encoding="utf-8").read()
+            except OSError:
+                continue
+            if total + len(content) > 10000:
+                continue
+            parts.append(f"--- {rel} ---\n{content}")
+            total += len(content)
+        return "\n".join(parts) or "（无）"
 
     @staticmethod
     def _parse_files(raw: str) -> dict | None:

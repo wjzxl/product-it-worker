@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from .apis import ApprovalAPI, GitLabAPI
 from .coder import Coder
 from .llm import llm_from_env
-from .sop import FlowContext, build_dev_graph, build_graph, build_test_graph
+from .sop import FlowContext, build_dev_graph, build_graph, build_ops_graph, build_test_graph
 from .tester import TestEngine
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 SOP_PRODUCT = "product-domain/prd-flow"
 SOP_DEV = "dev-domain/issue-to-merge"
 SOP_TEST = "test-domain/release-gate"
+SOP_OPS = "ops-domain/alert-to-postmortem"
 
 
 class RunIn(BaseModel):
@@ -35,6 +36,9 @@ class RunIn(BaseModel):
     project_id: str = "sandbox/prodesgin"
     path_with_namespace: str = ""
     prd_doc: str = ""
+    alert: dict = Field(default_factory=dict)   # 运维域：告警载荷
+    context: str = ""       # 运维域：日志/指标上下文
+    runbook: str = ""       # 运维域：Runbook 文本
 
 
 class ResumeIn(BaseModel):
@@ -51,13 +55,15 @@ def _status(graph, thread_id: str, sop: str) -> dict:
     values = snap.values or {}
     next_nodes = list(snap.next or [])
 
-    gate = next((g for g in ("gate_g1", "gate_g2", "gate_g3", "gate_g4") if g in next_nodes), None)
+    gate = next((g for g in ("gate_g1", "gate_g2", "gate_g3", "gate_g4", "gate_g5", "gate_g6") if g in next_nodes), None)
     if gate:
         aid_key = {
             "gate_g1": "approval_id",
             "gate_g2": "approval_id_g2",
             "gate_g3": "approval_id_g3",
             "gate_g4": "approval_id_g4",
+            "gate_g5": "approval_id_g5",
+            "gate_g6": "approval_id_g6",
         }[gate]
         body = {
             "thread_id": thread_id,
@@ -81,6 +87,13 @@ def _status(graph, thread_id: str, sop: str) -> dict:
             body["test_result"] = values.get("test_result", "")
             body["test_report"] = values.get("test_report", "")
             body["defects"] = values.get("defects", [])
+        if gate == "gate_g5":
+            body["diagnosis"] = values.get("diagnosis", "")
+            body["change_type"] = values.get("change_type", "")
+            body["fix_branch"] = values.get("fix_branch", "")
+        if gate == "gate_g6":
+            body["postmortem"] = values.get("postmortem", "")
+            body["execution"] = values.get("execution", "")
         return body
 
     if not next_nodes:
@@ -97,9 +110,13 @@ def _status(graph, thread_id: str, sop: str) -> dict:
             or values.get("gate3_decision") == "reject"
             or values.get("gate2_decision") == "reject"
             or values.get("gate4_decision") == "reject"
+            or values.get("gate5_decision") == "reject"
+            or values.get("gate6_decision") == "reject"
         ):
             comment = (
-                values.get("gate4_comment")
+                values.get("gate6_comment")
+                or values.get("gate5_comment")
+                or values.get("gate4_comment")
                 or values.get("gate3_comment")
                 or values.get("gate2_comment")
                 or values.get("gate_comment", "")
@@ -144,6 +161,7 @@ def create_app(
         SOP_PRODUCT: build_graph(ctx),
         SOP_DEV: build_dev_graph(ctx),
         SOP_TEST: build_test_graph(ctx),
+        SOP_OPS: build_ops_graph(ctx),
     }
 
     app = FastAPI(
@@ -176,6 +194,10 @@ def create_app(
         }
         if body.sop == SOP_DEV:
             init["prd_doc"] = body.prd_doc
+        if body.sop == SOP_OPS:
+            init["alert"] = body.alert
+            init["context"] = body.context
+            init["runbook"] = body.runbook
         try:
             graph.invoke(init, config)
         except Exception as exc:
@@ -199,7 +221,7 @@ def create_app(
             raise HTTPException(status_code=404, detail=f"线程 {thread_id} 不存在")
         config = _config(thread_id, sop)
         snap = graph.get_state(config)
-        if snap.next and not any(g in list(snap.next) for g in ("gate_g1", "gate_g2", "gate_g3", "gate_g4")):
+        if snap.next and not any(g in list(snap.next) for g in ("gate_g1", "gate_g2", "gate_g3", "gate_g4", "gate_g5", "gate_g6")):
             raise HTTPException(status_code=409, detail="当前流程不在人审挂起状态")
         try:
             graph.invoke(Command(resume={"decision": body.decision, "comment": body.comment}), config)

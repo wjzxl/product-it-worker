@@ -31,23 +31,48 @@ class GitLabAPI:
         self.base_url = base_url.rstrip("/")
         self._client = httpx.Client(timeout=30, transport=transport)
 
-    def create_issue(self, project_id: Any, title: str, description: str, labels: list[str]) -> dict:
-        resp = self._client.post(
-            f"{self.base_url}/gitlab/issues",
-            json={
-                "project_id": project_id,
-                "title": title,
-                "description": description,
-                "labels": labels,
-            },
-        )
-        resp.raise_for_status()
-        return resp.json()
+    def create_issue(self, project_id: Any, title: str, description: str, labels: list[str], retries: int = 2) -> dict:
+        """建单带 5xx/网络重试（代理抖动环境）。"""
+        import time as _time
 
-    def close_issue(self, project_id: Any, iid: int) -> dict:
-        resp = self._client.post(f"{self.base_url}/gitlab/issues/{project_id}/{iid}/close")
-        resp.raise_for_status()
-        return resp.json()
+        last: httpx.HTTPStatusError | None = None
+        for attempt in range(retries + 1):
+            resp = self._client.post(
+                f"{self.base_url}/gitlab/issues",
+                json={
+                    "project_id": project_id,
+                    "title": title,
+                    "description": description,
+                    "labels": labels,
+                },
+            )
+            if resp.status_code < 400:
+                return resp.json()
+            try:
+                resp.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                last = exc
+            if attempt < retries:
+                _time.sleep(5)
+        assert last is not None
+        raise last
+
+    def close_issue(self, project_id: Any, iid: int, retries: int = 2) -> dict:
+        import time as _time
+
+        last: httpx.HTTPStatusError | None = None
+        for attempt in range(retries + 1):
+            resp = self._client.post(f"{self.base_url}/gitlab/issues/{project_id}/{iid}/close")
+            if resp.status_code < 400:
+                return resp.json()
+            try:
+                resp.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                last = exc
+            if attempt < retries:
+                _time.sleep(5)
+        assert last is not None
+        raise last
 
     def create_mr(self, project_id: Any, source_branch: str, target_branch: str, title: str, description: str) -> dict:
         resp = self._client.post(

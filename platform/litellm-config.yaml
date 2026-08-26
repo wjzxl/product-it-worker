@@ -21,6 +21,18 @@ model_list:
       model: deepseek/deepseek-chat
       api_key: os.environ/DEEPSEEK_API_KEY
 
+  # Qwen（阿里云百炼 DashScope，OpenAI 兼容）
+  - model_name: qwen-max
+    litellm_params:
+      model: openai/qwen-max
+      api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+      api_key: os.environ/QWEN_API_KEY
+  - model_name: qwen-plus
+    litellm_params:
+      model: openai/qwen-plus
+      api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+      api_key: os.environ/QWEN_API_KEY
+
   # Mock 模型：真实 Key 未就绪时验证网关全链路（后端 = scripts/mock_llm_server.py）
   # 使用方式：python3 platform/scripts/mock_llm_server.py 后，网关内即可调用 mock-gpt / mock-embed
   - model_name: mock-gpt
