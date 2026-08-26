@@ -50,9 +50,9 @@ Issue → tech_design(DeepSeek 技术方案) → G2 评审 ⏸ → AI 编码(真
 
 ## 3. 批量试点（真实 Issue 端到端）✅
 
-**10 个真实 Issue 全链路合入**（试点 9 + 演示 1）：MR #4~#8、#10~#13 全部 merged；测试规模 2 → 95；
-平均端到端 56.3s；G2 决策平均 3.3s、G3 决策平均 0.53s（目标 <5 分钟）；
-含 1 次真实"退回修订→再审批"演练（#20）与单元级 reject/revise 覆盖。
+**11 个真实 Issue 全链路合入**（试点 10 + 演示 1）：MR #4~#8、#10~#13、#15 全部 merged；测试规模 2 → 115；
+平均端到端 67.1s；G2 决策平均 3.0s、G3 决策平均 0.49s（目标 <5 分钟）；
+**2 次真实"退回修订→再审批"演练**（#20 报表字段重命名、#25 报表周汇总）+ 单元级 reject/revise 覆盖。
 
 详见 [platform/reports/phase1-pilot-summary.md](platform/reports/phase1-pilot-summary.md)。
 

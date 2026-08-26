@@ -32,11 +32,25 @@ class GitLabClient:
     def close(self) -> None:
         self._client.close()
 
-    def _request(self, method: str, path: str, **kwargs) -> dict:
-        resp = self._client.request(method, path, **kwargs)
-        if resp.status_code >= 400:
-            raise GitLabAPIError(f"{method} {path} -> HTTP {resp.status_code}: {resp.text[:200]}")
-        return resp.json() if resp.content else {}
+    def _request(self, method: str, path: str, retries: int = 2, **kwargs) -> dict:
+        """带网络级重试：代理/连接抖动是环境常态（httpx.TransportError 类）。"""
+        import time as _time
+
+        last: Exception | None = None
+        for attempt in range(retries + 1):
+            try:
+                resp = self._client.request(method, path, **kwargs)
+                if resp.status_code >= 400:
+                    raise GitLabAPIError(
+                        f"{method} {path} -> HTTP {resp.status_code}: {resp.text[:200]}"
+                    )
+                return resp.json() if resp.content else {}
+            except httpx.TransportError as exc:
+                last = exc
+                if attempt < retries:
+                    _time.sleep(3)
+        assert last is not None
+        raise GitLabAPIError(f"{method} {path} 网络错误（已重试 {retries} 次）: {last}")
 
     @staticmethod
     def _encode(project_id) -> str:

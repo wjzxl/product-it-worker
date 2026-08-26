@@ -29,12 +29,11 @@
 |---|---|
 | 设计（文档 01~08） | ✅ 完成，6 个 Gate 已评审确认 |
 | **Phase 0 地基** | ✅ 全部完成并验收通过（真实 GitLab/飞书/DeepSeek、成本计量与观测闭环、CI 55 测试） |
-| **Phase 1 产品+研发闭环 MVP** | ✅ **完成并验收**：研发域闭环（DeepSeek 编码+质量门禁+MR+G3+合入）+ 真实仓库 **10 个 Issue 端到端合入**（MR #4~#13，测试 2→95），试点报告见 [platform/reports/phase1-pilot-summary.md](platform/reports/phase1-pilot-summary.md) |
-| Phase 1 产品+研发闭环 MVP | ⏳ 未开始 |
+| **Phase 1 产品+研发闭环 MVP** | ✅ **完成并验收**：研发域闭环（DeepSeek 编码+质量门禁+MR+G3+合入）+ 真实仓库 **11 个 Issue 端到端合入**（MR #4~#15，测试 2→115，含 2 次真实退回修订演练），试点报告见 [platform/reports/phase1-pilot-summary.md](platform/reports/phase1-pilot-summary.md) |
 | Phase 2 测试+运维域 | ⏳ 未开始 |
 | Phase 3 自进化 | ⏳ 未开始 |
 
-**已可运行**：审批网关（16 测试）、GitLab 集成桥（14）、任务中心（8）、Agent 运行时（6）、知识库（4），共 48 测试；一键演示：`platform/services/agent-runtime/.venv/bin/python platform/scripts/demo_phase0.py`。
+**已可运行**：审批网关（17 测试）、GitLab 集成桥（16）、任务中心（9）、Agent 运行时（10）、知识库（4），共 56 测试；演示：`platform/services/agent-runtime/.venv/bin/python platform/scripts/demo_phase0.py`（产品域）、`demo_phase1.py`（研发域）、`batch_pilot.py`（批量试点）。
 
 ## 文档导航
 

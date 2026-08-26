@@ -43,6 +43,7 @@ FEATURES = [
     {"title": "数值千分位格式化", "prd": "## 验收标准\n- WHEN 传入 1234567.8 THEN format_thousands 返回 1,234,567.8\n- WHEN 传入整数 THEN 不带小数\n- WHEN 传入负数 THEN 保留负号\n"},
     {"title": "日期范围重叠检测", "prd": "## 验收标准\n- WHEN 两个日期范围有交集 THEN has_overlap 返回 True\n- WHEN 首尾相接（end==start）THEN 视为重叠\n- WHEN 任一段无效 THEN 返回 False\n"},
     {"title": "报表字段重命名", "prd": "## 验收标准\n- WHEN 传入字段映射 THEN rename_columns 重命名并保留未映射字段\n- WHEN 映射为空 THEN 原样返回\n- 不修改输入列表", "review_touch": "revise"},
+    {"title": "报表周汇总", "prd": "## 验收标准\n- WHEN 传入日期+数值数据 THEN weekly_summary 按 ISO 周聚合数值并返回 {年-周: 合计}\n- WHEN 同周多条记录 THEN 数值累加\n- WHEN 数据为空 THEN 返回空字典", "review_touch": "revise"},
 ]
 
 

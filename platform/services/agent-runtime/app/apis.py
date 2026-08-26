@@ -63,13 +63,26 @@ class GitLabAPI:
         resp.raise_for_status()
         return resp.json()
 
-    def merge_mr(self, project_id: Any, mr_iid: int, sha: str | None = None) -> dict:
-        resp = self._client.post(
-            f"{self.base_url}/gitlab/mrs/{project_id}/{mr_iid}/merge",
-            json={"sha": sha} if sha else {},
-        )
-        resp.raise_for_status()
-        return resp.json()
+    def merge_mr(self, project_id: Any, mr_iid: int, sha: str | None = None, retries: int = 2) -> dict:
+        """合入 MR；GitLab 偶发 4xx/5xx（含新建后立即合入被拒），重试兜底。"""
+        import time as _time
+
+        last: httpx.HTTPStatusError | None = None
+        for attempt in range(retries + 1):
+            resp = self._client.post(
+                f"{self.base_url}/gitlab/mrs/{project_id}/{mr_iid}/merge",
+                json={"sha": sha} if sha else {},
+            )
+            if resp.status_code < 400:
+                return resp.json()
+            try:
+                resp.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                last = exc
+            if attempt < retries:
+                _time.sleep(10)
+        assert last is not None
+        raise last
 
 
 class MockApprovalAPI:
