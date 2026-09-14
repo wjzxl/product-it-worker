@@ -1,7 +1,7 @@
-version: 4
-updated_at: '2026-09-14T09:16:25.074282+00:00'
+version: 7
+updated_at: '2026-09-14T10:08:52.406964+00:00'
 prompts:
-  coder_agent: v2
+  coder_agent: v5
   tester_agent: v1
   ops_diagnose_agent: v1
   prd_agent: v1

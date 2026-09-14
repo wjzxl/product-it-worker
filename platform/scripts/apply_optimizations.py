@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime, timezone
 import subprocess
 import sys
 import tempfile
@@ -132,14 +133,20 @@ def main() -> int:
         return 1
     check("五个服务健康", True)
 
+    # 状态无关：脚本可反复执行（版本号可能已被上一轮推进，不假定一定是 v1）
     before = httpx.get(f"http://127.0.0.1:{PORTS['agent-runtime']}/prompts", timeout=30).json()
-    check("① 初始 Prompt 版本", before["prompts"].get("coder_agent") == "v1", f"coder_agent={before['prompts'].get('coder_agent')}")
+    ver_before = before["prompts"].get("coder_agent", "")
+    check("① 初始 Prompt 版本可读", bool(ver_before), f"coder_agent={ver_before}")
+    expect_next = f"v{int(ver_before.lstrip('v') or 1) + 1}"
 
     # 提案 A：升级编码 Agent Prompt（补充"最小化改动/禁止占位注释"约束——源自 Phase 1/2 真实教训）
+    # 内容带本轮标记：既保证每次演练的版本内容唯一可辨（指纹必然变化），也便于溯源是哪一轮固化的
+    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     new_prompt = (
         open(os.path.join(ROOT, "prompts", "coder_agent.v1.md"), encoding="utf-8").read().strip()
         + "\n- 外科手术式修改：只改动必要的实现行，禁止用占位注释替换函数体，禁止重写无关文件；\n"
-        + "- 保持既有函数签名与返回值类型不变（既有测试必须继续通过）。"
+        + "- 保持既有函数签名与返回值类型不变（既有测试必须继续通过）；\n"
+        + f"- （本轮固化标记：{stamp}，来源：G7 流程改进闸门演练）"
     )
     proposal_a = {
         "id": "prop-prompt-1",
@@ -152,18 +159,18 @@ def main() -> int:
     }
     res_a = apply_proposal(proposal_a, "平台负责人@Grace")
     check("② Prompt 新版本已写入并切换 active",
-          res_a["apply"]["applied"] and res_a["apply"]["after"] == "v2",
-          f"{res_a['apply'].get('before')} → {res_a['apply'].get('after')}")
+          res_a["apply"]["applied"] and res_a["apply"]["after"] == expect_next,
+          f"{res_a['apply'].get('before')} → {res_a['apply'].get('after')}（期望 {expect_next}）")
 
     after = httpx.get(f"http://127.0.0.1:{PORTS['agent-runtime']}/prompts", timeout=30).json()
     meta_before = before["loaded_meta"].get("coder_agent", {})
     meta_after = after["loaded_meta"].get("coder_agent", {})
     check("③ agent-runtime 热更新生效（无需重启）",
-          after["prompts"].get("coder_agent") == "v2"
+          after["prompts"].get("coder_agent") == expect_next
           and meta_after.get("sha256") != meta_before.get("sha256")
-          and meta_after.get("length", 0) > meta_before.get("length", 0),
-          f"v1(len={meta_before.get('length')}, sha={meta_before.get('sha256')}) → "
-          f"v2(len={meta_after.get('length')}, sha={meta_after.get('sha256')})")
+          and meta_after.get("length", 0) >= meta_before.get("length", 0),
+          f"{ver_before}(len={meta_before.get('length')}, sha={meta_before.get('sha256')}) → "
+          f"{expect_next}(len={meta_after.get('length')}, sha={meta_after.get('sha256')})")
     check("④ 改进项已登记 GitLab",
           bool(res_a["improvement_issue"].get("created")),
           f"issue #{res_a['improvement_issue'].get('issue_iid')}")
