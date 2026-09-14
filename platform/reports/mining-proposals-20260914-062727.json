@@ -1,0 +1,235 @@
+{
+  "report_summary": {
+    "gates": [
+      {
+        "gate": "G2 方案评审",
+        "domain": "研发域",
+        "requests": 24,
+        "decisions": 24,
+        "revises": 3,
+        "rejects": 0,
+        "timeouts": 0,
+        "wait_p50_s": 1.75,
+        "wait_p95_s": 5.55,
+        "timeout_rate": 0.0,
+        "rework_rate": 0.125,
+        "reasons": [
+          {
+            "gate": "G2 方案评审",
+            "decision": "revise",
+            "reason": "批量试点自动审批"
+          },
+          {
+            "gate": "G2 方案评审",
+            "decision": "revise",
+            "reason": "批量试点自动审批"
+          },
+          {
+            "gate": "G2 方案评审",
+            "decision": "revise",
+            "reason": "批量试点自动审批"
+          }
+        ]
+      },
+      {
+        "gate": "G5 变更审批",
+        "domain": "运维域",
+        "requests": 4,
+        "decisions": 4,
+        "revises": 0,
+        "rejects": 0,
+        "timeouts": 0,
+        "wait_p50_s": 0.8,
+        "wait_p95_s": 5.46,
+        "timeout_rate": 0.0,
+        "rework_rate": 0.0,
+        "reasons": []
+      },
+      {
+        "gate": "G1 需求评审",
+        "domain": "产品域",
+        "requests": 6,
+        "decisions": 6,
+        "revises": 0,
+        "rejects": 2,
+        "timeouts": 0,
+        "wait_p50_s": 0.11,
+        "wait_p95_s": 1.7,
+        "timeout_rate": 0.0,
+        "rework_rate": 0.333,
+        "reasons": [
+          {
+            "gate": "G1 需求评审",
+            "decision": "reject",
+            "reason": "多租户验证清理"
+          },
+          {
+            "gate": "G1 需求评审",
+            "decision": "reject",
+            "reason": "多租户验证清理"
+          }
+        ]
+      },
+      {
+        "gate": "G3 代码审查",
+        "domain": "研发域",
+        "requests": 16,
+        "decisions": 16,
+        "revises": 0,
+        "rejects": 0,
+        "timeouts": 0,
+        "wait_p50_s": 0.64,
+        "wait_p95_s": 1.36,
+        "timeout_rate": 0.0,
+        "rework_rate": 0.0,
+        "reasons": []
+      },
+      {
+        "gate": "G4 放行决策",
+        "domain": "测试域",
+        "requests": 18,
+        "decisions": 18,
+        "revises": 0,
+        "rejects": 0,
+        "timeouts": 0,
+        "wait_p50_s": 0.75,
+        "wait_p95_s": 1.18,
+        "timeout_rate": 0.0,
+        "rework_rate": 0.0,
+        "reasons": []
+      },
+      {
+        "gate": "G6 复盘审查",
+        "domain": "运维域",
+        "requests": 2,
+        "decisions": 2,
+        "revises": 0,
+        "rejects": 0,
+        "timeouts": 0,
+        "wait_p50_s": 0.57,
+        "wait_p95_s": 0.72,
+        "timeout_rate": 0.0,
+        "rework_rate": 0.0,
+        "reasons": []
+      },
+      {
+        "gate": "G7 流程改进",
+        "domain": "平台域",
+        "requests": 1,
+        "decisions": 1,
+        "revises": 0,
+        "rejects": 0,
+        "timeouts": 0,
+        "wait_p50_s": 0.18,
+        "wait_p95_s": 0.18,
+        "timeout_rate": 0.0,
+        "rework_rate": 0.0,
+        "reasons": []
+      }
+    ],
+    "bottlenecks": [
+      {
+        "type": "high_rework",
+        "gate": "G1 需求评审",
+        "evidence": "退回/否决率 33%（0 退回 / 2 否决 / 6 决策）",
+        "hint": "提高上游产出质量（模板/预检）或调整该 Gate 的审查要点"
+      },
+      {
+        "type": "variant_deviation",
+        "variant": "product-domain/prd-flow｜task.created",
+        "evidence": "变体出现 6 次（平均 0.0s），缺少完整审批留痕",
+        "hint": "检查该路径是否绕过了 Gate"
+      }
+    ],
+    "variants": [
+      {
+        "variant": "product-domain/prd-flow｜task.created → approval.requested → approval.decided → approval.requested → approval.decided",
+        "count": 9,
+        "avg_duration_s": 0.0
+      },
+      {
+        "variant": "product-domain/prd-flow｜task.created → status_changed → approval.requested → approval.decided",
+        "count": 6,
+        "avg_duration_s": 20.4
+      },
+      {
+        "variant": "product-domain/prd-flow｜task.created",
+        "count": 6,
+        "avg_duration_s": 0.0
+      },
+      {
+        "variant": "product-domain/prd-flow｜task.created → approval.requested → approval.decided",
+        "count": 4,
+        "avg_duration_s": 0.0
+      },
+      {
+        "variant": "product-domain/prd-flow｜task.created → status_changed → approval.requested → approval.decided → approval.requested → approval.decided",
+        "count": 3,
+        "avg_duration_s": 58.8
+      },
+      {
+        "variant": "product-domain/prd-flow｜task.created → approval.requested → approval.decided → approval.requested → approval.decided → approval.requested → approval.decided",
+        "count": 3,
+        "avg_duration_s": 0.0
+      },
+      {
+        "variant": "product-domain/prd-flow｜task.created → status_changed",
+        "count": 1,
+        "avg_duration_s": 1.1
+      },
+      {
+        "variant": "ops-domain/alert-to-postmortem｜task.created → approval.requested → approval.decided → approval.requested → approval.decided",
+        "count": 1,
+        "avg_duration_s": 0.0
+      }
+    ],
+    "cost_by_model": [
+      {
+        "model": "deepseek/deepseek-chat",
+        "calls": 174,
+        "spend_usd": 0.5152246959999999,
+        "tokens": 542657
+      },
+      {
+        "model": "openai/qwen-max",
+        "calls": 34,
+        "spend_usd": 0.0,
+        "tokens": 60883
+      },
+      {
+        "model": "openai/text-embedding-v3",
+        "calls": 6,
+        "spend_usd": 0.0,
+        "tokens": 857
+      }
+    ]
+  },
+  "proposals": [
+    {
+      "title": "优化需求评审流程以减少返工",
+      "rationale": "G1 需求评审的重做率为33%，表明该阶段存在较多问题，可能是由于输入材料质量不高或评审标准不清晰导致。通过改善这些方面可以显著降低返工率。",
+      "evidence": "退回/否决率 33%（0 退回 / 2 否决 / 6 决策）",
+      "action": {
+        "type": "advice",
+        "target": "G1 需求评审",
+        "value": "引入更明确的需求文档模板和预检机制"
+      },
+      "risk": "L2",
+      "id": "prop-1",
+      "appliable": false
+    },
+    {
+      "title": "加强多租户验证清理相关培训",
+      "rationale": "在G1需求评审中，因'多租户验证清理'原因被拒绝的情况出现了两次，这可能反映了团队对于这一领域的理解和执行存在不足。通过针对性地增强培训，可以提高首次提交的质量。",
+      "evidence": "top_rework_reasons 中 G1 需求评审的 '多租户验证清理' 原因出现两次",
+      "action": {
+        "type": "advice",
+        "target": "G1 需求评审",
+        "value": "为团队成员提供关于多租户验证清理的最佳实践培训"
+      },
+      "risk": "L2",
+      "id": "prop-2",
+      "appliable": false
+    }
+  ]
+}

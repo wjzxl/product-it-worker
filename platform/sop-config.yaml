@@ -1,0 +1,31 @@
+version: 4
+updated_at: '2026-09-14T06:27:27.775653+00:00'
+trust:
+  window: 20
+  min_samples: 10
+  l1_approve_rate: 0.9
+  l2_approve_rate: 0.8
+  sample_ratio: 0.3
+  penalty_hours: 24
+gates:
+  GATE_REQUIREMENT_REVIEW:
+    sla_hours: 24
+    description: 需求评审（产品负责人）
+  GATE_TECH_DESIGN_REVIEW:
+    sla_hours: 24
+    description: 方案评审（技术负责人）
+  GATE_PR_REVIEW:
+    sla_hours: 12
+    description: 代码审查；信任达 L1 时可自动放行
+  GATE_RELEASE_DECISION:
+    sla_hours: 12
+    description: 放行决策（发布负责人）
+  GATE_CHANGE_APPROVAL:
+    sla_hours: 4
+    description: 生产变更审批（强制人工）
+  GATE_POSTMORTEM_REVIEW:
+    sla_hours: 48
+    description: 复盘审查
+  GATE_PROCESS_IMPROVEMENT:
+    sla_hours: 24
+    description: 流程改进提案审批（Phase 3 自进化闸门）

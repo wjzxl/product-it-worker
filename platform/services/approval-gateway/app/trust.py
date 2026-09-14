@@ -22,22 +22,35 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .models import ApprovalRequest, Decision, TrustState, utcnow
+from .sop_config import trust_setting
 
 logger = logging.getLogger(__name__)
 
-WINDOW = 20
-MIN_SAMPLES = 10
-L1_APPROVE_RATE = 0.9
-L2_APPROVE_RATE = 0.8
 CLEAN_TAIL = 5
 
 
+def _window() -> int:
+    return int(trust_setting("window", cast=int))
+
+
+def _min_samples() -> int:
+    return int(trust_setting("min_samples", cast=int))
+
+
+def _l1_rate() -> float:
+    return trust_setting("l1_approve_rate")
+
+
+def _l2_rate() -> float:
+    return trust_setting("l2_approve_rate")
+
+
 def _sample_ratio() -> float:
-    return float(os.getenv("TRUST_SAMPLE_RATIO", "0.2"))
+    return trust_setting("sample_ratio", env_name="TRUST_SAMPLE_RATIO")
 
 
 def _penalty_hours() -> float:
-    return float(os.getenv("TRUST_PENALTY_HOURS", "24"))
+    return trust_setting("penalty_hours", env_name="TRUST_PENALTY_HOURS")
 
 
 def _active_penalty(db: Session, scope: str, now: datetime) -> datetime | None:
@@ -74,7 +87,7 @@ def compute_trust(db: Session, scope: str, now: datetime | None = None) -> dict:
         .join(ApprovalRequest, ApprovalRequest.id == Decision.request_id)
         .where(ApprovalRequest.type == scope)
         .order_by(Decision.decided_at.desc())
-        .limit(WINDOW)
+        .limit(_window())
     ).all()
     total = len(rows)
     approves = sum(1 for d, _ in rows if d == "approve")
@@ -86,9 +99,9 @@ def compute_trust(db: Session, scope: str, now: datetime | None = None) -> dict:
 
     if penalty_until:
         level, reason = "L3", f"惩罚期至 {penalty_until.isoformat()}（近期退回/否决）"
-    elif total >= MIN_SAMPLES and approve_rate >= L1_APPROVE_RATE and not any(d in ("revise", "reject") for d in tail):
+    elif total >= _min_samples() and approve_rate >= _l1_rate() and not any(d in ("revise", "reject") for d in tail):
         level, reason = "L1", f"通过率 {approve_rate:.0%}（{approves}/{total}）且近 {CLEAN_TAIL} 条无退回"
-    elif approve_rate >= L2_APPROVE_RATE:
+    elif approve_rate >= _l2_rate():
         level, reason = "L2", f"通过率 {approve_rate:.0%}（{approves}/{total}），按 {_sample_ratio():.0%} 抽样"
     else:
         level, reason = "L3", f"通过率 {approve_rate:.0%}（{approves}/{total}）低于阈值"
