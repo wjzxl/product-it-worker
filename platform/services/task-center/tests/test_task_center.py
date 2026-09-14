@@ -218,6 +218,23 @@ class TestPrometheusAlerts:
         assert r.json()["tasks"] == []
 
 
+class TestTenantIsolation:
+    def test_tasks_isolated_per_tenant(self, client):
+        a = client.post("/tasks", json={"external_ref": "acme-1", "sop": "dev-domain/issue-to-merge"},
+                        headers={"X-Tenant": "acme"}).json()
+        b = client.post("/tasks", json={"external_ref": "globex-1", "sop": "dev-domain/issue-to-merge"},
+                        headers={"X-Tenant": "globex"}).json()
+        assert a["tenant"] == "acme" and b["tenant"] == "globex"
+        acme = client.get("/tasks", headers={"X-Tenant": "acme"}).json()
+        globex = client.get("/tasks", headers={"X-Tenant": "globex"}).json()
+        assert all(t["tenant"] == "acme" for t in acme) and not any(t["id"] == b["id"] for t in acme)
+        assert all(t["tenant"] == "globex" for t in globex)
+
+    def test_default_tenant(self, client):
+        t = client.post("/tasks", json={"external_ref": "default-1"}).json()
+        assert t["tenant"] == "default"
+
+
 class TestTimeline:
     def test_append_event(self, client):
         task = client.post("/tasks", json={"external_ref": "manual-3"}).json()

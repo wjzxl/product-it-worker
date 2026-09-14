@@ -7,7 +7,7 @@
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -16,6 +16,7 @@ from .events import new_event, publisher_from_env
 from .models import ApprovalRequest, Decision, utcnow
 from .notifier import get_notifier
 from .policies import is_overdue
+from .auth import auth_summary, current_principal
 from .trust import all_trust, apply_penalty, compute_trust, should_auto_approve
 from .schemas import (
     ApprovalRequestCreate,
@@ -41,9 +42,16 @@ def _publish_targets() -> list:
 _publisher = publisher_from_env(_publish_targets() or None)
 
 
-def _get_or_404(db: Session, approval_id: str) -> ApprovalRequest:
+def current_tenant(x_tenant: str = Header(default="")) -> str:
+    """多租户：请求头 X-Tenant 指定租户（缺省取 DEFAULT_TENANT）。"""
+    import os
+
+    return x_tenant or os.getenv("DEFAULT_TENANT", "default")
+
+
+def _get_or_404(db: Session, approval_id: str, tenant: Optional[str] = None) -> ApprovalRequest:
     req = db.get(ApprovalRequest, approval_id)
-    if req is None:
+    if req is None or (tenant is not None and req.tenant != tenant):
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"approval {approval_id} 不存在")
     return req
 
@@ -56,13 +64,18 @@ def _check_pending(req: ApprovalRequest) -> None:
 
 
 @router.post("/approvals", response_model=ApprovalRequestOut, status_code=status.HTTP_201_CREATED)
-def create_approval(payload: ApprovalRequestCreate, db: Session = Depends(get_db)) -> ApprovalRequest:
+def create_approval(
+    payload: ApprovalRequestCreate,
+    db: Session = Depends(get_db),
+    tenant: str = Depends(current_tenant),
+) -> ApprovalRequest:
     """工作流到达 Gate 时调用。三要素校验已在 schema 层强制。
 
     `auto_gate=True` 时按信任等级决定：L1 自动放行 / L2 抽样命中自动放行 / L3 人工审批。
     自动放行一律留痕（决策人 `system:trust`），并发布 approval.decided 事件。
     """
     req = ApprovalRequest(
+        tenant=tenant,
         type=payload.type,
         stage=payload.stage,
         requester=payload.requester,
@@ -143,16 +156,17 @@ def create_approval(payload: ApprovalRequestCreate, db: Session = Depends(get_db
 def list_approvals(
     status_filter: Optional[str] = None,
     db: Session = Depends(get_db),
+    tenant: str = Depends(current_tenant),
 ) -> list[ApprovalRequest]:
-    stmt = select(ApprovalRequest).order_by(ApprovalRequest.created_at.desc())
+    stmt = select(ApprovalRequest).where(ApprovalRequest.tenant == tenant).order_by(ApprovalRequest.created_at.desc())
     if status_filter:
         stmt = stmt.where(ApprovalRequest.status == status_filter)
     return list(db.scalars(stmt))
 
 
 @router.get("/approvals/{approval_id}", response_model=ApprovalRequestOut)
-def get_approval(approval_id: str, db: Session = Depends(get_db)) -> ApprovalRequest:
-    return _get_or_404(db, approval_id)
+def get_approval(approval_id: str, db: Session = Depends(get_db), tenant: str = Depends(current_tenant)) -> ApprovalRequest:
+    return _get_or_404(db, approval_id, tenant=tenant)
 
 
 @router.post("/approvals/{approval_id}/decision", response_model=DecisionOut)
@@ -160,15 +174,18 @@ def decide(
     approval_id: str,
     payload: DecisionIn,
     db: Session = Depends(get_db),
+    principal=Depends(current_principal),
+    tenant: str = Depends(current_tenant),
 ) -> Decision:
-    """人做决策（Web 审批台入口）。"""
-    req = _get_or_404(db, approval_id)
+    """人做决策（Web 审批台入口）。AUTH_MODE=oidc/static 时要求登录（主体写入审计）。"""
+    req = _get_or_404(db, approval_id, tenant=tenant)
     _check_pending(req)
 
+    decided_by = payload.decided_by or principal.sub
     decision = Decision(
         request_id=req.id,
         decision=payload.decision,
-        decided_by=payload.decided_by,
+        decided_by=decided_by,
         comment=payload.comment,
     )
     db.add(decision)
@@ -211,6 +228,7 @@ def resubmit(
     approval_id: str,
     payload: ApprovalRequestCreate,
     db: Session = Depends(get_db),
+    principal=Depends(current_principal),
 ) -> ApprovalRequest:
     """revise 后修订重新提交：新上下文（version+1），重新进入 pending。"""
     req = _get_or_404(db, approval_id)
@@ -288,6 +306,12 @@ async def im_card_callback(payload: ImCardCallback, request: Request, db: Sessio
     return decision
 
 
+@router.get("/auth/info")
+def auth_info(principal=Depends(current_principal)) -> dict:
+    """当前认证配置与主体（前端可据此决定是否跳转 SSO 登录）。"""
+    return {**auth_summary(), "principal": {"sub": principal.sub, "roles": principal.roles}}
+
+
 @router.get("/trust")
 def trust_all(db: Session = Depends(get_db)) -> list[dict]:
     """全部 Gate 的信任等级与指标（Phase 3 动态升降级）。"""
@@ -300,7 +324,7 @@ def trust_one(gate_type: str, db: Session = Depends(get_db)) -> dict:
 
 
 @router.post("/admin/sweep")
-def admin_sweep(db: Session = Depends(get_db)) -> dict:
+def admin_sweep(db: Session = Depends(get_db), principal=Depends(current_principal)) -> dict:
     """手动触发超时扫描（等价于 python -m app.sweep）。"""
     from .sweeper import sweep
 

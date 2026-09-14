@@ -52,5 +52,31 @@ def test_unknown_event_accepted_but_ignored():
     assert r.json()["events"] == []
 
 
+def test_hmac_signature_accepted():
+    """生产推荐：HMAC-SHA256 签名校验（X-Gitlab-Signature）。"""
+    import hashlib
+    import hmac
+    import json as _json
+
+    body = _json.dumps(ISSUE_OPEN).encode()
+    sig = "sha256=" + hmac.new(b"s3cret", body, hashlib.sha256).hexdigest()
+    r = _client().post(
+        "/webhooks/gitlab",
+        content=body,
+        headers={"X-Gitlab-Signature": sig, "Content-Type": "application/json"},
+    )
+    assert r.status_code == 200 and r.json()["events"] == ["gitlab.issue.opened"]
+
+
+def test_hmac_signature_invalid_rejected():
+    body = b'{"object_kind": "issue", "object_attributes": {"action": "open"}}'
+    r = _client().post(
+        "/webhooks/gitlab",
+        content=body,
+        headers={"X-Gitlab-Signature": "sha256=deadbeef", "Content-Type": "application/json"},
+    )
+    assert r.status_code == 401
+
+
 def test_health():
     assert _client().get("/health").json()["service"] == "gitlab-bridge"

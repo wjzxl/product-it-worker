@@ -79,6 +79,7 @@ class DecisionOut(BaseModel):
 
 class ApprovalRequestOut(BaseModel):
     id: str
+    tenant: str = "default"
     type: str
     stage: str
     requester: str

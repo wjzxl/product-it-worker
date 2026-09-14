@@ -53,6 +53,7 @@ class EventOut(BaseModel):
 
 class TaskOut(BaseModel):
     id: str
+    tenant: str = "default"
     external_ref: str
     sop: str
     params: dict[str, Any]

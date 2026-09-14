@@ -131,6 +131,21 @@ class GitLabClient:
             "GET", f"/api/v4/projects/{self._encode(project_id)}/pipelines/{pipeline_id}/jobs"
         )
 
+    # ---------- Webhook ----------
+    def create_hook(self, project_id, url: str, secret: str = "", events: list[str] | None = None) -> dict:
+        payload: dict = {"url": url, "enable_ssl_verification": True}
+        if secret:
+            payload["token"] = secret
+        for ev in (events or ["issues_events", "merge_requests_events", "pipeline_events"]):
+            payload[ev] = True
+        return self._request("POST", f"/api/v4/projects/{self._encode(project_id)}/hooks", json=payload)
+
+    def list_hooks(self, project_id) -> list:
+        return self._request("GET", f"/api/v4/projects/{self._encode(project_id)}/hooks")
+
+    def delete_hook(self, project_id, hook_id: int) -> dict:
+        return self._request("DELETE", f"/api/v4/projects/{self._encode(project_id)}/hooks/{hook_id}")
+
     def list_pipelines(self, project_id, per_page: int = 5) -> list:
         return self._request(
             "GET", f"/api/v4/projects/{self._encode(project_id)}/pipelines?per_page={per_page}"

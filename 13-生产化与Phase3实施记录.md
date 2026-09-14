@@ -36,4 +36,28 @@
 ### 测试（approval-gateway 共 **31 项**）
 新增 14 项：指标→等级映射（L1/L2/L3、样本不足、近期退回阻断）、惩罚期与到期恢复、惩罚按 Gate 隔离、全量列举、抽样器（L1/L3/确定性/边界）、API 级自动放行 + 否决后降级 + `/trust` 端点。
 
-## ① 生产化部署（公网 webhook、SSO、多租户）—— 待实施
+## ① 生产化部署（公网 webhook、SSO、多租户）✅（本轮完成）
+
+### 公网 webhook
+- **HMAC 签名校验**：gitlab-bridge 支持 `X-Gitlab-Signature`（sha256=HMAC-SHA256(body, secret)）+ 原 Token 校验双通道；生产推荐签名（GitLab「签名令牌」）；
+- **自动注册**：`POST /gitlab/hooks`（bridge）+ `scripts/register_webhook.py`（部署脚本），可一次注册 issues/MR/pipeline 事件；
+  **真实验证**：在 `sandbox6853335/prodesgin-demo` 上注册 webhook #89070692 → 列表确认 → 删除（HTTP 204）；
+- **公网入口**：`docker-compose.prod.yml` + `Caddyfile`（Caddy 自动 HTTPS，反代 `/webhooks/*`、`/alerts/*`、`/approvals*`、`/metrics*`）+ `.env.prod.example`（密钥/SSO/GitLab/执行器配置模板）；
+  校验：`docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod config -q` → **exit 0**（11 服务：caddy + 6 平台服务 + postgres/qdrant/litellm/n8n）；
+- 统一服务镜像：`Dockerfile.service`（按 `SERVICE` 构建参数）。
+
+### SSO（OIDC）
+- `app/auth.py`：三种模式 `off`（默认）/ `static`（共享 Token）/ **`oidc`**（RS256 JWT + JWKS，校验 iss/aud/exp，角色 claim 支持嵌套如 `realm_access.roles`，可要求角色）；
+- 保护写操作（决策/重提/扫描）与 `/auth/info`；**决策主体写入审计**（`decided_by` 取自 SSO 主体）；
+- 真实 IdP（Keycloak/飞书/Okta/企业微信）按同一 OIDC 接口对接，代码不变；
+- **真实验证 `scripts/sso_check.py`**：本地 IdP（真实 JWKS，RSA-2048）→ 无令牌 401 ✅、角色不足 403 ✅、有效令牌 200 ✅、审计留痕 `alice@corp` ✅；
+- 测试 11 项（真实 RSA 签名/过期/受众/签发方/错误签名/角色/嵌套 claim/静态模式/API 鉴权）。
+
+### 多租户
+- 审批（approval_requests）与任务（tasks）新增 `tenant` 列 + **轻量自动迁移**（启动时补列与索引，PG/SQLite 兼容）；
+- 隔离方式：请求头 `X-Tenant`（缺省 `DEFAULT_TENANT`）→ 列表过滤、详情/决策跨租户返回 **404**；
+- **真实验证（PG 历史库）**：自动迁移日志"已为 approval_requests 补充 tenant 列"；acme/globex 两租户创建互不可见；跨租户读取 → HTTP 404 ✅；
+- 测试 6 项（approval 4 + task-center 2）。
+
+### 测试总量
+approval-gateway **46** ｜ gitlab-bridge **24** ｜ task-center **13** ｜ agent-runtime **29** ｜ knowledge-base **4** ｜ metrics-dashboard **3** = **119 项**

@@ -122,6 +122,34 @@ def test_trigger_pipeline_error_propagates():
         client.trigger_pipeline(42, "main")
 
 
+def test_create_hook():
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["json"] = json.loads(request.content)
+        return httpx.Response(201, json={"id": 7, "url": "https://platform.example.com/webhooks/gitlab"})
+
+    client = GitLabClient("https://gitlab.example.com", "tok", transport=httpx.MockTransport(handler))
+    hook = client.create_hook(42, "https://platform.example.com/webhooks/gitlab", "s3cret")
+    assert hook["id"] == 7
+    assert captured["url"].endswith("/api/v4/projects/42/hooks")
+    assert captured["json"]["url"].startswith("https://platform.example.com")
+    assert captured["json"]["token"] == "s3cret"
+    assert captured["json"]["issues_events"] is True and captured["json"]["pipeline_events"] is True
+
+
+def test_list_and_delete_hook():
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "DELETE":
+            return httpx.Response(204)
+        return httpx.Response(200, json=[{"id": 7, "url": "u"}])
+
+    client = GitLabClient("https://gitlab.example.com", "tok", transport=httpx.MockTransport(handler))
+    assert client.list_hooks(42)[0]["id"] == 7
+    assert client.delete_hook(42, 7) == {}
+
+
 def test_api_error_raises():
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(404, json={"message": "404 Project Not Found"})

@@ -1,0 +1,129 @@
+# 生产化部署编排：公网入口（Caddy 自动 HTTPS）+ 平台服务 + 基础设施
+# 用法：
+#   1) cp .env.prod.example .env.prod 并填写（域名/密钥/SSO/GitLab Token）
+#   2) docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod up -d
+# 说明：Caddy 负责 TLS 与反代；GitLab webhook 指向 https://<域名>/webhooks/gitlab
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: platform-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - PLATFORM_DOMAIN=${PLATFORM_DOMAIN:-platform.example.com}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - approval-gateway
+      - gitlab-bridge
+      - metrics-dashboard
+
+  approval-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE: approval-gateway
+    image: platform/approval-gateway:latest
+    restart: unless-stopped
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    env_file: [.env.prod]
+    environment:
+      - DATABASE_URL=postgresql+psycopg://platform:platform@postgres:5432/platform
+      - PUBLISH_TARGETS=http://task-center:8002/events
+      - AUTH_MODE=${AUTH_MODE:-oidc}
+      - DEFAULT_TENANT=${DEFAULT_TENANT:-default}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  gitlab-bridge:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE: gitlab-bridge
+    image: platform/gitlab-bridge:latest
+    restart: unless-stopped
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]
+    env_file: [.env.prod]
+    environment:
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET:?必须在 .env.prod 配置}
+      - PUBLISH_TARGETS=http://task-center:8002/events
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-https://platform.example.com}
+
+  task-center:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE: task-center
+    image: platform/task-center:latest
+    restart: unless-stopped
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8002"]
+    env_file: [.env.prod]
+    environment:
+      - DATABASE_URL=postgresql+psycopg://platform:platform@postgres:5432/platform
+      - AGENT_RUNTIME_URL=http://agent-runtime:8003
+      - OPS_PROJECT_ID=${OPS_PROJECT_ID:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  agent-runtime:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE: agent-runtime
+    image: platform/agent-runtime:latest
+    restart: unless-stopped
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8003"]
+    env_file: [.env.prod]
+    environment:
+      - APPROVAL_GATEWAY_URL=http://approval-gateway:8000
+      - GITLAB_BRIDGE_URL=http://gitlab-bridge:8001
+      - KNOWLEDGE_BASE_URL=http://knowledge-base:8004
+      - SANDBOX_MODE=${SANDBOX_MODE:-docker}
+      - OPS_EXECUTOR=${OPS_EXECUTOR:-dryrun}
+      - OPS_EXECUTOR_URL=${OPS_EXECUTOR_URL:-}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # 沙箱执行（受限：仅用于拉起 platform-sandbox）
+
+  knowledge-base:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE: knowledge-base
+    image: platform/knowledge-base:latest
+    restart: unless-stopped
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8004"]
+    env_file: [.env.prod]
+    environment:
+      - QDRANT_URL=http://qdrant:6333
+
+  metrics-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE: metrics-dashboard
+    image: platform/metrics-dashboard:latest
+    restart: unless-stopped
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8005"]
+    env_file: [.env.prod]
+    environment:
+      - PLATFORM_DSN=host=postgres port=5432 dbname=platform user=platform password=platform
+      - LITELLM_DSN=host=postgres port=5432 dbname=litellm user=platform password=platform
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -5,9 +5,12 @@
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
 import logging
 import os
 import secrets
+import json
 from dataclasses import dataclass, field
 from typing import Optional, Union
 
@@ -53,6 +56,13 @@ class NoteIn(BaseModel):
     body: str = Field(min_length=1)
 
 
+class HookIn(BaseModel):
+    project_id: Union[str, int]
+    url: str = Field(min_length=1, description="平台公网 webhook 地址")
+    secret: str = ""
+    events: list[str] = Field(default_factory=lambda: ["issues_events", "merge_requests_events", "pipeline_events"])
+
+
 class TriggerPipelineIn(BaseModel):
     project_id: Union[str, int]
     ref: str = "main"
@@ -79,11 +89,20 @@ def create_app(settings: Settings) -> FastAPI:
     # ---------- 方向一：GitLab → 平台 ----------
     @app.post("/webhooks/gitlab")
     async def gitlab_webhook(request: Request) -> dict:
+        """公网 webhook 入口：支持 Token 校验与 HMAC-SHA256 签名校验（生产推荐签名）。"""
+        raw = await request.body()
         token = request.headers.get("x-gitlab-token", "")
-        if not settings.webhook_secret or not secrets.compare_digest(token, settings.webhook_secret):
-            raise HTTPException(status_code=401, detail="invalid webhook token")
+        signature = request.headers.get("x-gitlab-signature", "")
+        token_ok = bool(settings.webhook_secret) and secrets.compare_digest(token, settings.webhook_secret)
+        signature_ok = False
+        if settings.webhook_secret and signature:
+            expected = hmac.new(settings.webhook_secret.encode(), raw, hashlib.sha256).hexdigest()
+            provided = signature.split("=", 1)[1] if signature.startswith("sha256=") else signature
+            signature_ok = secrets.compare_digest(provided, expected)
+        if not (token_ok or signature_ok):
+            raise HTTPException(status_code=401, detail="invalid webhook token/signature")
 
-        payload = await request.json()
+        payload = json.loads(raw or b"{}")
         event_uuid = request.headers.get("x-gitlab-event-uuid")
         events = normalize(payload, event_uuid)
         for ev in events:
@@ -174,6 +193,30 @@ def create_app(settings: Settings) -> FastAPI:
     def list_pipelines(project_id: str, per_page: int = 5) -> list:
         try:
             return app.state.gitlab.list_pipelines(project_id, per_page)
+        except GitLabAPIError as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
+
+    @app.post("/gitlab/hooks")
+    def register_hook(body: HookIn) -> dict:
+        """自动注册 webhook（部署脚本调用）：目标 URL 指向平台公网地址。"""
+        try:
+            return app.state.gitlab.create_hook(
+                body.project_id, body.url, body.secret, body.events
+            )
+        except GitLabAPIError as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
+
+    @app.get("/gitlab/hooks/{project_id}")
+    def list_hooks(project_id: str) -> list:
+        try:
+            return app.state.gitlab.list_hooks(project_id)
+        except GitLabAPIError as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
+
+    @app.delete("/gitlab/hooks/{project_id}/{hook_id}")
+    def delete_hook(project_id: str, hook_id: int) -> dict:
+        try:
+            return app.state.gitlab.delete_hook(project_id, hook_id)
         except GitLabAPIError as exc:
             raise HTTPException(status_code=502, detail=str(exc))
 

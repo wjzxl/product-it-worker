@@ -11,7 +11,7 @@ import logging
 import time
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -33,6 +33,13 @@ def _publish_targets() -> list:
 
 
 _publisher = publisher_from_env(_publish_targets() or None)
+
+
+def current_tenant(x_tenant: str = Header(default="")) -> str:
+    """多租户：请求头 X-Tenant 指定租户（缺省取 DEFAULT_TENANT）。"""
+    import os
+
+    return x_tenant or os.getenv("DEFAULT_TENANT", "default")
 
 
 def _get_or_404(db: Session, task_id: str) -> Task:
@@ -126,12 +133,13 @@ def _maybe_auto_start_dev_sop(task: Task, payload: dict) -> None:
 
 
 @router.post("/tasks", response_model=TaskOut, status_code=status.HTTP_201_CREATED)
-def create_task(payload: TaskCreate, db: Session = Depends(get_db)) -> Task:
+def create_task(payload: TaskCreate, db: Session = Depends(get_db), tenant: str = Depends(current_tenant)) -> Task:
     if payload.external_ref:
         existing = db.scalar(select(Task).where(Task.external_ref == payload.external_ref))
         if existing:
             return existing  # 幂等：同一外部引用只建一个任务
     task = Task(
+        tenant=tenant,
         external_ref=payload.external_ref,
         sop=payload.sop,
         params=payload.params,
@@ -153,8 +161,12 @@ def create_task(payload: TaskCreate, db: Session = Depends(get_db)) -> Task:
 
 
 @router.get("/tasks", response_model=list[TaskOut])
-def list_tasks(status_filter: Optional[str] = None, db: Session = Depends(get_db)) -> list[Task]:
-    stmt = select(Task).order_by(Task.created_at.desc())
+def list_tasks(
+    status_filter: Optional[str] = None,
+    db: Session = Depends(get_db),
+    tenant: str = Depends(current_tenant),
+) -> list[Task]:
+    stmt = select(Task).where(Task.tenant == tenant).order_by(Task.created_at.desc())
     if status_filter:
         stmt = stmt.where(Task.status == status_filter)
     return list(db.scalars(stmt))

@@ -30,6 +30,7 @@ class ApprovalRequest(Base):
     __tablename__ = "approval_requests"
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: new_id("apv"))
+    tenant: Mapped[str] = mapped_column(String(64), default="default", index=True)  # 多租户隔离键
     type: Mapped[str] = mapped_column(String(64), index=True)          # GATE_REQUIREMENT_REVIEW ...
     stage: Mapped[str] = mapped_column(String(128))                    # 如 "产品域 G1"
     requester: Mapped[str] = mapped_column(String(128))                # 如 "产品Agent@issue-1234"

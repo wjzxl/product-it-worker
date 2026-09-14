@@ -22,6 +22,7 @@ class Task(Base):
     __tablename__ = "tasks"
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: new_id("tsk"))
+    tenant: Mapped[str] = mapped_column(String(64), default="default", index=True)  # 多租户隔离键
     external_ref: Mapped[str] = mapped_column(String(128), unique=True, index=True, default="")
     sop: Mapped[str] = mapped_column(String(128), default="")          # 如 product-domain/prd-flow
     params: Mapped[dict] = mapped_column(JSON, default=dict)           # 流程入参（需求文本等）

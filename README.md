@@ -35,7 +35,7 @@
 | **Phase 2 收尾三项** | ✅ **全部完成**：Runbook RAG（Qwen 向量）+ Prometheus 告警接入（演示 10/10，AI 修复 MR !16 真实合入）；编码/测试沙箱容器隔离（`--network none` 实测）；三域度量面板 + [Phase 2 验收报告](12-Phase2验收报告.md)（75 测试全绿） |
 | **生产化 ③ 真实 CI/CD + 云 API** | ✅ 完成：`.gitlab-ci.yml` + bridge 触发/回读端点 + 运维域 D1 发布节点；操作执行器 dryrun/webhook（[13](13-生产化与Phase3实施记录.md)） |
 | **Phase 3 信任分级动态升降级** | ✅ 完成：L1 全自动 / L2 抽样 / L3 强制，失败即回升；**真实数据验证**（G3/G4 升 L1、G2 因 3 次真实退回降 L2），approval-gateway 31 测试 |
-| **生产化 ① 公网 webhook / SSO / 多租户** | ⏳ 待实施 |
+| **生产化 ① 公网 webhook / SSO / 多租户** | ✅ 完成：HMAC 签名 + webhook 自动注册（真实验证 #89070692）+ 生产编排（Caddy/HTTPS，config 校验通过）；OIDC SSO（真实 JWKS 验证 401/403/200 + 审计）；多租户隔离（PG 自动迁移 + 跨租户 404）。全平台 **119 测试** |
 | Phase 2 测试+运维域 | ⏳ 未开始 |
 | Phase 3 自进化 | ⏳ 未开始 |
 

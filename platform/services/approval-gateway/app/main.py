@@ -18,6 +18,25 @@ logger = logging.getLogger(__name__)
 # 建表（Phase 0 起步用；生产切 PG 后引入 Alembic 迁移）
 Base.metadata.create_all(bind=engine)
 
+
+def _ensure_tenant_column() -> None:
+    """轻量迁移：为既有库补 tenant 列（多租户）。"""
+    from sqlalchemy import inspect, text
+
+    try:
+        insp = inspect(engine)
+        cols = [c["name"] for c in insp.get_columns("approval_requests")]
+        if "tenant" not in cols:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE approval_requests ADD COLUMN tenant VARCHAR(64) DEFAULT 'default'"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_approval_requests_tenant ON approval_requests (tenant)"))
+            logger.info("已为 approval_requests 补充 tenant 列（多租户迁移）")
+    except Exception:  # 迁移失败不阻断服务（表可能尚不存在）
+        logger.exception("tenant 列迁移失败")
+
+
+_ensure_tenant_column()
+
 app = FastAPI(
     title="平台人审网关 approval-gateway",
     description="统一审批状态机 + Web/IM 双通道 + 超时升级（设计文档 03 §3）",

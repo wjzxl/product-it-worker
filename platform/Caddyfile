@@ -1,0 +1,42 @@
+# Caddy 反向代理（自动 HTTPS）。PLATFORM_DOMAIN 由环境变量注入。
+{$PLATFORM_DOMAIN} {
+	encode zstd gzip
+
+	# GitLab / Prometheus webhook（公网入口，HMAC 签名校验在服务内完成）
+	handle /webhooks/* {
+		reverse_proxy gitlab-bridge:8001
+	}
+	handle /alerts/* {
+		reverse_proxy task-center:8002
+	}
+
+	# 审批台（人审 UI，SSO 保护）
+	handle /approvals* {
+		reverse_proxy approval-gateway:8000
+	}
+	handle /callbacks/* {
+		reverse_proxy approval-gateway:8000
+	}
+	handle /admin/* {
+		reverse_proxy approval-gateway:8000
+	}
+	handle /auth/* {
+		reverse_proxy approval-gateway:8000
+	}
+
+	# 度量面板
+	handle /metrics* {
+		reverse_proxy metrics-dashboard:8005
+	}
+	handle /dashboard* {
+		reverse_proxy metrics-dashboard:8005
+	}
+
+	handle {
+		reverse_proxy metrics-dashboard:8005
+	}
+
+	log {
+		output file /data/access.log
+	}
+}
