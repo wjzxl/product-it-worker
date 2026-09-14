@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "metrics-dashboard"
+version = "0.1.0"
+description = "三域指标度量面板：Gate 决策/任务/成本汇总（Phase 2）"
+requires-python = ">=3.9"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "psycopg[binary]>=3.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "httpx>=0.27"]
+
+[tool.setuptools.packages.find]
+include = ["app*"]

@@ -32,6 +32,7 @@
 | **Phase 1 产品+研发闭环 MVP** | ✅ **完成并验收**：研发域闭环（DeepSeek 编码+质量门禁+MR+G3+合入）+ 真实仓库 **11 个 Issue 端到端合入**（MR #4~#15，测试 2→115，含 2 次真实退回修订演练），试点报告见 [platform/reports/phase1-pilot-summary.md](platform/reports/phase1-pilot-summary.md) |
 | **Phase 2 测试域** | ✅ 测试域流水线完成（独立用例→分层执行→缺陷闭环→G4 放行），批量试点 + 验收文档（[09](09-Phase2测试域实施记录.md)） |
 | **Phase 2 运维域** | ✅ **运维域流水线完成**（告警诊断→G5 变更审批→执行→复盘→G6），Qwen 已接入，真实演示 10/10（[10](10-Phase2运维域实施记录.md)） |
+| **Phase 2 收尾三项** | ✅ **全部完成**：Runbook RAG（Qwen 向量）+ Prometheus 告警接入（演示 10/10，AI 修复 MR !16 真实合入）；编码/测试沙箱容器隔离（`--network none` 实测）；三域度量面板 + [Phase 2 验收报告](12-Phase2验收报告.md)（75 测试全绿） |
 | Phase 2 测试+运维域 | ⏳ 未开始 |
 | Phase 3 自进化 | ⏳ 未开始 |
 
