@@ -30,3 +30,43 @@
 
 ### 测试
 agent-runtime 34 项（新增 prompts 5：加载/热更新/缺失回退/坏配置容错）；process-mining 25 项（新增应用动作 6：Prompt 版本切换/未知键/长度校验/入库请求/非法来源/提案可应用标记）。
+
+## ② 标准流程挖掘算法 ✅（已完成）
+
+此前自进化提案的"证据"只来自自研的简易路径统计。本节补齐**教科书级流程挖掘算法**（`app/algorithms.py`，8 个函数），使 SOP 改进提案建立在可复核的算法结论上。
+
+### 事件日志提取
+- `extract_event_log(dsn, sop=None)`：直读 PostgreSQL `approval_requests` + `task_timeline`，把审批/GATE/状态变更还原为 **case（task）× activity × timestamp** 标准事件日志；
+- `sop` 过滤参数：**这是关键修正**——平台日志是多产品线/多 SOP 异构混合（产品域 G1/G2、测试域 G4、运维域 G5/G6），不过滤时任何单一模型都会被"别的流程"淹没，导致 fitness 失真。
+
+### 挖掘算法
+| 算法 | 实现 | 输出 |
+|---|---|---|
+| DFG | `dfg(log)` | 直接跟随图（节点/边/频次/起点终点） |
+| Heuristic Miner | `heuristic_miner(log, threshold=0.8)` | 依赖度 `(a>b − b>a)/(a>b + b>a + 1)`，过滤噪声与短循环 |
+| α-Miner | `alpha_miner(log)` | 因果/并行/选择关系 → X_w 库所 + **source/sink 库所**（修正了无源汇导致的不可 replay 问题） |
+
+### 一致性检查（Conformance Checking）
+| 算法 | 方法 | 语义 |
+|---|---|---|
+| `conformance_dfg` | **留一法**（leave-one-out，默认，min_support=2） | 用"其余全部轨迹"建模型，逐条检查当前轨迹；对**唯一/稀有路径零容忍**，最擅长发现异常案例 |
+| `conformance_heuristic` | 边级检查 | 按依赖度阈值判断每条边是否"合规" |
+| `conformance_alpha` | **Token Replay** | `fitness = ½(1 − missing/consumed) + ½(1 − remaining/produced)` |
+| `threshold_sweep` | 多阈值扫描 | 0.3 / 0.5 / 0.8 下的模型与 fit 对比，辅助选参 |
+
+### 真实验证（真实 PostgreSQL 日志，非构造数据）
+日志规模：**33 cases / 178 events**；DFG：10 节点 / 16 边；Heuristic（0.8）：10 条依赖（如 `GATE_TECH_DESIGN_REVIEW:approve ⇒ approval.decided` dep=0.955）；α-Net：10 activities / 16 因果关系 / 0 并行 / 50 库所，start=[`task.created`]，end=[`approval.decided`, `status_changed`, `task.created`]。
+
+| 一致性算法 | Fitness | 偏差案例 | 结论 |
+|---|---|---|---|
+| **dfg_leave_one_out（默认）** | **0.97** | 1 | ✅ 精准命中唯一的运维异常案例 `tsk_70624766dd08`（告警触发流程，独有边 `approval.requested→GATE_POSTMORTEM_REVIEW:approve`） |
+| heuristic (0.8) | 0.182 | 27 | ⚠️ 阈值过滤后的模型对异构日志过严，适合"找偏差点"不适合当总评分 |
+| alpha_token_replay | 0.6 | 33 | ⚠️ 50 库所的严格网，对噪声敏感 |
+
+**方法论收获（已写入实现）**：多 SOP 混合日志上，全局单一 fitness 分数没有意义——必须先按 `sop` 过滤再建模；异常发现用留一法 DFG，模型拟合优度用 token replay，两者互补而非互相替代。
+
+### 新增接口（process-mining）
+`GET /mining/event-log`｜`/mining/dfg`｜`/mining/heuristic`｜`/mining/alpha`｜`/mining/conformance?algorithm=dfg|heuristic|alpha&threshold&sop&sweep`｜`/mining/report`。
+
+### 测试
+process-mining **41 项通过**（新增算法 16：事件日志构造/DFG/依赖度公式/阈值过滤/α 因果关系/源汇库所/留一法偏差定位/启发式边检查/token replay fitness/阈值扫描边界）。全平台回归：approval-gateway 46、gitlab-bridge 24、task-center 13、agent-runtime 34、knowledge-base 4、metrics-dashboard 3、process-mining 41 = **165 项全绿**。

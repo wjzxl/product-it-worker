@@ -25,6 +25,16 @@ import yaml
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
+from .algorithms import (
+    alpha_miner,
+    conformance_alpha,
+    conformance_dfg,
+    conformance_heuristic,
+    dfg,
+    extract_event_log,
+    heuristic_miner,
+    threshold_sweep,
+)
 from .apply import apply_action, config_path, record_improvement
 from .mining import mine
 from .proposals import generate
@@ -53,6 +63,60 @@ app = FastAPI(
     description="流程挖掘与 SOP 自进化：瓶颈 → 提案 → G7 人审 → 配置应用（设计文档 05 Phase 3）",
     version="0.1.0",
 )
+
+
+@app.get("/mining/event-log")
+def event_log(limit_cases: int = 200) -> dict:
+    """事件日志（任务时间线 + 审批决策）→ (case, activity, timestamp)。"""
+    log = extract_event_log(os.getenv("PLATFORM_DSN", "host=127.0.0.1 port=5432 dbname=platform user=platform password=platform"))
+    traces = dict(list(log["traces"].items())[:limit_cases])
+    return {"cases": len(traces), "events_total": sum(len(t) for t in traces.values()), "traces": traces}
+
+
+@app.get("/mining/dfg")
+def dfg_view() -> dict:
+    """DFG：活动频次 / 直接跟随边 / 开始结束活动。"""
+    return dfg(extract_event_log(os.getenv("PLATFORM_DSN", "host=127.0.0.1 port=5432 dbname=platform user=platform password=platform")))
+
+
+@app.get("/mining/heuristic")
+def heuristic_view(threshold: float = 0.8, sop: Optional[str] = None) -> dict:
+    """启发式 Miner：依赖度过滤后的因果网 + 长度-2 循环（可按域过滤）。"""
+    return heuristic_miner(
+        extract_event_log(os.getenv("PLATFORM_DSN", "host=127.0.0.1 port=5432 dbname=platform user=platform password=platform"), sop=sop),
+        threshold=threshold,
+    )
+
+
+@app.get("/mining/alpha")
+def alpha_view() -> dict:
+    """α-Miner：因果/并发/选择关系 + Petri 网库所（含源/汇库所）。"""
+    return alpha_miner(extract_event_log(os.getenv("PLATFORM_DSN", "host=127.0.0.1 port=5432 dbname=platform user=platform password=platform")))
+
+
+@app.get("/mining/conformance")
+def conformance_view(threshold: float = 0.8, algorithm: str = "dfg",
+                     sop: Optional[str] = None, sweep: bool = False) -> dict:
+    """一致性检查：dfg（留一法异常检测，默认）/ heuristic（边级）/ alpha（token replay）。
+
+    - `sop`：按域拆分日志（异构日志必须按域检查才有意义）；
+    - `sweep=true`：输出阈值敏感度扫描（0.3/0.5/0.8）。
+    """
+    log = extract_event_log(
+        os.getenv("PLATFORM_DSN", "host=127.0.0.1 port=5432 dbname=platform user=platform password=platform"),
+        sop=sop,
+    )
+    if algorithm == "alpha":
+        result = conformance_alpha(log, alpha_miner(log))
+    elif algorithm == "heuristic":
+        result = conformance_heuristic(log, heuristic_miner(log, threshold=threshold))
+    else:  # dfg（默认）：留一法异常检测，适配异构日志
+        result = conformance_dfg(log)
+    result["sop"] = log.get("sop")
+    result["sop_distribution"] = log.get("sop_distribution")
+    if sweep:
+        result["threshold_sweep"] = threshold_sweep(log)
+    return result
 
 
 @app.get("/mining/report")
