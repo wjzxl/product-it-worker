@@ -117,3 +117,21 @@ class GitLabClient:
         return self._request(
             "GET", f"/api/v4/projects/{self._encode(project_id)}/pipelines/{pipeline_id}"
         )
+
+    def trigger_pipeline(self, project_id, ref: str = "main") -> dict:
+        """触发流水线（POST /projects/:id/pipeline）。"""
+        return self._request(
+            "POST",
+            f"/api/v4/projects/{self._encode(project_id)}/pipeline",
+            json={"ref": ref},
+        )
+
+    def get_pipeline_jobs(self, project_id, pipeline_id: int) -> list:
+        return self._request(
+            "GET", f"/api/v4/projects/{self._encode(project_id)}/pipelines/{pipeline_id}/jobs"
+        )
+
+    def list_pipelines(self, project_id, per_page: int = 5) -> list:
+        return self._request(
+            "GET", f"/api/v4/projects/{self._encode(project_id)}/pipelines?per_page={per_page}"
+        )

@@ -154,6 +154,35 @@ class TestOpsFlow:
         assert body["status"] == "rejected"
         assert body["comment"] == "变更窗口未批准"
 
+    def test_release_success_recorded(self):
+        """D1 发布执行：流水线触发+回读成功，结果进入 G6 上下文。"""
+        env = _env([_diag("operational"), "复盘：扩容后恢复正常。"])
+        r = _start(env, task_ref="alert-rel-1")
+        tid = r.json()["thread_id"]
+        r = env["client"].post(f"/runs/{tid}/resume", json={"decision": "approve", "comment": "放行"})
+        body = r.json()
+        assert body["gate"] == "gate_g6"
+        assert body["release_status"] == "success"
+        assert body["release_pipeline_id"] == 99
+
+    def test_release_blocked_is_recorded_not_fatal(self):
+        """流水线触发被拒（如账号未实名/Runner 缺失）→ 如实记录，闭环继续。"""
+        import httpx
+
+        env = _env([_diag("operational"), "复盘：操作已执行但发布流水线未触发。"])
+        env["gitlab"].pipeline_raises = httpx.HTTPStatusError(
+            "Identity verification is required in order to run CI jobs",
+            request=httpx.Request("POST", "http://bridge/gitlab/pipelines/trigger"),
+            response=httpx.Response(502, json={"detail": "Identity verification is required"}),
+        )
+        r = _start(env, task_ref="alert-rel-2")
+        tid = r.json()["thread_id"]
+        r = env["client"].post(f"/runs/{tid}/resume", json={"decision": "approve", "comment": "放行"})
+        body = r.json()
+        assert body["gate"] == "gate_g6" and body["release_status"] == "not_triggered"
+        r = env["client"].post(f"/runs/{tid}/resume", json={"decision": "approve", "comment": "复盘通过"})
+        assert r.json()["status"] == "done"
+
     def test_g6_reject_after_execute(self):
         env = _env([_diag("operational"), "复盘：常规告警。"])
         r = _start(env, task_ref="alert-4")

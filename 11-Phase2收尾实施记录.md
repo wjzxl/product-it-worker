@@ -57,7 +57,31 @@
 
 **诚实标注**：git clone/push 仍由宿主执行（需 token 与网络）；**AI 生成的代码与测试用例的执行（风险最高环节）已全部在无网络容器内完成**。
 
-## ③ 三域指标度量面板 + Phase 2 验收报告 ✅（本轮完成）
+## ③' 真实 CI/CD 接入 + 云 API 操作执行器 ✅（本轮完成，属生产化三项之一）
+
+### 真实 CI/CD
+- **仓库侧**：`prodesgin-demo` 已加入 [.gitlab-ci.yml](../platform/../../)（`stages: test → build`：pytest + 构建产物归档），提交 `15412a7b`（push 已真实触发流水线）；
+- **平台侧（gitlab-bridge）**：新增 `POST /gitlab/pipelines/trigger`（触发）、`GET /gitlab/pipelines/{project}`（列表）、`GET /gitlab/pipelines/{project}/{id}/jobs`（作业回读），20 测试；
+- **运维域 SOP 新增 D1 发布执行节点**：`execute（变更合入）→ release（触发流水线 + 回读状态/作业，≤60s）→ postmortem → G6`；流水线状态进入复盘与 G6 审批依据；触发被拒时**如实记录 `not_triggered` 且不阻断闭环**。
+
+### 真实验证（`scripts/ci_check.py`，经 bridge → 真实 GitLab）
+| 步骤 | 结果 |
+|---|---|
+| ① 读流水线列表 | ✅ pipeline !2845485393 status=**failed** ref=main（真实） |
+| ② 读该流水线作业 | ✅ 作业数 **0**（无 Runner 分配） |
+| ③ 触发新流水线 | ⚠️ 被 GitLab 拒绝：`Identity verification is required in order to run CI jobs`（账号需实名验证） |
+
+**结论**：平台读写通路已打通且错误如实呈现；**阻塞点为 gitlab.com 账号实名验证**（用户侧动作），或改用内网 GitLab 复用现有 Runner。
+
+### 云 API 操作执行器（`app/executors.py`）
+| 模式 | 行为 |
+|---|---|
+| `dryrun`（默认） | 仅记录（无基础设施时的安全默认） |
+| `webhook` | **真实 HTTP 下发**到外部运维 API（Bearer Token；`OPS_EXECUTOR_URL` 配置） |
+- 运维域 `execute` 节点：operational 变更经执行器下发（重启/扩容/回滚动作从诊断文本解析），执行结果写入真实变更单；
+- 测试：dryrun 记录、webhook 真实 POST（MockTransport 断言 URL/Token/载荷）、失败处理、环境变量选择（4 项）。
+
+## ③ 三域指标度量面板 + Phase 2 验收报告 ✅（前一轮完成）
 
 ### 度量面板（`services/metrics-dashboard`，端口 8005）
 - 后端：从 PostgreSQL（平台库 + LiteLLM 库）实时汇总——Gate 决策数/平均决策耗时、任务按域、审批状态与决策分布、LLM 成本按模型；

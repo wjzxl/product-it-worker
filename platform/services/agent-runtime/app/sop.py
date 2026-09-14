@@ -37,13 +37,14 @@ class FlowState(TypedDict, total=False):
 
 
 class FlowContext:
-    def __init__(self, llm, approval_api, gitlab_api, coder=None, tester=None, knowledge=None):
+    def __init__(self, llm, approval_api, gitlab_api, coder=None, tester=None, knowledge=None, executor=None):
         self.llm = llm
         self.approval_api = approval_api
         self.gitlab_api = gitlab_api
         self.coder = coder  # 研发域编码执行器（可选）
         self.tester = tester  # 测试域执行引擎（可选）
         self.knowledge = knowledge  # 知识库检索（Runbook RAG，可选）
+        self.executor = executor  # 操作类变更执行器（可选：dryrun/webhook）
 
 
 def _build_approval_payload(state: FlowState, version: int) -> dict:
@@ -491,11 +492,26 @@ class OpsState(TypedDict, total=False):
     gate5_comment: str
     execution: str
     change_issue_iid: int
+    release_pipeline_id: int
+    release_status: str
+    release_jobs: list
     postmortem: str
     approval_id_g6: str
     gate6_decision: str
     gate6_comment: str
     logs: Annotated[list[str], operator.add]
+
+
+def _parse_action(diagnosis: str) -> tuple[str, str]:
+    """从诊断文本推断操作动作（重启/扩容/回滚）与目标。"""
+    text = diagnosis or ""
+    if "扩容" in text or "scale" in text.lower():
+        return "scale_out", "reports-exporter"
+    if "回滚" in text or "rollback" in text.lower():
+        return "rollback", "reports-exporter"
+    if "重启" in text or "restart" in text.lower():
+        return "restart", "reports-exporter"
+    return "operate", "reports-exporter"
 
 
 def _parse_diag_json(raw: str) -> dict | None:
@@ -637,24 +653,74 @@ def build_ops_graph(ctx: FlowContext):
                 "fix_mr_iid": mr.get("iid"),
                 "logs": [f"step:execute merged !{mr.get('iid')}"],
             }
-        # operational：记录执行 + 创建变更记录单
+        # operational：经操作执行器下发（dryrun 记录 / webhook 真实调用）
+        action, target = _parse_action(state.get("diagnosis", ""))
+        result = (
+            ctx.executor.execute(action, target, {"alert": (state.get("alert") or {}).get("id", "")})
+            if ctx.executor is not None
+            else {"ok": True, "mode": "none", "detail": "未配置执行器（记录式）"}
+        )
         change_issue = ctx.gitlab_api.create_issue(
             state.get("project_id", "sandbox/prodesgin"),
             title=f"变更: {(state.get('alert') or {}).get('title', '')}",
-            description=f"操作类变更已执行（模拟）：\n{state.get('diagnosis', '')[:2000]}",
+            description=(
+                f"操作类变更（{result.get('mode')}）：{result.get('detail')}\n\n"
+                f"诊断：\n{state.get('diagnosis', '')[:1500]}"
+            ),
             labels=["change", "auto-ops"],
         )
         return {
-            "execution": "operational 变更已执行（模拟：重启/扩容等操作）",
+            "execution": f"operational 变更：{result.get('detail')}",
             "change_issue_iid": change_issue.get("iid"),
-            "logs": [f"step:execute operational change #{change_issue.get('iid')}"],
+            "logs": [f"step:execute operational {result.get('mode')} ok={result.get('ok')} change #{change_issue.get('iid')}"],
         }
+
+    def release(state: OpsState) -> dict:
+        """D1 发布执行：触发真实 CI/CD 流水线并回读结果（无 Runner/未配置时如实记录）。"""
+        import time as _time
+
+        project = state.get("project_id", "sandbox/prodesgin")
+        try:
+            pipeline = ctx.gitlab_api.trigger_pipeline(project, "main")
+            pid = pipeline.get("id")
+            status = pipeline.get("status", "pending")
+            # 回读（最多 ~60s，避免长时间阻塞）
+            for _ in range(12):
+                if status in ("success", "failed", "canceled", "skipped"):
+                    break
+                _time.sleep(5)
+                status = ctx.gitlab_api.get_pipeline(project, pid).get("status", status)
+            jobs = []
+            try:
+                jobs = [
+                    {"name": j.get("name"), "status": j.get("status")}
+                    for j in ctx.gitlab_api.get_pipeline_jobs(project, pid)
+                ]
+            except Exception:  # 作业列表读取失败不影响主流程
+                pass
+            return {
+                "release_pipeline_id": pid,
+                "release_status": status,
+                "release_jobs": jobs,
+                "logs": [f"step:release pipeline !{pid} status={status} jobs={len(jobs)}"],
+            }
+        except Exception as exc:  # 触发被拒（如账号未实名/Runner 缺失）如实记录，不阻断闭环
+            detail = str(exc)
+            note = "流水线触发失败"
+            if "Identity verification" in detail:
+                note = "流水线触发被拒：GitLab 账号需实名验证（或改用自建 Runner）"
+            return {
+                "release_status": "not_triggered",
+                "release_jobs": [],
+                "logs": [f"step:release {note}: {detail[:200]}"],
+            }
 
     def postmortem(state: OpsState) -> dict:
         prompt = (
             "生成故障复盘文档（时间线/根因/影响/改进项/跟进负责人）：\n"
             f"告警：{state.get('alert')}\n诊断：{state.get('diagnosis', '')}\n"
-            f"处置：{state.get('execution', '')}\n变更类型：{state.get('change_type')}"
+            f"处置：{state.get('execution', '')}\n变更类型：{state.get('change_type')}\n"
+            f"发布流水线：{state.get('release_status', '-')}（作业：{state.get('release_jobs', [])}）"
         )
         report = ctx.llm.chat([{"role": "user", "content": prompt}])
         approval = ctx.approval_api.create_approval(
@@ -665,7 +731,10 @@ def build_ops_graph(ctx: FlowContext):
                 "task_ref": str((state.get("alert") or {}).get("id", "")),
                 "context_snapshot": {
                     "artifact_ref": f"复盘-{(state.get('alert') or {}).get('title', '')[:20]}",
-                    "diff_summary": f"复盘文档已生成：{state.get('execution', '')}",
+                    "diff_summary": (
+                        f"复盘文档已生成：{state.get('execution', '')}｜"
+                        f"发布流水线：{state.get('release_status', '-')}"
+                    ),
                     "evidence": [f"告警：{(state.get('alert') or {}).get('title', '')}", "诊断：见复盘文档"],
                     "risk": {"score": 40, "level": "L2", "factors": ["复盘审查", "常规告警"]},
                     "self_review": "复盘含根因与改进项；事故级需技术负责人审查",
@@ -704,6 +773,7 @@ def build_ops_graph(ctx: FlowContext):
     builder.add_node("g5_approval", g5_approval)
     builder.add_node("gate_g5", gate_g5)
     builder.add_node("execute", execute)
+    builder.add_node("release", release)
     builder.add_node("postmortem_doc", postmortem)
     builder.add_node("gate_g6", gate_g6)
     builder.add_node("done_end", done_end)
@@ -715,7 +785,8 @@ def build_ops_graph(ctx: FlowContext):
     builder.add_conditional_edges(
         "gate_g5", route_g5, {"execute": "execute", "reject_end": "reject_end"}
     )
-    builder.add_edge("execute", "postmortem_doc")
+    builder.add_edge("execute", "release")
+    builder.add_edge("release", "postmortem_doc")
     builder.add_edge("postmortem_doc", "gate_g6")
     builder.add_conditional_edges(
         "gate_g6", route_g6, {"done_end": "done_end", "reject_end": "reject_end"}

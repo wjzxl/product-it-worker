@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 
 from .apis import ApprovalAPI, GitLabAPI, KnowledgeAPI
 from .coder import Coder
+from .executors import executor_from_env
 from .llm import llm_from_env
 from .sop import FlowContext, build_dev_graph, build_graph, build_ops_graph, build_test_graph
 from .tester import TestEngine
@@ -95,6 +96,8 @@ def _status(graph, thread_id: str, sop: str) -> dict:
         if gate == "gate_g6":
             body["postmortem"] = values.get("postmortem", "")
             body["execution"] = values.get("execution", "")
+            body["release_status"] = values.get("release_status", "")
+            body["release_pipeline_id"] = values.get("release_pipeline_id")
         return body
 
     if not next_nodes:
@@ -135,6 +138,7 @@ def create_app(
     coder=None,
     tester=None,
     knowledge_api=None,
+    executor=None,
 ) -> FastAPI:
     llm = llm or llm_from_env()
     gitlab_api = gitlab_api or GitLabAPI(os.getenv("GITLAB_BRIDGE_URL", "http://localhost:8001"))
@@ -153,6 +157,7 @@ def create_app(
         project_path=os.getenv("DEMO_PROJECT", "sandbox/prodesgin"),
     )
     knowledge = knowledge_api or KnowledgeAPI(os.getenv("KNOWLEDGE_BASE_URL", "http://localhost:8004"))
+    executor = executor or executor_from_env()
     ctx = FlowContext(
         llm=llm,
         approval_api=approval_api or ApprovalAPI(os.getenv("APPROVAL_GATEWAY_URL", "http://localhost:8000")),
@@ -160,6 +165,7 @@ def create_app(
         coder=coder,
         tester=tester,
         knowledge=knowledge,
+        executor=executor,
     )
     graphs = {
         SOP_PRODUCT: build_graph(ctx),

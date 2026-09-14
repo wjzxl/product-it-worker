@@ -53,6 +53,11 @@ class NoteIn(BaseModel):
     body: str = Field(min_length=1)
 
 
+class TriggerPipelineIn(BaseModel):
+    project_id: Union[str, int]
+    ref: str = "main"
+
+
 class CreateMrIn(BaseModel):
     project_id: Union[str, int]
     source_branch: str = Field(min_length=1)
@@ -147,6 +152,28 @@ def create_app(settings: Settings) -> FastAPI:
     def get_pipeline(project_id: str, pipeline_id: int) -> dict:
         try:
             return app.state.gitlab.get_pipeline(project_id, pipeline_id)
+        except GitLabAPIError as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
+
+    @app.get("/gitlab/pipelines/{project_id}/{pipeline_id}/jobs")
+    def get_pipeline_jobs(project_id: str, pipeline_id: int) -> list:
+        try:
+            return app.state.gitlab.get_pipeline_jobs(project_id, pipeline_id)
+        except GitLabAPIError as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
+
+    @app.post("/gitlab/pipelines/trigger")
+    def trigger_pipeline(body: TriggerPipelineIn) -> dict:
+        """触发真实流水线（CI/CD 发布执行）。GitLab 侧限制（如账号未实名/Runner 缺失）会以 502+原因返回。"""
+        try:
+            return app.state.gitlab.trigger_pipeline(body.project_id, body.ref)
+        except GitLabAPIError as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
+
+    @app.get("/gitlab/pipelines/{project_id}")
+    def list_pipelines(project_id: str, per_page: int = 5) -> list:
+        try:
+            return app.state.gitlab.list_pipelines(project_id, per_page)
         except GitLabAPIError as exc:
             raise HTTPException(status_code=502, detail=str(exc))
 

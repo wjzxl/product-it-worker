@@ -89,6 +89,39 @@ def test_close_issue():
     assert captured["json"] == {"state_event": "close"}
 
 
+def test_trigger_pipeline():
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["json"] = json.loads(request.content)
+        return httpx.Response(201, json={"id": 99, "status": "pending", "ref": "main"})
+
+    client = GitLabClient("https://gitlab.example.com", "tok", transport=httpx.MockTransport(handler))
+    result = client.trigger_pipeline(42, "main")
+    assert result["id"] == 99 and result["status"] == "pending"
+    assert captured["url"].endswith("/api/v4/projects/42/pipeline")
+    assert captured["json"] == {"ref": "main"}
+
+
+def test_get_pipeline_jobs():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=[{"id": 1, "name": "test", "status": "failed"}])
+
+    client = GitLabClient("https://gitlab.example.com", "tok", transport=httpx.MockTransport(handler))
+    jobs = client.get_pipeline_jobs(42, 99)
+    assert jobs[0]["name"] == "test" and jobs[0]["status"] == "failed"
+
+
+def test_trigger_pipeline_error_propagates():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, json={"message": {"base": ["Identity verification is required"]}})
+
+    client = GitLabClient("https://gitlab.example.com", "tok", transport=httpx.MockTransport(handler))
+    with pytest.raises(GitLabAPIError, match="Identity verification"):
+        client.trigger_pipeline(42, "main")
+
+
 def test_api_error_raises():
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(404, json={"message": "404 Project Not Found"})

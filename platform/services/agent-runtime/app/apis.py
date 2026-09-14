@@ -93,6 +93,24 @@ class GitLabAPI:
         resp.raise_for_status()
         return resp.json()
 
+    def trigger_pipeline(self, project_id: Any, ref: str = "main") -> dict:
+        resp = self._client.post(
+            f"{self.base_url}/gitlab/pipelines/trigger",
+            json={"project_id": project_id, "ref": ref},
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def get_pipeline(self, project_id: Any, pipeline_id: int) -> dict:
+        resp = self._client.get(f"{self.base_url}/gitlab/pipelines/{project_id}/{pipeline_id}")
+        resp.raise_for_status()
+        return resp.json()
+
+    def get_pipeline_jobs(self, project_id: Any, pipeline_id: int) -> list:
+        resp = self._client.get(f"{self.base_url}/gitlab/pipelines/{project_id}/{pipeline_id}/jobs")
+        resp.raise_for_status()
+        return resp.json()
+
     def merge_mr(self, project_id: Any, mr_iid: int, sha: str | None = None, retries: int = 2) -> dict:
         """合入 MR；GitLab 偶发 4xx/5xx（含新建后立即合入被拒），重试兜底。"""
         import time as _time
@@ -173,6 +191,20 @@ class MockGitLabAPI:
     def close_issue(self, project_id, iid) -> dict:
         self.closed_issues.append(iid)
         return {"iid": iid, "state": "closed"}
+
+    # pipeline：默认模拟"成功流水线"
+    pipeline_status = "success"
+
+    def trigger_pipeline(self, project_id, ref="main") -> dict:
+        if getattr(self, "pipeline_raises", None):
+            raise self.pipeline_raises
+        return {"id": 99, "status": "pending", "ref": ref}
+
+    def get_pipeline(self, project_id, pipeline_id) -> dict:
+        return {"id": pipeline_id, "status": self.pipeline_status}
+
+    def get_pipeline_jobs(self, project_id, pipeline_id) -> list:
+        return [{"id": 1, "name": "test", "status": self.pipeline_status}]
 
     def create_mr(self, project_id, source_branch, target_branch, title, description) -> dict:
         item = {
