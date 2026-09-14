@@ -1,0 +1,106 @@
+# 区分度任务（陷阱 + 精确边界）：云端强模型也常在精确语义/误导信号上翻车
+# 判分口径：仍为机器判定（隐藏测试 / JSON Schema / 关键词禁令），不含主观评分。
+- id: coder_moving_average
+  role: coder
+  weight: 1.5
+  prompt: |
+    请实现 Python 函数 `moving_average(values: list, window: int) -> list`：
+    - 返回与输入等长的列表，第 i 项是「以 i 结尾、长度不超过 window」的滑动平均；
+    - 数据不足 window 个时（前 window-1 项）返回 `None`（不是用部分数据求平均）；
+    - `window <= 0` 抛 `ValueError`；`values` 为空返回空列表；
+    - 不要修改入参 `values`。
+    只输出一个代码块，第一行写 `# file: solution.py`，内容为该文件的完整实现。
+  checks:
+    - type: hidden_tests
+      tests: |
+        import pytest
+        from solution import moving_average
+
+        def test_warmup_returns_none():
+            assert moving_average([1, 2, 3], 2) == [None, 1.5, 2.5]
+
+        def test_exact_window():
+            assert moving_average([1, 2, 3, 4], 2) == [None, 1.5, 2.5, 3.5]
+
+        def test_window_one():
+            assert moving_average([1, 2, 3], 1) == [1, 2, 3]
+
+        def test_window_larger_than_input():
+            assert moving_average([1, 2], 5) == [None, None]
+
+        def test_empty_values():
+            assert moving_average([], 3) == []
+
+        def test_invalid_window_raises():
+            with pytest.raises(ValueError):
+                moving_average([1, 2], 0)
+
+        def test_does_not_mutate_input():
+            data = [1, 2, 3]
+            moving_average(data, 2)
+            assert data == [1, 2, 3]
+
+- id: ops_misleading_signal
+  role: ops_diagnose
+  weight: 1.5
+  prompt: |
+    告警：`HighLatency` 服务 search-api P99 从 180ms 涨到 6.2s（持续 10 分钟）。
+    指标：DB 连接池 active=4/50（空闲）、DB 慢查询 0、CPU 12%、GC 正常、QPS 与昨日持平，
+    但线程池 `searchExecutor` 队列深度 5000（上限 5000）、活跃线程 200/200（打满），
+    下游只有 `index-service` 调用，其自身 P99 为 150ms（正常）。
+    日志：
+    ```
+    WARN search.exec - Task rejected from searchExecutor: queue full
+    WARN search.exec - Waiting for task completion exceeded 5000ms
+    ```
+    请给出根因判断与处置建议（Markdown，含「根因」「处置」「验证」三段）。
+    注意：连接池与数据库指标均正常，不要把根因归到数据库/连接池。
+  checks:
+    - type: required_sections
+      sections: ["根因", "处置", "验证"]
+    - type: required_keywords
+      keywords: ["线程池", "队列"]
+      match: any
+      label: "定位到线程池/队列"
+    - type: forbidden_regex
+      pattern: "根因是数据库|根因是连接池|数据库连接池耗尽|数据库慢查询导致"
+      label: "不得把根因误判为数据库/连接池"
+
+- id: prd_contradiction_scan
+  role: prd
+  weight: 1.5
+  prompt: |
+    下面是一段需求描述，其中存在**互相矛盾或不可同时满足**的要求，请找出全部矛盾点，
+    只输出 JSON（不要解释、不要 markdown 代码块）：
+    ```
+    1. 导出任务必须在用户点击后 1 秒内返回完整文件。
+    2. 单次导出最多 500 万行数据。
+    3. 导出接口为同步接口，不引入队列与异步任务。
+    4. 导出文件必须包含全部字段，且不加任何压缩。
+    5. 接口 P99 延迟必须保持在 200ms 以内。
+    ```
+    JSON 字段：
+    - `contradictions`(array of object)：每项含 `ids`(array of integer，涉及的需求编号，至少 2 个)、
+      `reason`(string，说明为何不可同时满足)
+    - `severity`(string)：只能是 "高" / "中" / "低"
+    要求 `contradictions` 至少 2 项。
+  checks:
+    - type: json_schema
+      schema:
+        type: object
+        required: ["contradictions", "severity"]
+        properties:
+          contradictions:
+            type: array
+            min_items: 2
+            items:
+              type: object
+              required: ["ids", "reason"]
+              properties:
+                ids: {type: array, items: {type: integer}, min_items: 2}
+                reason: {type: string}
+          severity: {type: string, enum: ["高", "中", "低"]}
+    - type: regex_any
+      pattern: "(同步|1 ?秒|P99|200 ?ms|500 ?万)"
+      min_matches: 2
+      label: "矛盾说明需引用具体约束"

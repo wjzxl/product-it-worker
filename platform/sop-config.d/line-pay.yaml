@@ -1,0 +1,28 @@
+# 产品线覆盖配置：line-pay（画像 strict）
+# 优先级：环境变量 > 本文件 > sop-config.yaml 基线 > 内置默认
+# 只写差异项；删除本文件即回退平台基线。
+version: 1
+tenant: line-pay
+profile: strict
+description: 强监管/核心链路：样本要求高、抽样比例低、SLA 宽松（由 onboard_product_line.py 生成，可手工微调）
+trust:
+  window: 30
+  min_samples: 20
+  l1_approve_rate: 0.95
+  l2_approve_rate: 0.9
+  sample_ratio: 0.2
+gates:
+  GATE_REQUIREMENT_REVIEW:
+    sla_hours: 24
+  GATE_TECH_DESIGN_REVIEW:
+    sla_hours: 24
+  GATE_PR_REVIEW:
+    sla_hours: 12
+  GATE_RELEASE_DECISION:
+    sla_hours: 8
+  GATE_CHANGE_APPROVAL:
+    sla_hours: 4
+  GATE_POSTMORTEM_REVIEW:
+    sla_hours: 48
+  GATE_PROCESS_IMPROVEMENT:
+    sla_hours: 48

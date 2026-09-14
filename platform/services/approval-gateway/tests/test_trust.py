@@ -89,8 +89,9 @@ class TestTrustMetrics:
     def test_all_trust_lists_scopes(self, db):
         _seed(db, SCOPE, approves=12)
         _seed(db, PENALTY_SCOPE, approves=2, rejects=2)
-        scopes = {t["scope"]: t["level"] for t in all_trust(db)}
+        scopes = {t["gate"]: t["level"] for t in all_trust(db)}
         assert scopes[SCOPE] == "L1" and scopes[PENALTY_SCOPE] == "L3"
+        assert all(t["tenant"] == "default" for t in all_trust(db))
 
 
 class TestSampler:
@@ -157,7 +158,9 @@ class TestApiAutoGate:
 
     def test_trust_endpoints(self, client):
         assert isinstance(client.get("/trust").json(), list)
-        assert client.get(f"/trust/{SCOPE}").json()["scope"] == SCOPE
+        one = client.get(f"/trust/{SCOPE}").json()
+        assert one["gate"] == SCOPE and one["tenant"] == "default"
+        assert one["scope"] == f"default::{SCOPE}"  # 作用域键 = 产品线 × Gate
 
 
 @pytest.fixture(scope="module")

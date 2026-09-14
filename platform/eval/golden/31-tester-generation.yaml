@@ -1,0 +1,28 @@
+# 测试域：用例生成质量（mutation_tests 判分——平台真实痛点：生成的用例"能过但抓不到 bug"）
+# 判分口径（0 / 0.5 / 1）：
+#   - 生成的用例跑「正确实现」必须全绿，否则 0 分（用例本身是坏的）；
+#   - 再跑「含 bug 实现」必须变红，才拿满分 1；若仍然全绿说明用例太弱（0.5 分）。
+- id: tester_test_generation_kills_mutant
+  role: tester
+  weight: 1.0
+  prompt: |
+    请为下面的函数规格编写 pytest 用例（只输出一个代码块，第一行写 `# file: test_generated.py`）：
+
+    `def divide(a: float, b: float) -> float` —— 返回 a / b；当 b == 0 时抛 `ValueError`。
+
+    要求：用例必须能同时覆盖正常路径与异常路径，并且**必须能在实现有 bug 时失败**
+    （不要写只断言 `is not None` 这类空洞断言）。被测实现由 `solution.py` 提供，
+    用 `from solution import divide` 导入。
+  checks:
+    - type: mutation_tests
+      correct_files:
+        solution.py: |
+          def divide(a: float, b: float) -> float:
+              if b == 0:
+                  raise ValueError("division by zero")
+              return a / b
+      buggy_files:
+        solution.py: |
+          def divide(a: float, b: float) -> float:
+              # BUG: 缺少除零校验，且返回值被取整
+              return int(a / b) if b else 0

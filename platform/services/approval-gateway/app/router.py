@@ -17,7 +17,7 @@ from .models import ApprovalRequest, Decision, utcnow
 from .notifier import get_notifier
 from .policies import is_overdue
 from .auth import auth_summary, current_principal
-from .trust import all_trust, apply_penalty, compute_trust, should_auto_approve
+from .trust import all_trust, apply_penalty, compute_trust, should_auto_approve, tenant_summary
 from .schemas import (
     ApprovalRequestCreate,
     ApprovalRequestOut,
@@ -110,7 +110,7 @@ def create_approval(
     )
     logger.info("approval.requested id=%s stage=%s", req.id, req.stage)
 
-    trust_info = compute_trust(db, req.type)
+    trust_info = compute_trust(db, req.type, tenant=req.tenant)
     auto_decision = "pending"
     if payload.auto_gate:
         allowed, why = should_auto_approve(trust_info, req.id)
@@ -194,10 +194,10 @@ def decide(
         req.status = "approved"
     elif payload.decision == "reject":
         req.status = "rejected"
-        apply_penalty(db, req.type, f"否决：{payload.comment}")
+        apply_penalty(db, req.type, f"否决：{payload.comment}", tenant=req.tenant)
     else:  # revise：退回修订，允许修订后重新提交（version+1）
         req.status = "revised"
-        apply_penalty(db, req.type, f"退回：{payload.comment}")
+        apply_penalty(db, req.type, f"退回：{payload.comment}", tenant=req.tenant)
 
     db.commit()
     db.refresh(decision)
@@ -279,10 +279,10 @@ async def im_card_callback(payload: ImCardCallback, request: Request, db: Sessio
         req.status = "approved"
     elif payload.action == "reject":
         req.status = "rejected"
-        apply_penalty(db, req.type, f"否决(IM)：{payload.comment}")
+        apply_penalty(db, req.type, f"否决(IM)：{payload.comment}", tenant=req.tenant)
     else:
         req.status = "revised"
-        apply_penalty(db, req.type, f"退回(IM)：{payload.comment}")
+        apply_penalty(db, req.type, f"退回(IM)：{payload.comment}", tenant=req.tenant)
     db.commit()
     db.refresh(decision)
     _publisher.publish(
@@ -313,14 +313,23 @@ def auth_info(principal=Depends(current_principal)) -> dict:
 
 
 @router.get("/trust")
-def trust_all(db: Session = Depends(get_db)) -> list[dict]:
-    """全部 Gate 的信任等级与指标（Phase 3 动态升降级）。"""
-    return all_trust(db)
+def trust_all(db: Session = Depends(get_db), tenant: str = Depends(current_tenant)) -> list[dict]:
+    """本产品线（X-Tenant）各 Gate 的信任等级与指标（Phase 3 动态升降级）。
+
+    注意：信任按 **产品线 × Gate** 隔离——新产品线从零积累，不继承其它产品线的 L1。
+    """
+    return all_trust(db, tenant=tenant)
+
+
+@router.get("/trust/overview")
+def trust_overview(db: Session = Depends(get_db)) -> list[dict]:
+    """平台管理员总览：各产品线的 Gate 数、等级分布、自动放行占比（多产品线推广看板）。"""
+    return tenant_summary(db)
 
 
 @router.get("/trust/{gate_type}")
-def trust_one(gate_type: str, db: Session = Depends(get_db)) -> dict:
-    return compute_trust(db, gate_type)
+def trust_one(gate_type: str, db: Session = Depends(get_db), tenant: str = Depends(current_tenant)) -> dict:
+    return compute_trust(db, gate_type, tenant=tenant)
 
 
 @router.post("/admin/sweep")

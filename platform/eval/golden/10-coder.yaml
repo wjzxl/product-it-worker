@@ -1,0 +1,65 @@
+# 研发域编码任务（hidden_tests 判分：模型代码在沙箱里跑隐藏测试，通过比例即得分）
+# 判分口径：隐藏测试不进 prompt，模型只能靠需求描述写对；score = 通过数 / 总数。
+- id: coder_slugify
+  role: coder
+  weight: 1.0
+  prompt: |
+    请实现 Python 函数 `slugify(text: str) -> str`，规则：
+    1) 转小写；2) 所有非字母数字字符替换为 `-`；3) 连续 `-` 合并为一个；
+    4) 去掉首尾 `-`；5) 非 ASCII 字符（如中文）直接丢弃；6) 空串或全为符号时返回空串。
+    只输出一个代码块，第一行写 `# file: solution.py`，内容为该文件的完整实现。
+  checks:
+    - type: hidden_tests
+      tests: |
+        import pytest
+        from solution import slugify
+
+        def test_basic():
+            assert slugify("Hello World") == "hello-world"
+
+        def test_symbols_and_spaces():
+            assert slugify("  Foo__Bar!! ") == "foo-bar"
+
+        def test_unicode_dropped():
+            assert slugify("中文 Test 123") == "test-123"
+
+        def test_all_symbols_returns_empty():
+            assert slugify("!!!") == ""
+
+        def test_dashes_collapsed():
+            assert slugify("a - - b") == "a-b"
+
+- id: coder_parse_duration
+  role: coder
+  weight: 1.0
+  prompt: |
+    请实现 Python 函数 `parse_duration(s: str) -> int`，把时长字符串解析为秒数：
+    支持 `h`（小时）、`m`（分钟）、`s`（秒）三种单位，可组合（如 `1h30m`、`1h2m3s`），
+    也可单独出现（如 `45s`、`2h`）。要求：单位必须按 h→m→s 的顺序出现，顺序错误抛 `ValueError`；
+    无法解析的输入（含空串、纯字母、缺单位）同样抛 `ValueError`。
+    只输出一个代码块，第一行写 `# file: solution.py`，内容为该文件的完整实现。
+  checks:
+    - type: hidden_tests
+      tests: |
+        import pytest
+        from solution import parse_duration
+
+        def test_hours_minutes():
+            assert parse_duration("1h30m") == 5400
+
+        def test_seconds_only():
+            assert parse_duration("45s") == 45
+
+        def test_hours_only():
+            assert parse_duration("2h") == 7200
+
+        def test_all_units():
+            assert parse_duration("1h2m3s") == 3723
+
+        def test_invalid_raises():
+            with pytest.raises(ValueError):
+                parse_duration("abc")
+
+        def test_wrong_order_raises():
+            with pytest.raises(ValueError):
+                parse_duration("30m1h")

@@ -1,0 +1,37 @@
+# 产品域 / 研发域文档产出任务（required_sections + regex 判分：结构完整性与可验收性）
+# 判分口径：必备小节齐备 + 关键可验收表述存在 + 无含糊占位词。
+- id: prd_export_feature
+  role: prd
+  weight: 1.0
+  prompt: |
+    为「报表导出」功能写一份 PRD 草案（市场规模、竞品分析不需要）。必须包含小节：
+    `## 需求`、`## 验收标准`、`## 边界与非目标`。
+    验收标准必须用 `WHEN ... THEN ...` 的句式逐条书写，至少 3 条。
+    不要出现「待定」「TBD」「后续补充」这类占位表述。
+  checks:
+    - type: required_sections
+      sections: ["需求", "验收标准", "边界与非目标"]
+    - type: regex_any
+      pattern: "WHEN[^\n]{0,120}THEN"
+      min_matches: 3
+      label: "至少 3 条 WHEN...THEN 验收标准"
+    - type: forbidden_regex
+      pattern: "待定|TBD|后续补充"
+      label: "不得出现占位表述"
+
+- id: tech_design_inventory_api
+  role: tech_design
+  weight: 1.0
+  prompt: |
+    为「库存扣减接口」写技术方案。必须包含小节：`## 接口定义`、`## 数据模型`、`## 风险与回滚`。
+    接口定义需给出 HTTP 方法与路径（例如 `POST /api/v1/inventory/deduct`）。
+    风险与回滚小节必须明确写出回滚方案。
+  checks:
+    - type: required_sections
+      sections: ["接口定义", "数据模型", "风险与回滚"]
+    - type: regex_any
+      pattern: "(GET|POST|PUT|PATCH|DELETE)[\\s\\S]{0,60}?/[A-Za-z0-9/_{}-]{2,}"
+      label: "给出 HTTP 方法与路径"
+    - type: required_keywords
+      keywords: ["回滚"]
+      label: "必须包含回滚方案"

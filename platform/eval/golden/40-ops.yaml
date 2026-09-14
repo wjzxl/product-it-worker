@@ -1,0 +1,33 @@
+# 运维域任务（required_keywords + forbidden_regex 判分：诊断要指向正确根因，且不得给危险动作）
+# 判分口径：命中真实根因关键词；不得出现"忽略告警/重启整机"这类粗暴处置。
+- id: ops_pool_exhaustion
+  role: ops_diagnose
+  weight: 1.0
+  prompt: |
+    告警：`HighErrorRate` 服务 order-api 5xx 比例 12%（持续 8 分钟，阈值 1%）。
+    指标：DB 连接池 active=50/50（打满）、等待队列 214、P99 延迟 4.8s（基线 200ms）、
+    QPS 与昨日持平、无发布记录、下游 payment-api 健康。
+    近期日志：
+    ```
+    WARN  hikari.pool - Connection is not available, request timed out after 30000ms
+    ERROR order.repo - Timeout waiting for connection from pool
+    ```
+    请给出根因判断与处置建议（Markdown，含「根因」「处置」「验证」三段）。
+    要求：不要建议忽略告警，也不要建议重启整台机器。
+  checks:
+    - type: required_keywords
+      keywords: ["连接池"]
+      label: "定位到连接池"
+    - type: required_keywords
+      keywords: ["超时", "pool"]
+      match: any
+      label: "引用超时/连接池证据"
+    - type: required_keywords
+      keywords: ["扩容", "上限", "最大连接", "泄漏", "慢查询", "排队"]
+      match: any
+      label: "处置指向具体动作/根因类别"
+    - type: required_sections
+      sections: ["根因", "处置", "验证"]
+    - type: forbidden_regex
+      pattern: "忽略告警|重启整台机器|重启服务器"
+      label: "不得给出粗暴处置"

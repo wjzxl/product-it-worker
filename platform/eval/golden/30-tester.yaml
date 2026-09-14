@@ -1,0 +1,33 @@
+# 测试域任务（json_schema 判分：结构化产出必须能被平台直接消费，而非自由文本）
+# 判分口径：输出必须是合法 JSON 且字段/类型/枚举齐全——缺陷单要能被自动建单。
+- id: tester_defect_report
+  role: tester
+  weight: 1.0
+  prompt: |
+    下面是 CI 失败日志，请产出一份**结构化缺陷单**，只输出 JSON（不要 markdown 代码块、不要解释）：
+
+    ```
+    =========================== short test summary info ============================
+    FAILED tests/test_report.py::test_export_empty_range - AssertionError: assert 500 == 200
+    E   AssertionError: assert 500 == 200
+    E    +  where 500 = client.get('/api/v1/report/export?from=2026-03-01&to=2026-03-01').status_code
+    --------------- tests/test_report.py:42 ---------------
+    ```
+
+    JSON 字段：
+    - `defect_title`(string)：一句话缺陷标题
+    - `severity`(string)：只能是 "高" / "中" / "低"
+    - `reproduce_steps`(array of string)：复现步骤，至少 2 条
+    - `root_cause_hypothesis`(string)：根因假设
+    - `suggested_fix`(string)：修复建议
+  checks:
+    - type: json_schema
+      schema:
+        type: object
+        required: ["defect_title", "severity", "reproduce_steps", "root_cause_hypothesis", "suggested_fix"]
+        properties:
+          defect_title: {type: string}
+          severity: {type: string, enum: ["高", "中", "低"]}
+          reproduce_steps: {type: array, items: {type: string}, min_items: 2}
+          root_cause_hypothesis: {type: string}
+          suggested_fix: {type: string}

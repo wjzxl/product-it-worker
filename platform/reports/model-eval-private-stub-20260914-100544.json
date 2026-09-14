@@ -1,0 +1,214 @@
+{
+  "started_at": "2026-09-14T10:05:44.734695+00:00",
+  "endpoint": "http://127.0.0.1:4000/v1",
+  "judge_enabled": false,
+  "runner_mode": "host",
+  "tasks": [
+    {
+      "id": "coder_slugify",
+      "role": "coder",
+      "weight": 1.0,
+      "checks": [
+        "hidden_tests"
+      ]
+    },
+    {
+      "id": "coder_parse_duration",
+      "role": "coder",
+      "weight": 1.0,
+      "checks": [
+        "hidden_tests"
+      ]
+    },
+    {
+      "id": "prd_export_feature",
+      "role": "prd",
+      "weight": 1.0,
+      "checks": [
+        "required_sections",
+        "regex_any",
+        "forbidden_regex"
+      ]
+    },
+    {
+      "id": "tech_design_inventory_api",
+      "role": "tech_design",
+      "weight": 1.0,
+      "checks": [
+        "required_sections",
+        "regex_any",
+        "required_keywords"
+      ]
+    },
+    {
+      "id": "tester_defect_report",
+      "role": "tester",
+      "weight": 1.0,
+      "checks": [
+        "json_schema"
+      ]
+    }
+  ],
+  "models": [
+    {
+      "model": "mock-gpt",
+      "tasks": 5,
+      "passed": 0,
+      "pass_rate": 0.0,
+      "avg_score": 0.2,
+      "latency_p50_ms": 30.2,
+      "latency_p95_ms": 37.5,
+      "prompt_tokens": 150,
+      "completion_tokens": 300,
+      "total_tokens": 450,
+      "cost_usd": null,
+      "cost_status": "unmetered",
+      "unmetered_calls": 5
+    }
+  ],
+  "results": [
+    {
+      "model": "mock-gpt",
+      "task_id": "coder_slugify",
+      "role": "coder",
+      "weight": 1.0,
+      "score": 0.0,
+      "passed": false,
+      "checks": [
+        {
+          "passed": false,
+          "detail": "输出中没有可提取的代码块",
+          "score": 0.0,
+          "type": "hidden_tests",
+          "label": "hidden_tests"
+        }
+      ],
+      "latency_ms": 38.4,
+      "total_tokens": 90,
+      "cost": null,
+      "output_chars": 306,
+      "output_head": "# PRD 草案（mock-mock-gpt 生成）\n\n## 需求\n请实现 Python 函数 `slugify(text: str) -> str`，规则：\n1) 转小写；2) 所有非字母数字字符替换为 `-`；3) 连续 `-` 合并为一个；\n4) 去掉首尾 `-`；5) 非 ASCII 字符（如中文）直接丢弃；6) 空串或全为符号时返回空串。\n只输出一个代码块，第一行写 `# file: solution.py`，内容为该文件的完整实现。\n\n\n## 验收标准\n- WHEN 用户按日期筛选 THEN 系统仅返回所选日期范围的数据\n- WHEN 用户点击导出 THEN 系统生成 CSV 文件并开始下载\n"
+    },
+    {
+      "model": "mock-gpt",
+      "task_id": "coder_parse_duration",
+      "role": "coder",
+      "weight": 1.0,
+      "score": 0.0,
+      "passed": false,
+      "checks": [
+        {
+          "passed": false,
+          "detail": "输出中没有可提取的代码块",
+          "score": 0.0,
+          "type": "hidden_tests",
+          "label": "hidden_tests"
+        }
+      ],
+      "latency_ms": 30.2,
+      "total_tokens": 90,
+      "cost": null,
+      "output_chars": 315,
+      "output_head": "# PRD 草案（mock-mock-gpt 生成）\n\n## 需求\n请实现 Python 函数 `parse_duration(s: str) -> int`，把时长字符串解析为秒数：\n支持 `h`（小时）、`m`（分钟）、`s`（秒）三种单位，可组合（如 `1h30m`、`1h2m3s`），\n也可单独出现（如 `45s`、`2h`）。要求：单位必须按 h→m→s 的顺序出现，顺序错误抛 `ValueError`；\n无法解析的输入（含空串、纯字母、缺单位）同样抛 \n\n## 验收标准\n- WHEN 用户按日期筛选 THEN 系统仅返回所选日期范围的数据\n- WHEN 用户点击导出 THEN 系统生成 CSV 文件并开始下载\n"
+    },
+    {
+      "model": "mock-gpt",
+      "task_id": "prd_export_feature",
+      "role": "prd",
+      "weight": 1.0,
+      "score": 0.3333,
+      "passed": false,
+      "checks": [
+        {
+          "passed": false,
+          "detail": "缺少小节：边界与非目标",
+          "evidence": "# PRD 草案（mock-mock-gpt 生成）\n\n## 需求\n为「报表导出」功能写一份 PRD 草案（市场规模、竞品分析不需要）。必须包含小节：\n`## 需求`、`## 验收标准`、`## 边界与非目标`。\n验收标准必须用 `WHEN ... THEN ...` 的句式逐条书写，至少 3 条。\n不要出现「待定」「TBD」「后续补充」这类占位表述。\n\n\n## 验收标准\n- WHEN 用户按日期筛选 THEN 系统仅返回所选日期范围的数据\n- WHEN 用户点击导出 THEN 系统生成 CSV 文件并开始下载\n",
+          "score": 0.0,
+          "type": "required_sections",
+          "label": "required_sections"
+        },
+        {
+          "passed": true,
+          "detail": "匹配 3 处（要求 ≥3）：至少 3 条 WHEN...THEN 验收标准",
+          "score": 1.0,
+          "type": "regex_any",
+          "label": "至少 3 条 WHEN...THEN 验收标准"
+        },
+        {
+          "passed": false,
+          "detail": "命中禁止表述：'TBD'（不得出现占位表述），共 2 处",
+          "evidence": "与非目标`。\n验收标准必须用 `WHEN ... THEN ...` 的句式逐条书写，至少 3 条。\n不要出现「待定」「TBD」「后续补充」这类占位表述。\n\n\n## 验收标准\n- WHEN 用户按日期筛选 THEN 系统仅返回所选日期范围的数据\n",
+          "score": 0.0,
+          "type": "forbidden_regex",
+          "label": "不得出现占位表述"
+        }
+      ],
+      "latency_ms": 15.4,
+      "total_tokens": 90,
+      "cost": null,
+      "output_chars": 259,
+      "output_head": "# PRD 草案（mock-mock-gpt 生成）\n\n## 需求\n为「报表导出」功能写一份 PRD 草案（市场规模、竞品分析不需要）。必须包含小节：\n`## 需求`、`## 验收标准`、`## 边界与非目标`。\n验收标准必须用 `WHEN ... THEN ...` 的句式逐条书写，至少 3 条。\n不要出现「待定」「TBD」「后续补充」这类占位表述。\n\n\n## 验收标准\n- WHEN 用户按日期筛选 THEN 系统仅返回所选日期范围的数据\n- WHEN 用户点击导出 THEN 系统生成 CSV 文件并开始下载\n"
+    },
+    {
+      "model": "mock-gpt",
+      "task_id": "tech_design_inventory_api",
+      "role": "tech_design",
+      "weight": 1.0,
+      "score": 0.6667,
+      "passed": false,
+      "checks": [
+        {
+          "passed": false,
+          "detail": "缺少小节：接口定义, 数据模型, 风险与回滚",
+          "evidence": "# PRD 草案（mock-mock-gpt 生成）\n\n## 需求\n为「库存扣减接口」写技术方案。必须包含小节：`## 接口定义`、`## 数据模型`、`## 风险与回滚`。\n接口定义需给出 HTTP 方法与路径（例如 `POST /api/v1/inventory/deduct`）。\n风险与回滚小节必须明确写出回滚方案。\n\n\n## 验收标准\n- WHEN 用户按日期筛选 THEN 系统仅返回所选日期范围的数据\n- WHEN 用户点击导出 THEN 系统生成 CSV 文件并开始下载\n",
+          "score": 0.0,
+          "type": "required_sections",
+          "label": "required_sections"
+        },
+        {
+          "passed": true,
+          "detail": "匹配 1 处（要求 ≥1）：给出 HTTP 方法与路径",
+          "score": 1.0,
+          "type": "regex_any",
+          "label": "给出 HTTP 方法与路径"
+        },
+        {
+          "passed": true,
+          "detail": "命中关键词 ['回滚']（要求 all：['回滚']）",
+          "score": 1.0,
+          "type": "required_keywords",
+          "label": "必须包含回滚方案"
+        }
+      ],
+      "latency_ms": 33.8,
+      "total_tokens": 90,
+      "cost": null,
+      "output_chars": 244,
+      "output_head": "# PRD 草案（mock-mock-gpt 生成）\n\n## 需求\n为「库存扣减接口」写技术方案。必须包含小节：`## 接口定义`、`## 数据模型`、`## 风险与回滚`。\n接口定义需给出 HTTP 方法与路径（例如 `POST /api/v1/inventory/deduct`）。\n风险与回滚小节必须明确写出回滚方案。\n\n\n## 验收标准\n- WHEN 用户按日期筛选 THEN 系统仅返回所选日期范围的数据\n- WHEN 用户点击导出 THEN 系统生成 CSV 文件并开始下载\n"
+    },
+    {
+      "model": "mock-gpt",
+      "task_id": "tester_defect_report",
+      "role": "tester",
+      "weight": 1.0,
+      "score": 0.0,
+      "passed": false,
+      "checks": [
+        {
+          "passed": false,
+          "detail": "输出不是合法 JSON（Expecting value: line 1 column 1 (char 0)）",
+          "evidence": "# PRD 草案（mock-mock-gpt 生成）\n\n## 需求\n下面是 CI 失败日志，请产出一份**结构化缺陷单**，只输出 JSON（不要 markdown 代码块、不要解释）：\n\n```\n=========================== short test summary info ============================\nFAILED tests/test_report.py::test_export_empty_range -\n\n## 验收标准\n- WHEN 用户按日期筛选 THEN 系统仅返回所选日期范围的数据\n- WHEN 用户点击导出 THEN 系统",
+          "score": 0.0,
+          "type": "json_schema",
+          "label": "json_schema"
+        }
+      ],
+      "latency_ms": 14.9,
+      "total_tokens": 90,
+      "cost": null,
+      "output_chars": 315,
+      "output_head": "# PRD 草案（mock-mock-gpt 生成）\n\n## 需求\n下面是 CI 失败日志，请产出一份**结构化缺陷单**，只输出 JSON（不要 markdown 代码块、不要解释）：\n\n```\n=========================== short test summary info ============================\nFAILED tests/test_report.py::test_export_empty_range -\n\n## 验收标准\n- WHEN 用户按日期筛选 THEN 系统仅返回所选日期范围的数据\n- WHEN 用户点击导出 THEN 系统生成 CSV 文件并开始下载\n"
+    }
+  ],
+  "finished_at": "2026-09-14T10:05:44.988494+00:00"
+}

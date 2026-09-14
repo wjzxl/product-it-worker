@@ -10,12 +10,13 @@ import logging
 import os
 from typing import Optional
 
+import httpx
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-from .embedder import embedder_from_env
+from .embedder import EmbeddingDimError, embedder_from_env
 from .ingest import chunk_markdown
-from .store import MemoryStore, QdrantStore
+from .store import MemoryStore, QdrantStore, VectorDimMismatch
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
@@ -28,6 +29,10 @@ class DocumentIn(BaseModel):
 class SearchIn(BaseModel):
     query: str = Field(min_length=1)
     limit: int = 5
+    source_prefix: str = Field(
+        default="",
+        description="只返回该来源前缀下的知识（多产品线隔离：如 `line-pay/`；空=不限，检索全平台）",
+    )
 
 
 class ChunkOut(BaseModel):
@@ -61,19 +66,43 @@ def create_app(store=None, embedder=None) -> FastAPI:
         chunks = chunk_markdown(document.content, document.source)
         if not chunks:
             raise HTTPException(status_code=422, detail="文档内容为空")
-        vectors = embedder.embed([c["text"] for c in chunks])
-        n = store.upsert(chunks, vectors)
-        return {"source": document.source, "chunks": n}
+        try:
+            vectors = embedder.embed([c["text"] for c in chunks])
+            n = store.upsert(chunks, vectors)
+        except (VectorDimMismatch, EmbeddingDimError) as exc:
+            # 配置错误（换 embedder 未换 collection / 维度声明不符）：明确报错，不落成 500
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except httpx.HTTPStatusError as exc:
+            raise HTTPException(status_code=503, detail=f"向量化失败（embedder 网关）：{exc}") from exc
+        return {"source": document.source, "chunks": n, "dim": getattr(store, "dim", None)}
 
     @app.post("/search")
     def search(body: SearchIn) -> list[ChunkOut]:
-        vector = embedder.embed([body.query])[0]
-        hits = store.search(vector, limit=body.limit)
-        return [ChunkOut(**h) for h in hits]
+        try:
+            vector = embedder.embed([body.query])[0]
+            prefix = (body.source_prefix or "").strip()
+            hits = store.search(vector, limit=body.limit * 3 if prefix else body.limit)
+        except (VectorDimMismatch, EmbeddingDimError) as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except httpx.HTTPStatusError as exc:
+            raise HTTPException(status_code=503, detail=f"向量化失败（embedder 网关）：{exc}") from exc
+        prefix = (body.source_prefix or "").strip()
+        if prefix:
+            # 产品线隔离：先多取候选再按来源前缀过滤，避免过滤后结果过少
+            hits = [h for h in hits if str(h.get("source", "")).startswith(prefix)]
+        return [ChunkOut(**h) for h in hits[: body.limit]]
 
     @app.get("/health")
     def health() -> dict:
-        return {"status": "ok", "service": "knowledge-base", "version": "0.1.0"}
+        store_info = store.describe()
+        status = "ok" if store_info.get("ok", True) else "degraded"
+        return {
+            "status": status,
+            "service": "knowledge-base",
+            "version": "0.1.0",
+            "embedder": type(embedder).__name__,
+            "store": store_info,
+        }
 
     return app
 
