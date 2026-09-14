@@ -3,6 +3,8 @@
 提案动作类型（`action.type`）：
 - `trust_threshold`：调整信任参数（如 sample_ratio / l1_approve_rate / penalty_hours）
 - `gate_sla`：调整某 Gate 的 SLA 小时数
+- `prompt_version`：写入新 Prompt 版本并切换 active（`target`=Prompt 键，`value`=新 Prompt 全文）
+- `knowledge_ingest`：把新知识/规范入库（`target`=来源前缀如 runbooks，`value`=Markdown 内容）
 - `advice`：建议类（不改配置，仅登记改进项）
 LLM 不可用时回退规则化提案（保证链路可用）。
 """
@@ -25,7 +27,7 @@ SYSTEM_PROMPT = (
     "规则：提案必须有数据依据；每次 1~3 条；只输出 JSON，不要解释。"
 )
 
-APPLIABLE_ACTIONS = ("trust_threshold", "gate_sla")
+APPLIABLE_ACTIONS = ("trust_threshold", "gate_sla", "prompt_version", "knowledge_ingest")
 
 
 def llm_from_env() -> Callable[[str], str] | None:

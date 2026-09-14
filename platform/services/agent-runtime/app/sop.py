@@ -13,11 +13,21 @@ from typing import Annotated, TypedDict
 import logging
 
 from langgraph.checkpoint.memory import MemorySaver
+
+from .prompts import get_prompt
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_DIAGNOSE_PROMPT = (
+    "你是运维域诊断 Agent。基于告警、上下文与 Runbook 输出诊断报告（JSON）：\n"
+    '{"root_cause": "...", "impact": "...", "change_type": "fix_code|operational", '
+    '"change_summary": "建议变更...", "risk_level": "L2|L3"}\n'
+    "- fix_code：需要修改代码（走修复分支+MR）；operational：操作类处置（重启/回滚/扩容等）；\n"
+    "- 必须引用 Runbook 中的处置建议作为依据。"
+)
 
 
 class FlowState(TypedDict, total=False):
@@ -553,14 +563,13 @@ def build_ops_graph(ctx: FlowContext):
             except Exception as exc:  # KB 不可用不阻断诊断
                 logger.warning("知识库检索失败，回退入参 Runbook: %s", exc)
         prompt = (
-            "你是运维域诊断 Agent。基于告警、上下文与 Runbook 输出诊断报告（JSON）：\n"
-            "{\"root_cause\": \"...\", \"impact\": \"...\", \"change_type\": \"fix_code|operational\", "
-            "\"change_summary\": \"建议变更...\", \"risk_level\": \"L2|L3\"}\n\n"
             f"# 告警\n{alert}\n\n# 上下文（日志/指标）\n{state.get('context', '')[:3000]}\n\n"
             f"# Runbook（知识库检索，含来源）\n{runbook_text[:3000]}\n"
-            "- fix_code：需要修改代码（走修复分支+MR）；operational：操作类处置（重启/回滚/扩容等）"
         )
-        raw = ctx.llm.chat([{"role": "user", "content": prompt}])
+        raw = ctx.llm.chat([
+            {"role": "system", "content": get_prompt("ops_diagnose_agent", DEFAULT_DIAGNOSE_PROMPT)},
+            {"role": "user", "content": prompt},
+        ])
         diag = _parse_diag_json(raw) or {}
         change_type = diag.get("change_type", "operational")
         if change_type not in ("fix_code", "operational"):

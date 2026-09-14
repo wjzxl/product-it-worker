@@ -17,6 +17,7 @@ from .apis import ApprovalAPI, GitLabAPI, KnowledgeAPI
 from .coder import Coder
 from .executors import executor_from_env
 from .llm import llm_from_env
+from .prompts import active_versions, get_prompt
 from .sop import FlowContext, build_dev_graph, build_graph, build_ops_graph, build_test_graph
 from .tester import TestEngine
 
@@ -257,6 +258,23 @@ def create_app(
                     "values": snap.values or {},
                 }
         raise HTTPException(status_code=404, detail=f"线程 {thread_id} 不存在")
+
+    @app.get("/prompts")
+    def prompts_info() -> dict:
+        """当前 Prompt 版本（自进化应用后热更新，无需重启）。"""
+        import hashlib
+
+        info = active_versions()
+        meta = {}
+        for key, version in (info.get("prompts") or {}).items():
+            content = get_prompt(key, "")
+            meta[key] = {
+                "version": version,
+                "length": len(content),
+                "sha256": hashlib.sha256(content.encode("utf-8")).hexdigest()[:16],
+            }
+        info["loaded_meta"] = meta
+        return info
 
     @app.get("/health")
     def health() -> dict:

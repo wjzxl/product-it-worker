@@ -21,11 +21,12 @@ import sys
 import tempfile
 
 from .coder import Coder, CodingError
+from .prompts import get_prompt
 from .sandbox import get_runner
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = (
+DEFAULT_SYSTEM_PROMPT = (
     "你是测试域 Agent。依据 PRD 的验收标准，为已合入的代码生成**独立**的测试用例。\n"
     "输出必须是纯 JSON：{\"files\": {\"<相对路径>\": \"<文件内容>\", ...}}\n"
     "规则：\n"
@@ -89,7 +90,8 @@ class TestEngine:
         result = {"ok": False, "summary": "", "detail": ""}
         for regen in range(3):  # 收集错误自动重生成（最多 3 次）
             raw = self.llm.chat(
-                [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": prompt}]
+                [{"role": "system", "content": get_prompt("tester_agent", DEFAULT_SYSTEM_PROMPT)},
+                 {"role": "user", "content": prompt}]
             )
             test_files = self._parse_files(raw)
             if not test_files:

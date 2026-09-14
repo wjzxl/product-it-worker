@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -12,6 +13,14 @@ import yaml
 logger = logging.getLogger(__name__)
 
 DEFAULT_CONFIG = Path(__file__).resolve().parents[3] / "sop-config.yaml"
+DEFAULT_PROMPTS_DIR = Path(__file__).resolve().parents[3] / "prompts"
+
+
+def prompts_dir() -> Path:
+    return Path(os.getenv("PROMPTS_DIR", str(DEFAULT_PROMPTS_DIR)))
+
+
+SOURCE_RE = re.compile(r"^[a-z0-9][a-z0-9_\-/]{0,40}$")
 
 # 允许的信任参数与其取值校验
 TRUST_KEYS = {
@@ -22,13 +31,59 @@ TRUST_KEYS = {
     "sample_ratio": lambda v: isinstance(v, (int, float)) and 0.0 <= float(v) <= 1.0,
     "penalty_hours": lambda v: isinstance(v, (int, float)) and 1 <= float(v) <= 720,
 }
-import re
-
 GATE_RE = re.compile(r"^GATE_[A-Z_]+$")
 
 
 def config_path() -> Path:
     return Path(os.getenv("SOP_CONFIG_PATH", str(DEFAULT_CONFIG)))
+
+
+def _apply_prompt_version(target: str, value: object) -> dict:
+    """Prompt 版本化：写入 <key>.v<N+1>.md 并切换 registry active 版本（agent-runtime 热更新生效）。"""
+    text = str(value or "").strip()
+    if not (50 <= len(text) <= 8000):
+        return {"applied": False, "reason": f"Prompt 内容长度需在 50~8000 字符（当前 {len(text)}）"}
+    path = prompts_dir() / "registry.yaml"
+    if not path.exists():
+        return {"applied": False, "reason": f"Prompt 注册表不存在: {path}"}
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    prompts = data.setdefault("prompts", {})
+    if target not in prompts:
+        return {"applied": False, "reason": f"未知 Prompt 键 {target!r}（可选 {sorted(prompts)}）"}
+    before = str(prompts[target])
+    try:
+        n = int(before.lstrip("v")) + 1
+    except ValueError:
+        n = 2
+    after = f"v{n}"
+    (prompts_dir() / f"{target}.{after}.md").write_text(text + "\n", encoding="utf-8")
+    prompts[target] = after
+    data["version"] = int(data.get("version", 1)) + 1
+    data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    path.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8")
+    logger.info("Prompt 版本已更新：%s %s → %s", target, before, after)
+    return {"applied": True, "kind": "prompt_version", "target": target, "before": before, "after": after,
+            "file": str(prompts_dir() / f"{target}.{after}.md")}
+
+
+def _apply_knowledge_ingest(target: str, value: object) -> dict:
+    """知识库自动入库：把新规范/经验写入知识库（Agent 检索即可用，带来源）。"""
+    text = str(value or "").strip()
+    if not (20 <= len(text) <= 20000):
+        return {"applied": False, "reason": f"知识内容长度需在 20~20000 字符（当前 {len(text)}）"}
+    if not SOURCE_RE.match(target):
+        return {"applied": False, "reason": f"非法来源前缀 {target!r}"}
+    url = os.getenv("KNOWLEDGE_BASE_URL", "http://localhost:8004").rstrip("/")
+    source = f"{target}/auto-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}.md"
+    try:
+        resp = httpx.post(f"{url}/documents", json={"source": source, "content": text}, timeout=120)
+        resp.raise_for_status()
+        body = resp.json()
+    except httpx.HTTPError as exc:
+        return {"applied": False, "reason": f"知识库入库失败: {exc}"}
+    logger.info("知识已入库：%s（%s 块）", source, body.get("chunks"))
+    return {"applied": True, "kind": "knowledge_ingest", "target": target, "source": source,
+            "chunks": body.get("chunks")}
 
 
 def apply_action(action: dict) -> dict:
@@ -40,6 +95,12 @@ def apply_action(action: dict) -> dict:
 
     if kind == "advice":
         return {"applied": False, "reason": "advice 类型仅登记改进项，不改配置", "config": str(path)}
+
+    if kind == "prompt_version":
+        return {**_apply_prompt_version(target, value), "config": str(prompts_dir() / "registry.yaml")}
+
+    if kind == "knowledge_ingest":
+        return {**_apply_knowledge_ingest(target, value), "config": f"kb:{os.getenv('KNOWLEDGE_BASE_URL', 'http://localhost:8004')}"}
 
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     before = None

@@ -17,11 +17,12 @@ import subprocess
 import sys
 import tempfile
 
+from .prompts import get_prompt
 from .sandbox import get_runner
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = (
+DEFAULT_SYSTEM_PROMPT = (
     "你是研发域编码 Agent。根据 PRD 与技术方案实现功能。\n"
     "输出必须是纯 JSON，格式：{\"files\": {\"<相对路径>\": \"<文件完整内容>\", ...}}\n"
     "规则：\n"
@@ -93,8 +94,9 @@ class Coder:
         changed: dict = {}
         for attempt in range(1, self.max_iterations + 1):
             prompt = self._build_prompt(task, prd, tech_design, repo_files, feedback)
+            system_prompt = get_prompt("coder_agent", DEFAULT_SYSTEM_PROMPT)  # 注册中心热更新
             raw = self.llm.chat(
-                [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": prompt}]
+                [{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}]
             )
             files = self._parse_files(raw)
             if files is None:
