@@ -23,6 +23,13 @@ class TimelineIn(BaseModel):
     detail: dict[str, Any] = Field(default_factory=dict)
 
 
+class PrometheusAlertsIn(BaseModel):
+    """Prometheus Alertmanager webhook 载荷（精简）。"""
+
+    status: str = "firing"
+    alerts: list[dict[str, Any]] = Field(default_factory=list)
+
+
 class EventEnvelope(BaseModel):
     """平台事件信封（契约 contracts/events.md）。"""
 

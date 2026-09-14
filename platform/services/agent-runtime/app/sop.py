@@ -10,9 +10,14 @@ import operator
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, TypedDict
 
+import logging
+
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
+
+
+logger = logging.getLogger(__name__)
 
 
 class FlowState(TypedDict, total=False):
@@ -32,12 +37,13 @@ class FlowState(TypedDict, total=False):
 
 
 class FlowContext:
-    def __init__(self, llm, approval_api, gitlab_api, coder=None, tester=None):
+    def __init__(self, llm, approval_api, gitlab_api, coder=None, tester=None, knowledge=None):
         self.llm = llm
         self.approval_api = approval_api
         self.gitlab_api = gitlab_api
         self.coder = coder  # 研发域编码执行器（可选）
         self.tester = tester  # 测试域执行引擎（可选）
+        self.knowledge = knowledge  # 知识库检索（Runbook RAG，可选）
 
 
 def _build_approval_payload(state: FlowState, version: int) -> dict:
@@ -473,7 +479,8 @@ class OpsState(TypedDict, total=False):
     title: str
     alert: dict
     context: str          # 日志/指标摘要（诊断输入）
-    runbook: str          # Runbook 文本（MVP 由输入提供；后续接知识库 RAG）
+    runbook: str          # Runbook 文本（入参兜底）
+    runbook_sources: list  # Runbook RAG 命中的来源（引用留痕）
     diagnosis: str        # 诊断报告
     change_type: str      # fix_code / operational
     fix_branch: str
@@ -513,12 +520,28 @@ def _parse_diag_json(raw: str) -> dict | None:
 def build_ops_graph(ctx: FlowContext):
     def diagnose(state: OpsState) -> dict:
         alert = state.get("alert") or {}
+        # Runbook RAG：优先知识库检索（带来源引用），失败回退入参 Runbook 文本
+        runbook_text = state.get("runbook", "")
+        sources: list[str] = []
+        if ctx.knowledge is not None:
+            try:
+                hits = ctx.knowledge.search(
+                    f"{alert.get('title', '')} {alert.get('message', '')}".strip(), limit=3
+                )
+                if hits:
+                    runbook_text = "\n".join(
+                        f"[{h.get('source', '?')}] {h.get('text', '')}" for h in hits
+                    )
+                    sources = [h.get("source", "") for h in hits if h.get("source")]
+                    logger.info("Runbook RAG 命中 %s", sources)
+            except Exception as exc:  # KB 不可用不阻断诊断
+                logger.warning("知识库检索失败，回退入参 Runbook: %s", exc)
         prompt = (
             "你是运维域诊断 Agent。基于告警、上下文与 Runbook 输出诊断报告（JSON）：\n"
             "{\"root_cause\": \"...\", \"impact\": \"...\", \"change_type\": \"fix_code|operational\", "
             "\"change_summary\": \"建议变更...\", \"risk_level\": \"L2|L3\"}\n\n"
             f"# 告警\n{alert}\n\n# 上下文（日志/指标）\n{state.get('context', '')[:3000]}\n\n"
-            f"# Runbook\n{state.get('runbook', '')[:2000]}\n"
+            f"# Runbook（知识库检索，含来源）\n{runbook_text[:3000]}\n"
             "- fix_code：需要修改代码（走修复分支+MR）；operational：操作类处置（重启/回滚/扩容等）"
         )
         raw = ctx.llm.chat([{"role": "user", "content": prompt}])
@@ -533,7 +556,8 @@ def build_ops_graph(ctx: FlowContext):
         return {
             "diagnosis": summary,
             "change_type": change_type,
-            "logs": [f"step:diagnose type={change_type} risk={diag.get('risk_level', 'L3')}"],
+            "runbook_sources": sources,
+            "logs": [f"step:diagnose type={change_type} risk={diag.get('risk_level', 'L3')} runbook={sources}"],
         }
 
     def change_prepare(state: OpsState) -> dict:
@@ -569,6 +593,7 @@ def build_ops_graph(ctx: FlowContext):
                     "evidence": [
                         f"告警：{(state.get('alert') or {}).get('title', '')}",
                         "诊断报告：见 artifact_ref",
+                        f"Runbook 来源：{', '.join(state.get('runbook_sources', [])) or '（入参 Runbook）'}",
                         f"修复分支：{state.get('fix_branch', '-')}（fix_code 时）",
                     ],
                     "risk": {"score": 70, "level": "L3", "factors": ["影响面:生产", "不可逆:需回滚预案"]},

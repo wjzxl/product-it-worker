@@ -13,7 +13,7 @@ from fastapi import FastAPI, HTTPException
 from langgraph.types import Command
 from pydantic import BaseModel, Field
 
-from .apis import ApprovalAPI, GitLabAPI
+from .apis import ApprovalAPI, GitLabAPI, KnowledgeAPI
 from .coder import Coder
 from .llm import llm_from_env
 from .sop import FlowContext, build_dev_graph, build_graph, build_ops_graph, build_test_graph
@@ -91,6 +91,7 @@ def _status(graph, thread_id: str, sop: str) -> dict:
             body["diagnosis"] = values.get("diagnosis", "")
             body["change_type"] = values.get("change_type", "")
             body["fix_branch"] = values.get("fix_branch", "")
+            body["runbook_sources"] = values.get("runbook_sources", [])
         if gate == "gate_g6":
             body["postmortem"] = values.get("postmortem", "")
             body["execution"] = values.get("execution", "")
@@ -133,6 +134,7 @@ def create_app(
     llm=None,
     coder=None,
     tester=None,
+    knowledge_api=None,
 ) -> FastAPI:
     llm = llm or llm_from_env()
     gitlab_api = gitlab_api or GitLabAPI(os.getenv("GITLAB_BRIDGE_URL", "http://localhost:8001"))
@@ -150,12 +152,14 @@ def create_app(
         gitlab_token=os.getenv("GITLAB_TOKEN", ""),
         project_path=os.getenv("DEMO_PROJECT", "sandbox/prodesgin"),
     )
+    knowledge = knowledge_api or KnowledgeAPI(os.getenv("KNOWLEDGE_BASE_URL", "http://localhost:8004"))
     ctx = FlowContext(
         llm=llm,
         approval_api=approval_api or ApprovalAPI(os.getenv("APPROVAL_GATEWAY_URL", "http://localhost:8000")),
         gitlab_api=gitlab_api,
         coder=coder,
         tester=tester,
+        knowledge=knowledge,
     )
     graphs = {
         SOP_PRODUCT: build_graph(ctx),

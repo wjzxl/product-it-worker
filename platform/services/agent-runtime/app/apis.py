@@ -115,6 +115,35 @@ class GitLabAPI:
         raise last
 
 
+class KnowledgeAPI:
+    """知识库检索客户端（Runbook RAG）。"""
+
+    def __init__(self, base_url: str, transport: httpx.BaseTransport | None = None):
+        self.base_url = base_url.rstrip("/")
+        self._client = httpx.Client(timeout=30, transport=transport)
+
+    def search(self, query: str, limit: int = 3) -> list[dict]:
+        resp = self._client.post(f"{self.base_url}/search", json={"query": query, "limit": limit})
+        resp.raise_for_status()
+        return resp.json()
+
+
+class MockKnowledgeAPI:
+    def __init__(self, hits: list[dict] | None = None):
+        self.hits = hits if hits is not None else [
+            {
+                "text": "导出接口 p95 超过 3s：检查日期范围跨度；>365 天时在 fetch_report_data 增加范围校验",
+                "source": "export-performance.md",
+                "score": 0.92,
+            }
+        ]
+        self.queries: list[str] = []
+
+    def search(self, query: str, limit: int = 3) -> list[dict]:
+        self.queries.append(query)
+        return self.hits[:limit]
+
+
 class MockApprovalAPI:
     def __init__(self):
         self.requests: list[dict] = []

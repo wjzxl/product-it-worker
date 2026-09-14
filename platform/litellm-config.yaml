@@ -32,6 +32,12 @@ model_list:
       model: openai/qwen-plus
       api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
       api_key: os.environ/QWEN_API_KEY
+  # Qwen 向量模型（知识库 RAG 用）
+  - model_name: qwen-embed
+    litellm_params:
+      model: openai/text-embedding-v3
+      api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+      api_key: os.environ/QWEN_API_KEY
 
   # Mock 模型：真实 Key 未就绪时验证网关全链路（后端 = scripts/mock_llm_server.py）
   # 使用方式：python3 platform/scripts/mock_llm_server.py 后，网关内即可调用 mock-gpt / mock-embed

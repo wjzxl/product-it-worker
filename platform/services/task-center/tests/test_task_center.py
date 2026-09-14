@@ -168,6 +168,56 @@ class TestEventIngestion:
         assert body["project_id"] == "85697055"
 
 
+class TestPrometheusAlerts:
+    def test_firing_alert_creates_task_and_triggers_ops(self, client, monkeypatch):
+        """Prometheus firing 告警 → 建任务 + 自动触发运维域 SOP（含告警载荷）。"""
+        import httpx
+
+        captured = {}
+
+        def fake_post(url, json=None, timeout=None):
+            captured["url"] = url
+            captured["json"] = json
+            return httpx.Response(200, json={"status": "waiting_approval"}, request=httpx.Request("POST", url, json=json))
+
+        monkeypatch.setenv("AGENT_RUNTIME_URL", "http://localhost:8003")
+        monkeypatch.setenv("OPS_PROJECT_ID", "85697055")
+        monkeypatch.setattr("httpx.post", fake_post)
+
+        r = client.post(
+            "/alerts/prometheus",
+            json={
+                "status": "firing",
+                "alerts": [
+                    {
+                        "status": "firing",
+                        "labels": {"alertname": "ExportHighLatency", "severity": "P1", "job": "reports-exporter", "fingerprint": "abc123"},
+                        "annotations": {"summary": "导出接口 p95 12s", "description": "p95 12s 超过 SLO 3s"},
+                    }
+                ],
+            },
+        )
+        assert r.status_code == 200 and len(r.json()["tasks"]) == 1
+        assert captured["url"].endswith("/runs")
+        body = captured["json"]
+        assert body["sop"] == "ops-domain/alert-to-postmortem"
+        assert body["alert"]["title"] == "ExportHighLatency"
+        assert body["alert"]["severity"] == "P1"
+        assert "SLO 3s" in body["context"]
+        assert body["project_id"] == "85697055"
+        # 任务已建（sop=运维域）
+        tasks = client.get("/tasks").json()
+        assert any(t["sop"] == "ops-domain/alert-to-postmortem" for t in tasks)
+
+    def test_resolved_alert_ignored(self, client, monkeypatch):
+        monkeypatch.setenv("AGENT_RUNTIME_URL", "http://localhost:8003")
+        r = client.post(
+            "/alerts/prometheus",
+            json={"status": "resolved", "alerts": [{"status": "resolved", "labels": {"alertname": "X"}}]},
+        )
+        assert r.json()["tasks"] == []
+
+
 class TestTimeline:
     def test_append_event(self, client):
         task = client.post("/tasks", json={"external_ref": "manual-3"}).json()

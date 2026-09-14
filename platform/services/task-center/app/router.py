@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -17,7 +18,7 @@ from sqlalchemy.orm import Session
 from .db import get_db
 from .events import new_event, publisher_from_env
 from .models import EventInbox, Task, TaskEvent
-from .schemas import EventEnvelope, TaskCreate, TaskOut, TimelineIn, TransitionIn
+from .schemas import EventEnvelope, PrometheusAlertsIn, TaskCreate, TaskOut, TimelineIn, TransitionIn
 from .state import TERMINAL, validate_transition
 
 logger = logging.getLogger(__name__)
@@ -45,6 +46,47 @@ def _record(db: Session, task: Task, event_type: str, by: str = "", detail: dict
     ev = TaskEvent(task_id=task.id, event_type=event_type, by=by, detail=detail or {})
     db.add(ev)
     return ev
+
+
+def _maybe_auto_start_ops_sop(task: Task, alert: dict) -> None:
+    """Prometheus 告警 → 自动启动运维域 SOP（AGENT_RUNTIME_URL 配置后生效）。"""
+    import os
+
+    import httpx
+
+    url = os.getenv("AGENT_RUNTIME_URL", "")
+    if not url:
+        logger.warning("AGENT_RUNTIME_URL 未配置，跳过告警自动触发 task=%s", task.id)
+        return
+    labels = alert.get("labels") or {}
+    annotations = alert.get("annotations") or {}
+    alert_body = {
+        "id": task.external_ref,
+        "title": labels.get("alertname", "告警"),
+        "severity": labels.get("severity", "P2"),
+        "source": labels.get("job") or labels.get("instance") or "prometheus",
+        "message": annotations.get("summary") or annotations.get("description", ""),
+    }
+    context = f"{annotations.get('description', '')}\nlabels={labels}"
+    try:
+        resp = httpx.post(
+            f"{url}/runs",
+            json={
+                "sop": "ops-domain/alert-to-postmortem",
+                "requirement_text": alert_body["title"],
+                "title": alert_body["title"],
+                "task_ref": task.external_ref,
+                "project_id": os.getenv("OPS_PROJECT_ID", ""),
+                "alert": alert_body,
+                "context": context,
+                "runbook": "",
+            },
+            timeout=10,
+        )
+        resp.raise_for_status()
+        logger.info("告警自动触发运维域 SOP task=%s status=%s", task.id, resp.json().get("status"))
+    except (httpx.HTTPError, ValueError) as exc:
+        logger.warning("告警自动触发失败 task=%s: %s", task.id, exc)
 
 
 def _maybe_auto_start_dev_sop(task: Task, payload: dict) -> None:
@@ -155,6 +197,33 @@ def append_timeline(task_id: str, payload: TimelineIn, db: Session = Depends(get
     db.commit()
     db.refresh(task)
     return task
+
+
+@router.post("/alerts/prometheus", status_code=status.HTTP_200_OK)
+def prometheus_alerts(payload: PrometheusAlertsIn, db: Session = Depends(get_db)) -> dict:
+    """Prometheus Alertmanager webhook：firing 告警 → 建任务 + 自动触发运维域 SOP。"""
+    created: list[str] = []
+    for alert in payload.alerts:
+        if alert.get("status") not in (None, "firing"):
+            continue
+        labels = alert.get("labels") or {}
+        name = labels.get("alertname", "alert")
+        ref = f"alert-{labels.get('fingerprint') or name}-{int(time.time() * 1000) % 100000}"
+        task = Task(
+            external_ref=ref,
+            sop="ops-domain/alert-to-postmortem",
+            params={"alertname": name, "severity": labels.get("severity", "P2"), "labels": labels},
+            status="pending",
+        )
+        db.add(task)
+        db.flush()
+        _record(db, task, "task.created", by="prometheus", detail={"alertname": name, "severity": labels.get("severity")})
+        db.commit()
+        db.refresh(task)
+        _publisher.publish(new_event("task.created", {"task_id": task.id, "external_ref": ref}, "task-center"))
+        _maybe_auto_start_ops_sop(task, alert)
+        created.append(task.id)
+    return {"status": "accepted", "tasks": created}
 
 
 @router.post("/events", status_code=status.HTTP_200_OK)

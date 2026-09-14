@@ -10,7 +10,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from app.apis import MockApprovalAPI, MockGitLabAPI
+from app.apis import MockApprovalAPI, MockGitLabAPI, MockKnowledgeAPI
 from app.coder import Coder
 from app.llm import MockLLM
 from app.main import create_app
@@ -80,8 +80,9 @@ def _env(answers: list[str]):
     gitlab = MockGitLabAPI()
     repo = _make_repo()
     coder = Coder(llm=llm, gitlab_url="https://gitlab.com", gitlab_token="tok", project_path="sandbox/prodesgin", workdir=repo, push=False)
-    app = create_app(approval_api=approval, gitlab_api=gitlab, llm=llm, coder=coder)
-    return {"client": TestClient(app), "approval": approval, "gitlab": gitlab, "repo": repo}
+    knowledge = MockKnowledgeAPI()
+    app = create_app(approval_api=approval, gitlab_api=gitlab, llm=llm, coder=coder, knowledge_api=knowledge)
+    return {"client": TestClient(app), "approval": approval, "gitlab": gitlab, "repo": repo, "knowledge": knowledge}
 
 
 def _start(env, task_ref="alert-1"):
@@ -113,6 +114,10 @@ class TestOpsFlow:
         payload = env["approval"].requests[-1]
         assert payload["type"] == "GATE_CHANGE_APPROVAL"
         assert payload["context_snapshot"]["risk"]["level"] == "L3"
+        # Runbook RAG：知识库检索被调用且来源进入审批依据（引用留痕）
+        assert env["knowledge"].queries, "应触发 Runbook 检索"
+        assert any("export-performance.md" in e for e in payload["context_snapshot"]["evidence"])
+        assert body["runbook_sources"] == ["export-performance.md"]
 
         r = env["client"].post(f"/runs/alert-1/resume", json={"decision": "approve", "comment": "变更合规，放行"})
         body = r.json()
