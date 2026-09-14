@@ -37,10 +37,25 @@
 | **Phase 3 信任分级动态升降级** | ✅ 完成：L1 全自动 / L2 抽样 / L3 强制，失败即回升；**真实数据验证**（G3/G4 升 L1、G2 因 3 次真实退回降 L2），approval-gateway 31 测试 |
 | **生产化 ① 公网 webhook / SSO / 多租户** | ✅ 完成：HMAC 签名 + webhook 自动注册（真实验证 #89070692）+ 生产编排（Caddy/HTTPS，config 校验通过）；OIDC SSO（真实 JWKS 验证 401/403/200 + 审计）；多租户隔离（PG 自动迁移 + 跨租户 404） |
 | **Phase 3 流程挖掘与 SOP 自进化** | ✅ 完成：挖掘（Gate 等待/超时/退回/变体/成本）→ LLM 提案 → **G7 流程改进闸门** → 配置中心应用（热更新）→ GitLab 改进项台账；真实演示 **9/9**，全平台 **138 测试**（[14](14-Phase3流程挖掘与SOP自进化.md)） |
+| **Phase 3 扩展三项** | ✅ 完成（[15](15-Phase3扩展实施记录.md)）：① Prompt 版本化注册中心 + 知识库自动入库（应用动作，热更新实测）；② **标准流程挖掘算法**（事件日志/DFG/Heuristic/α-Miner + 三种一致性检查，真实日志 dfg 留一法 fitness **0.97** 并命中唯一异常案例）；③ **多产品线推广**（信任按 `<tenant>::<GATE>` 隔离 + 产品线接入脚本 `onboard_product_line.py` + 隔离验收演练）+ **私有化/多模型评估夹具**（10 任务金标集 + 沙箱判分 + 报告）。全平台 **232 测试全绿** |
 | Phase 2 测试+运维域 | ⏳ 未开始 |
 | Phase 3 自进化 | ⏳ 未开始 |
 
 **已可运行**：审批网关（17 测试）、GitLab 集成桥（16）、任务中心（9）、Agent 运行时（10）、知识库（4），共 56 测试；演示：`platform/services/agent-runtime/.venv/bin/python platform/scripts/demo_phase0.py`（产品域）、`demo_phase1.py`（研发域）、`batch_pilot.py`（批量试点）。
+
+**多产品线接入 / 模型选型**：
+
+```bash
+cd platform
+# 接入一条新产品线（含隔离验收演练）
+services/approval-gateway/.venv/bin/python scripts/onboard_product_line.py \
+    --tenant line-pay --product-name "支付中台" --profile strict --verify
+# 多模型对比 / 私有化模型验收（EVAL_BASE_URL 指向任意 OpenAI 兼容端点）
+SANDBOX_MODE=host services/agent-runtime/.venv/bin/python scripts/model_eval.py \
+    --models deepseek-chat,qwen-plus --tag cloud
+```
+
+最新评估结论（[报告](platform/reports/model-eval-cloud-v3-20260914-100524.md)）：云模型能力均已够用，选型差异主要在**成本与延迟**（deepseek-chat P50 2.6s、成本可计量）；私有化小模型接入前用同一夹具验收（弱模型桩实测 0/5 被挡）。
 
 ## 文档导航
 
