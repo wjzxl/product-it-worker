@@ -21,6 +21,7 @@ import sys
 import tempfile
 
 from .coder import Coder, CodingError
+from .sandbox import get_runner
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,7 @@ class TestEngine:
         self.max_defect_rounds = max_defect_rounds
         self.push = push  # False = 测试模式（就地修复复跑，不 push/MR/合入）
         self.workdir = workdir  # 预置 checkout（测试用）；为空则 clone
+        self.runner = get_runner()  # 执行沙箱（host / docker）
 
     def run(
         self,
@@ -215,18 +217,20 @@ class TestEngine:
         self._run(["git", "clone", "--depth=1", self._clone_url(), repo], cwd=os.path.dirname(repo) or ".")
 
     def _pytest(self, repo: str, targets: list[str] | None = None) -> dict:
-        try:
-            cmd = [sys.executable, "-m", "pytest", "-q"]
-            if targets:
-                cmd += targets  # 隔离自检：只收集本次生成的文件
-            proc = subprocess.run(
-                cmd, cwd=repo, capture_output=True, text=True, timeout=300,
-            )
-        except subprocess.TimeoutExpired:
-            return {"ok": False, "summary": "测试超时(300s)", "detail": "timeout"}
-        stdout = proc.stdout or ""
+        """分层执行：pytest 在沙箱中运行（SANDBOX_MODE=docker 时 AI 用例不出容器）。"""
+        cmd = [self.runner.python(), "-m", "pytest", "-q"]
+        if targets:
+            cmd += targets  # 隔离自检：只收集本次生成的文件
+        res = self.runner.run(cmd, workdir=repo, timeout=300)
+        stdout = res["stdout"]
         summary = stdout.strip().splitlines()[-1] if stdout.strip() else "无输出"
-        return {"ok": proc.returncode == 0, "summary": summary, "detail": ((proc.stderr or "") + stdout)[-3000:]}
+        if res["returncode"] == 124:
+            summary = "测试超时(300s)"
+        return {
+            "ok": res["returncode"] == 0,
+            "summary": summary,
+            "detail": ((res["stderr"] or "") + stdout)[-3000:],
+        }
 
     @staticmethod
     def _parse_files(raw: str) -> dict | None:

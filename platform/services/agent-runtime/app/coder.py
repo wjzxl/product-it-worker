@@ -17,6 +17,8 @@ import subprocess
 import sys
 import tempfile
 
+from .sandbox import get_runner
+
 logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = (
@@ -45,6 +47,7 @@ class Coder:
         max_iterations: int = 3,
         workdir: str | None = None,
         push: bool = True,
+        runner=None,
     ):
         self.llm = llm
         self.gitlab_url = gitlab_url.rstrip("/")
@@ -54,6 +57,7 @@ class Coder:
         self.max_iterations = max_iterations
         self.workdir = workdir  # 预置 checkout（测试用）；为空则 clone
         self.push = push
+        self.runner = runner or get_runner()  # 执行沙箱（host / docker）
 
     # ---------- 对外主流程 ----------
     def implement(
@@ -241,17 +245,14 @@ class Coder:
         return files
 
     def _run_tests(self, repo: str) -> dict:
-        try:
-            proc = subprocess.run(
-                [sys.executable, "-m", "pytest", "-q"],
-                cwd=repo, capture_output=True, text=True, timeout=300,
-            )
-        except subprocess.TimeoutExpired:
-            return {"ok": False, "summary": "测试超时(300s)", "detail": "timeout"}
-        stdout = proc.stdout or ""
+        """质量门禁：在沙箱中执行 pytest（SANDBOX_MODE=docker 时 AI 代码不出容器）。"""
+        res = self.runner.run([self.runner.python(), "-m", "pytest", "-q"], workdir=repo, timeout=300)
+        stdout = res["stdout"]
         summary = stdout.strip().splitlines()[-1] if stdout.strip() else "无输出"
-        detail = ((proc.stderr or "") + stdout)[-3000:]
-        return {"ok": proc.returncode == 0, "summary": summary, "detail": detail}
+        detail = ((res["stderr"] or "") + stdout)[-3000:]
+        if res["returncode"] == 124:
+            summary = "测试超时(300s)"
+        return {"ok": res["returncode"] == 0, "summary": summary, "detail": detail}
 
     def _commit_push(self, repo: str, branch: str, task: dict, iid: str) -> None:
         self._git(repo, "add", "-A")
