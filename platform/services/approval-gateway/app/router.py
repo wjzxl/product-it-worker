@@ -16,6 +16,7 @@ from .events import new_event, publisher_from_env
 from .models import ApprovalRequest, Decision, utcnow
 from .notifier import get_notifier
 from .policies import is_overdue
+from .trust import all_trust, apply_penalty, compute_trust, should_auto_approve
 from .schemas import (
     ApprovalRequestCreate,
     ApprovalRequestOut,
@@ -56,7 +57,11 @@ def _check_pending(req: ApprovalRequest) -> None:
 
 @router.post("/approvals", response_model=ApprovalRequestOut, status_code=status.HTTP_201_CREATED)
 def create_approval(payload: ApprovalRequestCreate, db: Session = Depends(get_db)) -> ApprovalRequest:
-    """工作流到达 Gate 时调用。三要素校验已在 schema 层强制。"""
+    """工作流到达 Gate 时调用。三要素校验已在 schema 层强制。
+
+    `auto_gate=True` 时按信任等级决定：L1 自动放行 / L2 抽样命中自动放行 / L3 人工审批。
+    自动放行一律留痕（决策人 `system:trust`），并发布 approval.decided 事件。
+    """
     req = ApprovalRequest(
         type=payload.type,
         stage=payload.stage,
@@ -91,7 +96,47 @@ def create_approval(payload: ApprovalRequestCreate, db: Session = Depends(get_db
         )
     )
     logger.info("approval.requested id=%s stage=%s", req.id, req.stage)
-    return req
+
+    trust_info = compute_trust(db, req.type)
+    auto_decision = "pending"
+    if payload.auto_gate:
+        allowed, why = should_auto_approve(trust_info, req.id)
+        if allowed:
+            decision = Decision(
+                request_id=req.id,
+                decision="approve",
+                decided_by="system:trust",
+                comment=f"信任自动放行：{why}（{trust_info['reason']}）",
+            )
+            db.add(decision)
+            req.status = "approved"
+            db.commit()
+            db.refresh(req)
+            auto_decision = "approved"
+            _publisher.publish(
+                new_event(
+                    "approval.decided",
+                    {
+                        "approval_id": req.id,
+                        "task_ref": req.task_ref,
+                        "decision": "approve",
+                        "decided_by": "system:trust",
+                        "comment": decision.comment,
+                        "channel": "trust",
+                        "version": req.version,
+                    },
+                    "approval-gateway",
+                )
+            )
+            logger.info("信任自动放行 id=%s level=%s why=%s", req.id, trust_info["level"], why)
+        else:
+            auto_decision = "sampled_review" if trust_info["level"] == "L2" else "pending"
+
+    out = ApprovalRequestOut.model_validate(req)
+    out.trust_level = trust_info["level"]
+    out.trust_reason = trust_info["reason"]
+    out.auto_decision = auto_decision
+    return out
 
 
 @router.get("/approvals", response_model=list[ApprovalRequestOut])
@@ -132,8 +177,10 @@ def decide(
         req.status = "approved"
     elif payload.decision == "reject":
         req.status = "rejected"
+        apply_penalty(db, req.type, f"否决：{payload.comment}")
     else:  # revise：退回修订，允许修订后重新提交（version+1）
         req.status = "revised"
+        apply_penalty(db, req.type, f"退回：{payload.comment}")
 
     db.commit()
     db.refresh(decision)
@@ -214,8 +261,10 @@ async def im_card_callback(payload: ImCardCallback, request: Request, db: Sessio
         req.status = "approved"
     elif payload.action == "reject":
         req.status = "rejected"
+        apply_penalty(db, req.type, f"否决(IM)：{payload.comment}")
     else:
         req.status = "revised"
+        apply_penalty(db, req.type, f"退回(IM)：{payload.comment}")
     db.commit()
     db.refresh(decision)
     _publisher.publish(
@@ -237,6 +286,17 @@ async def im_card_callback(payload: ImCardCallback, request: Request, db: Sessio
         "approval.decided(im) id=%s decision=%s by=%s", req.id, decision.decision, decision.decided_by
     )
     return decision
+
+
+@router.get("/trust")
+def trust_all(db: Session = Depends(get_db)) -> list[dict]:
+    """全部 Gate 的信任等级与指标（Phase 3 动态升降级）。"""
+    return all_trust(db)
+
+
+@router.get("/trust/{gate_type}")
+def trust_one(gate_type: str, db: Session = Depends(get_db)) -> dict:
+    return compute_trust(db, gate_type)
 
 
 @router.post("/admin/sweep")

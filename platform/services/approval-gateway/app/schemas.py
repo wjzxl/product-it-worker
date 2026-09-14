@@ -51,6 +51,7 @@ class ApprovalRequestCreate(BaseModel):
     options: list[DecisionValue] = Field(default=["approve", "reject", "revise"])
     deadline: datetime
     escalation_policy: EscalationPolicy = Field(default_factory=EscalationPolicy)
+    auto_gate: bool = False  # True → 由信任等级决定是否自动放行（L1 放行 / L2 抽样 / L3 人工）
 
 
 class DecisionIn(BaseModel):
@@ -90,6 +91,9 @@ class ApprovalRequestOut(BaseModel):
     version: int
     created_at: datetime
     decisions: list[DecisionOut] = []
+    trust_level: str = ""
+    trust_reason: str = ""
+    auto_decision: str = ""  # approved / sampled_review / pending
 
     model_config = {"from_attributes": True}
 

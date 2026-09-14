@@ -8,6 +8,7 @@
 """
 import uuid
 from datetime import datetime, timezone
+from typing import Optional
 
 from sqlalchemy import JSON, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -53,6 +54,17 @@ class ApprovalRequest(Base):
     decisions: Mapped[list["Decision"]] = relationship(
         back_populates="request", order_by="Decision.decided_at"
     )
+
+
+class TrustState(Base):
+    """Gate 信任状态（惩罚期）：退回/否决后强制 L3，到期按指标重新计算。"""
+
+    __tablename__ = "trust_state"
+
+    scope: Mapped[str] = mapped_column(String(64), primary_key=True)  # Gate 类型
+    penalty_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    reason: Mapped[str] = mapped_column(Text, default="")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 
 class Decision(Base):
