@@ -22,35 +22,73 @@ model_list:
       api_key: os.environ/DEEPSEEK_API_KEY
 
   # Qwen（阿里云百炼 DashScope，OpenAI 兼容）
+  # 计费说明（解决"Qwen 调用成本 unmetered"）：
+  #   走 openai/ 兼容路由时 LiteLLM 不认识模型名 → 无价格 → 响应头不带成本。
+  #   实测 model_info.base_model 指向 dashscope/* 条目会被解析成 0（价格查到但未生效），
+  #   故此处直接写**显式单价**（USD/token），数值与官方定价页及 LiteLLM 价格表一致。
+  # 来源：Alibaba Cloud Model Studio《Model inference pricing》（International/Singapore 区，2026-09-15 更新）
+  #       https://www.alibabacloud.com/help/en/model-studio/model-pricing
+  #       qwen-max  $1.6 / $6.4  每 1M tokens → 1.6e-06 / 6.4e-06
+  #       qwen-plus $0.4 / $1.2  每 1M tokens → 4e-07   / 1.2e-06（非思考模式）
+  # 已知口径限制：qwen-plus 在 >256K tokens 请求上进入更高价档（$1.2/$3.6），
+  #   本配置按标准档计量，超长上下文请求会被低估——平台单次调用远低于该档位。
+  #   如与账单不符，改这里的两个数即可（改完重启 litellm 容器生效）。
   - model_name: qwen-max
     litellm_params:
       model: openai/qwen-max
       api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
       api_key: os.environ/QWEN_API_KEY
+    model_info:
+      input_cost_per_token: 0.0000016    # $1.6 / 1M tokens
+      output_cost_per_token: 0.0000064   # $6.4 / 1M tokens
   - model_name: qwen-plus
     litellm_params:
       model: openai/qwen-plus
       api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
       api_key: os.environ/QWEN_API_KEY
+    model_info:
+      input_cost_per_token: 0.0000004    # $0.4 / 1M tokens
+      output_cost_per_token: 0.0000012   # $1.2 / 1M tokens
   # Qwen 向量模型（知识库 RAG 用）
+  # 价格表无 text-embedding-v3 条目 → 显式覆盖：官方价 $0.07 / 1M input tokens
+  # 来源：Alibaba Cloud Model Studio《Synchronous API for text embedding》（新加坡区，2026-09-11 更新）
+  #       https://www.alibabacloud.com/help/en/model-studio/text-embedding-synchronous-api
+  # 注意：北京区/香港区价格略有差异，如与账单不符请按此处改为实际单价。
   - model_name: qwen-embed
     litellm_params:
       model: openai/text-embedding-v3
       api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
       api_key: os.environ/QWEN_API_KEY
+    model_info:
+      input_cost_per_token: 0.00000007   # $0.07 / 1M tokens（embedding 无输出计费）
+      output_cost_per_token: 0.0
 
   # Mock 模型：真实 Key 未就绪时验证网关全链路（后端 = scripts/mock_llm_server.py）
   # 使用方式：python3 platform/scripts/mock_llm_server.py 后，网关内即可调用 mock-gpt / mock-embed
+  # 显式置 0：本地桩无真实花费，避免被当成"未知价格模型"参与预算判定
   - model_name: mock-gpt
     litellm_params:
       model: openai/mock-gpt
       api_base: http://host.docker.internal:8098/v1
       api_key: mock-key
+    model_info:
+      input_cost_per_token: 0.0
+      output_cost_per_token: 0.0
   - model_name: mock-embed
     litellm_params:
       model: openai/mock-embed
       api_base: http://host.docker.internal:8098/v1
       api_key: mock-key
+    model_info:
+      input_cost_per_token: 0.0
+      output_cost_per_token: 0.0
+
+# 价格覆盖（备用）：若某模型在价格表中缺失或与本账号账单不符，
+# 直接在对应 model 的 model_info 下写显式单价（USD/token），例如：
+#   model_info:
+#     input_cost_per_token: 0.0000016
+#     output_cost_per_token: 0.0000064
+# 校准方法：跑一次真实调用，用响应头 x-litellm-response-cost 与账单核对。
 
 # 成本与预算（Phase 0 起步）
 litellm_settings:

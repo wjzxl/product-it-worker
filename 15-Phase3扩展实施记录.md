@@ -122,16 +122,20 @@ process-mining **41 项通过**（新增算法 16：事件日志构造/DFG/依�
 | 判分器 `app/eval.py` | `hidden_tests`（沙箱跑隐藏测试，按通过比例给分）、`mutation_tests`（**变异检验**：正确实现必须全绿、含 bug 实现必须变红，抓不到只给 0.5）、`json_schema`、`required_sections`、`regex_any`、`forbidden_regex`（否定语境感知）、`required_keywords` |
 | CLI `scripts/model_eval.py` | `--models`、`--limit`、`--tag`、`--mode gateway|private`；报告落 `reports/model-eval-*.md|json` |
 | 私有化接入 | `EVAL_BASE_URL` / `EVAL_API_KEY` 指向任意 OpenAI 兼容端点（vLLM / Ollama / 内网部署）即可复用同一报告 |
-| 成本口径 | 取网关 `x-litellm-response-cost` 头；**拿不到就标 `unmetered`**（Qwen 自定义 DashScope 端点无价格映射），不做估算 |
+| 成本口径 | 取网关 `x-litellm-response-cost` 头；拿不到就标 `unmetered`，不做估算（Qwen 已补价格映射，见 ③-F） |
 
-**真实评估结果**（`reports/model-eval-cloud-v3-20260914-100524.md`，10 任务全量）：
+**真实评估结果**（`reports/model-eval-cloud-v4-metered-20260916-014327.md`，10 任务全量，成本均已计量）：
 
-| 模型 | 通过 | 加权得分 | 延迟 P50 | tokens | 成本 |
+| 模型 | 通过 | 加权得分 | 延迟 P50 | tokens | 成本（真实计量） |
 |---|---|---|---|---|---|
-| `deepseek-chat` | 9/10 | 0.935 | **2608 ms** | 8417 | **$0.008755（已计量）** |
-| `qwen-plus` | 10/10 | 1.000 | 8522 ms | 8136 | unmetered |
-| `qwen-max` | 10/10 | 1.000 | 10883 ms | 5412 | unmetered |
-| `mock-gpt`（弱模型桩，验证"挡住不达标模型"） | **0/5** | 0.200 | 30 ms | 450 | unmetered |
+| `deepseek-chat` | 9/10 | 0.935 | **1864 ms** | 7482 | **$0.007633** |
+| `qwen-plus` | 10/10 | 1.000 | 8056 ms | 7828 | **$0.008068** |
+| `qwen-max` | 8/10 | 0.952 | 14625 ms | 5796 | **$0.029141** |
+| `mock-gpt`（弱模型桩，验证"挡住不达标模型"） | 0/5 | 0.200 | 30 ms | 450 | $0（本地桩显式置 0） |
+
+> 上一轮（`cloud-v3`，Qwen 尚未计价）为 deepseek 9/10、qwen-plus 10/10、qwen-max 10/10；
+> **同模型同任务两轮结果不同**（qwen-max 10/10 → 8/10，temperature=0 也不保证确定性），
+> 该现象已写入报告的口径声明——单轮结果用于排除明显不适用者，精细对比需多轮取均值。
 
 **夹具自身也被真实模型校准过（重要教训）**：首轮 7 任务跑出 2 个"失败"其实都是**夹具误判**——
 ① deepseek-chat 严格按指令直接输出代码但**不加围栏**，抽取器只认围栏块 → 误判 0 分（已支持裸代码）；
@@ -139,10 +143,62 @@ process-mining **41 项通过**（新增算法 16：事件日志构造/DFG/依�
 ③ 模型把"**不建议**忽略告警"写成禁止项，朴素子串匹配判违规（已加否定语境感知）。
 校准后三模型在 7 个基础任务上全部 7/7 → **说明基础集对这些前沿云模型已饱和**，据此补充 3 个高权重陷阱任务，区分度随即出现（deepseek-chat 因 JSON 漏 `severity` 字段丢分）。
 
-**选型结论（本平台口径）**：云模型能力已足够跑通全流程，选型差异主要在**成本与延迟**（deepseek-chat 快 3–4 倍且成本可计量）；真正的门槛在**私有化小模型**——夹具的价值正是接入前的验收闸门（`mock-gpt` 桩 0/5 演示了"不达标即挡住"）。
+**选型结论（本平台口径）**：云模型能力已足够跑通全流程，选型差异主要在**成本与延迟**（deepseek-chat 快 3–4 倍，单轮成本最低；qwen-max 最贵且本轮波动最大）；真正的门槛在**私有化小模型**——夹具的价值正是接入前的验收闸门（`mock-gpt` 桩 0/5 演示了"不达标即挡住"）。
+
+## ③-F 收尾修复：Qwen 成本映射 + G7 指标标注 ✅
+
+### 1) Qwen 成本映射（原"unmetered"缺口）
+
+**根因**：Qwen 走 `openai/` 兼容路由（`api_base` 指向 DashScope 兼容端点），LiteLLM 不认识模型名 → 响应不带 `x-litellm-response-cost` → 计费日志记 0。
+**修复**：在 `litellm-config.yaml` 用 `model_info` 显式声明单价（先试过 `base_model: dashscope/qwen-*`，实测会被解析成 0，故改为显式值）：
+
+| 模型 | 单价（USD / 1M tokens） | 来源 |
+|---|---|---|
+| `qwen-max` | $1.6 in / $6.4 out | [Model inference pricing](https://www.alibabacloud.com/help/en/model-studio/model-pricing)（International 区，2026-09-15 更新），与 LiteLLM 内置 `dashscope/qwen-max` 一致 |
+| `qwen-plus` | $0.4 in / $1.2 out | 同上（非思考模式；>256K tokens 进更高价档，已在配置注释中说明会被低估） |
+| `qwen-embed`（text-embedding-v3） | $0.07 in / 0 out | [同步接口文档](https://www.alibabacloud.com/help/en/model-studio/text-embedding-synchronous-api)（新加坡区，2026-09-11 更新；LiteLLM 价格表无此条目） |
+| `mock-gpt` / `mock-embed` | 0 / 0 | 本地桩，显式置 0 避免被当作"未知价格模型" |
+
+**验证（真实调用 + 精确算术核对）**：
+- `qwen-plus` 14 in / 1 out → 14×4e-07 + 1×1.2e-06 = **6.8e-06** ✅（响应头实测 6.799999999999999e-06）
+- `qwen-max` 14 in / 1 out → 14×1.6e-06 + 1×6.4e-06 = **2.88e-05** ✅
+- `qwen-embed` 6 tokens → 6×7e-08 = **4.2e-07** ✅
+- 全量评估复跑（`cloud-v4-metered`）：三个模型的成本列**全部为真实计量值**，不再有 unmetered。
+
+**历史缺口审计**（`scripts/qwen_cost_audit.py`，**只读**，价格直接读配置文件避免两处漂移）：
+
+| 模型 | 调用 | in tok | out tok | 已记录 | 应有 | 缺口 |
+|---|---|---|---|---|---|---|
+| `openai/qwen-max` | 61 | 55694 | 20699 | $0.0000288 | $0.221584 | **$0.2215552** |
+| `openai/qwen-plus` | 29 | 4079 | 17047 | $0.0000068 | $0.022088 | **$0.0220812** |
+| `openai/text-embedding-v3` | 28 | 2996 | 0 | $0.0000007 | $0.00020972 | $0.00020902 |
+| **合计** | 118 | | | $0.000036 | **$0.243882** | **$0.243845** |
+
+**平台成本口径修正**：计费库已记录总额 $0.537233（其中 deepseek $0.537197）→ 加上历史 Qwen 缺口后 ≈ **$0.7811**。
+即修复前 Qwen 占**真实花费约 31%、却占已记录花费 0%**，成本面板系统性低估。脚本不修改计费日志，缺口以可复核的估算形式给出（tokens 是实测值，单价是配置中显式声明的值）。
+
+### 2) G7 指标标注（面板曾显示原始键名）
+
+**问题**：`14` 文档声明 G7 已"纳入度量面板标签"，但 `metrics-dashboard/app/metrics.py` 与 `scripts/metrics_report.py` 的标签映射仍只有 G1–G6（`process-mining/app/mining.py` 有），导致 **G7 在面板上显示为 `GATE_PROCESS_IMPROVEMENT` 且"域"列为 `-`**。
+**修复**：两处补 `GATE_PROCESS_IMPROVEMENT → "G7 流程改进"` 与域归属 `平台域`（它改进的是平台自身流程，不属于四域）；面板标题改为"四域 + 平台域指标"、"Gate 决策（G1–G7…）"。
+
+**真实验证**（真实库 + 真实面板渲染）：
+
+| Gate | 域 | 审批数 | 平均决策 |
+|---|---|---|---|
+| G1 需求评审 | 产品域 | 6 | 0.44s |
+| G2 方案评审 | 研发域 | 24 | 2.29s |
+| G3 代码审查 | 研发域 | 16 | 0.57s |
+| G4 放行决策 | 测试域 | 18 | 0.91s |
+| G5 变更审批 | 运维域 | 4 | 1.94s |
+| G6 复盘审查 | 运维域 | 2 | 0.65s |
+| **G7 流程改进** | **平台域** | **12** | **0.08s** |
+
+新增测试 2 项：标签必须为"G7 流程改进"且域为"平台域"；七个 Gate 标签齐全（防止再漏配）+ 真实库中不得出现未映射的 `GATE_` 原始键名。
 
 ### 测试
 - approval-gateway **58 项**（新增多产品线 12：新线不继承信任/惩罚不跨线/单线单 Gate 惩罚/作用域键往返/租户过滤总览/SOP 覆盖生效/覆盖热更新/缺失覆盖回退/`X-Tenant` 读写隔离 404/信任接口租户视图/总览聚合）；
 - knowledge-base **17 项**（新增维度守卫 5 + 自动发现 4 + 来源前缀隔离 2 + 惰性建库 2）；
 - agent-runtime **76 项**（新增评估夹具 42：金标集校验 7/判分器 13/变异检验 3/裸代码抽取 4/指标汇总 6/报告渲染 3 等）；
-- 全平台回归 = **232 项全绿**（approval 58、bridge 24、task-center 13、agent-runtime 76、KB 17、dashboard 3、process-mining 41）。
+- metrics-dashboard **5 项**（新增 G7 标签 2）；
+- 全平台回归 = **234 项全绿**（approval 58、bridge 24、task-center 13、agent-runtime 76、KB 17、dashboard 5、process-mining 41）。

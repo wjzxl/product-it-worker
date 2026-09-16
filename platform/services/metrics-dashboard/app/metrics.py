@@ -16,6 +16,7 @@ GATE_LABEL = {
     "GATE_RELEASE_DECISION": "G4 放行决策",
     "GATE_CHANGE_APPROVAL": "G5 变更审批",
     "GATE_POSTMORTEM_REVIEW": "G6 复盘审查",
+    "GATE_PROCESS_IMPROVEMENT": "G7 流程改进",  # 平台域：SOP 自进化提案闸门（Phase 3）
 }
 DOMAIN_OF_GATE = {
     "GATE_REQUIREMENT_REVIEW": "产品域",
@@ -24,6 +25,7 @@ DOMAIN_OF_GATE = {
     "GATE_RELEASE_DECISION": "测试域",
     "GATE_CHANGE_APPROVAL": "运维域",
     "GATE_POSTMORTEM_REVIEW": "运维域",
+    "GATE_PROCESS_IMPROVEMENT": "平台域",  # 不属于四域：它改进的是平台自身流程
 }
 SOP_LABEL = {
     "product-domain/prd-flow": "产品域",

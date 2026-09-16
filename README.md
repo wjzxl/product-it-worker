@@ -55,7 +55,7 @@ SANDBOX_MODE=host services/agent-runtime/.venv/bin/python scripts/model_eval.py 
     --models deepseek-chat,qwen-plus --tag cloud
 ```
 
-最新评估结论（[报告](platform/reports/model-eval-cloud-v3-20260914-100524.md)）：云模型能力均已够用，选型差异主要在**成本与延迟**（deepseek-chat P50 2.6s、成本可计量）；私有化小模型接入前用同一夹具验收（弱模型桩实测 0/5 被挡）。
+最新评估结论（[报告](platform/reports/model-eval-cloud-v4-metered-20260916-014327.md)）：云模型能力均已够用，选型差异主要在**成本与延迟**（deepseek-chat P50 1.9s、$0.0076；qwen-plus $0.0081；qwen-max $0.0291）；私有化小模型接入前用同一夹具验收（弱模型桩实测 0/5 被挡）。Qwen 成本已接入 LiteLLM 计量（原先 unmetered），历史缺口可用 `scripts/qwen_cost_audit.py` 复盘。
 
 ## 文档导航
 

@@ -1,0 +1,1142 @@
+{
+  "started_at": "2026-09-16T01:37:46.717451+00:00",
+  "endpoint": "http://127.0.0.1:4000/v1",
+  "judge_enabled": false,
+  "runner_mode": "host",
+  "tasks": [
+    {
+      "id": "coder_slugify",
+      "role": "coder",
+      "weight": 1.0,
+      "checks": [
+        "hidden_tests"
+      ]
+    },
+    {
+      "id": "coder_parse_duration",
+      "role": "coder",
+      "weight": 1.0,
+      "checks": [
+        "hidden_tests"
+      ]
+    },
+    {
+      "id": "prd_export_feature",
+      "role": "prd",
+      "weight": 1.0,
+      "checks": [
+        "required_sections",
+        "regex_any",
+        "forbidden_regex"
+      ]
+    },
+    {
+      "id": "tech_design_inventory_api",
+      "role": "tech_design",
+      "weight": 1.0,
+      "checks": [
+        "required_sections",
+        "regex_any",
+        "required_keywords"
+      ]
+    },
+    {
+      "id": "tester_defect_report",
+      "role": "tester",
+      "weight": 1.0,
+      "checks": [
+        "json_schema"
+      ]
+    },
+    {
+      "id": "tester_test_generation_kills_mutant",
+      "role": "tester",
+      "weight": 1.0,
+      "checks": [
+        "mutation_tests"
+      ]
+    },
+    {
+      "id": "ops_pool_exhaustion",
+      "role": "ops_diagnose",
+      "weight": 1.0,
+      "checks": [
+        "required_keywords",
+        "required_keywords",
+        "required_keywords",
+        "required_sections",
+        "forbidden_regex"
+      ]
+    },
+    {
+      "id": "coder_moving_average",
+      "role": "coder",
+      "weight": 1.5,
+      "checks": [
+        "hidden_tests"
+      ]
+    },
+    {
+      "id": "ops_misleading_signal",
+      "role": "ops_diagnose",
+      "weight": 1.5,
+      "checks": [
+        "required_sections",
+        "required_keywords",
+        "forbidden_regex"
+      ]
+    },
+    {
+      "id": "prd_contradiction_scan",
+      "role": "prd",
+      "weight": 1.5,
+      "checks": [
+        "json_schema",
+        "regex_any"
+      ]
+    }
+  ],
+  "models": [
+    {
+      "model": "deepseek-chat",
+      "tasks": 10,
+      "passed": 9,
+      "pass_rate": 0.9,
+      "avg_score": 0.9348,
+      "latency_p50_ms": 1863.7,
+      "latency_p95_ms": 7645.1,
+      "prompt_tokens": 1495,
+      "completion_tokens": 5987,
+      "total_tokens": 7482,
+      "cost_usd": 0.007633,
+      "cost_status": "metered",
+      "unmetered_calls": 0
+    },
+    {
+      "model": "qwen-plus",
+      "tasks": 10,
+      "passed": 10,
+      "pass_rate": 1.0,
+      "avg_score": 1.0,
+      "latency_p50_ms": 8056.0,
+      "latency_p95_ms": 40266.9,
+      "prompt_tokens": 1657,
+      "completion_tokens": 6171,
+      "total_tokens": 7828,
+      "cost_usd": 0.008068,
+      "cost_status": "metered",
+      "unmetered_calls": 0
+    },
+    {
+      "model": "qwen-max",
+      "tasks": 10,
+      "passed": 8,
+      "pass_rate": 0.8,
+      "avg_score": 0.9524,
+      "latency_p50_ms": 14624.9,
+      "latency_p95_ms": 25844.8,
+      "prompt_tokens": 1657,
+      "completion_tokens": 4139,
+      "total_tokens": 5796,
+      "cost_usd": 0.029141,
+      "cost_status": "metered",
+      "unmetered_calls": 0
+    }
+  ],
+  "results": [
+    {
+      "model": "deepseek-chat",
+      "task_id": "coder_slugify",
+      "role": "coder",
+      "weight": 1.0,
+      "score": 1.0,
+      "passed": true,
+      "checks": [
+        {
+          "passed": true,
+          "score": 1.0,
+          "detail": "隐藏测试 5/5 通过（returncode=0）",
+          "evidence": "",
+          "files": [
+            "solution.py"
+          ],
+          "type": "hidden_tests",
+          "label": "hidden_tests"
+        }
+      ],
+      "latency_ms": 1258.8,
+      "total_tokens": 184,
+      "cost": 0.00011729999999999999,
+      "output_chars": 210,
+      "output_head": "# file: solution.py\nimport re\n\n\ndef slugify(text: str) -> str:\n    text = text.lower()\n    text = re.sub(r'[^a-z0-9]+', '-', text)\n    text = re.sub(r'-+', '-', text)\n    text = text.strip('-')\n    return text\n"
+    },
+    {
+      "model": "deepseek-chat",
+      "task_id": "coder_parse_duration",
+      "role": "coder",
+      "weight": 1.0,
+      "score": 1.0,
+      "passed": true,
+      "checks": [
+        {
+          "passed": true,
+          "score": 1.0,
+          "detail": "隐藏测试 6/6 通过（returncode=0）",
+          "evidence": "",
+          "files": [
+            "solution.py"
+          ],
+          "type": "hidden_tests",
+          "label": "hidden_tests"
+        }
+      ],
+      "latency_ms": 1371.5,
+      "total_tokens": 344,
+      "cost": 0.0002742,
+      "output_chars": 662,
+      "output_head": "# file: solution.py\nimport re\n\n\ndef parse_duration(s: str) -> int:\n    if not isinstance(s, str) or s == \"\":\n        raise ValueError(\"invalid duration\")\n\n    pattern = re.compile(r\"^(?:(\\d+)h)?(?:(\\d+)m)?(?:(\\d+)s)?$\")\n    match = pattern.match(s)\n    if not match:\n        raise ValueError(\"invalid duration\")\n\n    h_str, m_str, s_str = match.groups()\n    if h_str is None and m_str is None and s_s"
+    },
+    {
+      "model": "deepseek-chat",
+      "task_id": "prd_export_feature",
+      "role": "prd",
+      "weight": 1.0,
+      "score": 1.0,
+      "passed": true,
+      "checks": [
+        {
+          "passed": true,
+          "detail": "必备小节齐备",
+          "evidence": "",
+          "score": 1.0,
+          "type": "required_sections",
+          "label": "required_sections"
+        },
+        {
+          "passed": true,
+          "detail": "匹配 7 处（要求 ≥3）：至少 3 条 WHEN...THEN 验收标准",
+          "score": 1.0,
+          "type": "regex_any",
+          "label": "至少 3 条 WHEN...THEN 验收标准"
+        },
+        {
+          "passed": true,
+          "detail": "未出现禁止表述",
+          "score": 1.0,
+          "type": "forbidden_regex",
+          "label": "不得出现占位表述"
+        }
+      ],
+      "latency_ms": 4054.3,
+      "total_tokens": 796,
+      "cost": 0.0008742,
+      "output_chars": 1147,
+      "output_head": "## 需求\n\n### 背景\n当前系统内的数据仅支持在线查看，用户无法将报表数据带离系统进行二次加工、归档或对外报送。业务方需要通过导出功能获取结构化数据文件。\n\n### 目标用户\n- 运营人员：定期导出业务数据用于周报/月报\n- 财务人员：导出对账明细用于财务核算\n- 管理员：导出全量数据用于审计留痕\n\n### 功能范围\n1. 支持在报表页面发起导出操作\n2. 支持导出格式：CSV、XLSX\n3. 导出内容遵循当前报表的筛选条件与列配置\n4. 导出任务异步执行，完成后提供下载入口\n5. 导出记录可查询，文件保留 7 天\n\n### 交互流程\n1. 用户在报表页点击「导出」按钮\n2. 弹窗选择导出格式（CSV / XLSX）\n3. 确认后创建导出任务，页面提示「任务已提交」\n4. 任务完成后，通过站内通知与导出记录页提供下载链接\n5. 用户点击下载，获取文件\n\n### 数据规则\n- 导出字段与"
+    },
+    {
+      "model": "deepseek-chat",
+      "task_id": "tech_design_inventory_api",
+      "role": "tech_design",
+      "weight": 1.0,
+      "score": 1.0,
+      "passed": true,
+      "checks": [
+        {
+          "passed": true,
+          "detail": "必备小节齐备",
+          "evidence": "",
+          "score": 1.0,
+          "type": "required_sections",
+          "label": "required_sections"
+        },
+        {
+          "passed": true,
+          "detail": "匹配 2 处（要求 ≥1）：给出 HTTP 方法与路径",
+          "score": 1.0,
+          "type": "regex_any",
+          "label": "给出 HTTP 方法与路径"
+        },
+        {
+          "passed": true,
+          "detail": "命中关键词 ['回滚']（要求 all：['回滚']）",
+          "score": 1.0,
+          "type": "required_keywords",
+          "label": "必须包含回滚方案"
+        }
+      ],
+      "latency_ms": 7895.6,
+      "total_tokens": 1995,
+      "cost": 0.0023255999999999997,
+      "output_chars": 4203,
+      "output_head": "## 接口定义\n\n### 基本信息\n\n| 项 | 值 |\n| --- | --- |\n| 接口名称 | 库存扣减 |\n| HTTP 方法 | `POST` |\n| 路径 | `/api/v1/inventory/deduct` |\n| 幂等性 | 支持，通过 `requestId` 保证 |\n| 鉴权 | 内部服务鉴权（Service Token / mTLS） |\n\n### 请求头\n\n| 字段 | 必填 | 说明 |\n| --- | --- | --- |\n| `Content-Type` | 是 | `application/json` |\n| `X-Request-Id` | 是 | 全局唯一请求 ID，用于幂等与链路追踪 |\n| `Authorization` | 是 | 服务间调用凭证 |\n\n### 请求体\n\n```json\n{\n  \"requestId\": \"req-20240"
+    },
+    {
+      "model": "deepseek-chat",
+      "task_id": "tester_defect_report",
+      "role": "tester",
+      "weight": 1.0,
+      "score": 1.0,
+      "passed": true,
+      "checks": [
+        {
+          "passed": true,
+          "detail": "JSON Schema 校验通过",
+          "evidence": "",
+          "score": 1.0,
+          "type": "json_schema",
+          "label": "json_schema"
+        }
+      ],
+      "latency_ms": 1864.5,
+      "total_tokens": 417,
+      "cost": 0.0003006,
+      "output_chars": 392,
+      "output_head": "{\"defect_title\":\"报表导出接口在起止日期相同的空区间查询时返回 500 而非 200\",\"severity\":\"中\",\"reproduce_steps\":[\"启动服务，准备测试环境\",\"调用 GET /api/v1/report/export?from=2026-03-01&to=2026-03-01\",\"观察响应状态码，实际返回 500，期望返回 200\"],\"root_cause_hypothesis\":\"导出逻辑未处理 from 与 to 相同（空时间区间）的边界情况，可能在计算区间长度、除零、聚合或查询结果为空时抛出未捕获异常，导致 500。\",\"suggested_fix\":\"在导出接口中增加对 from/to 的校验与空区间处理：当 from >= to 或区间内无数据时返回空报表并保持 200；同时捕获并记录异常，补充针对空区间的单元测试。\"}"
+    },
+    {
+      "model": "deepseek-chat",
+      "task_id": "tester_test_generation_kills_mutant",
+      "role": "tester",
+      "weight": 1.0,
+      "score": 1.0,
+      "passed": true,
+      "checks": [
+        {
+          "files": [
+            "test_generated.py"
+          ],
+          "correct_run": {
+            "passed": 8,
+            "failed": 0,
+            "errors": 0,
+            "returncode": 0
+          },
+          "buggy_run": {
+            "passed": 4,
+            "failed": 4,
+            "errors": 0,
+            "returncode": 1
+          },
+          "passed": true,
+          "score": 1.0,
+          "detail": "用例在正确实现上全绿（8 passed），并成功捕获含 bug 实现 ✅",
+          "evidence": "",
+          "type": "mutation_tests",
+          "label": "mutation_tests"
+        }
+      ],
+      "latency_ms": 1585.8,
+      "total_tokens": 389,
+      "cost": 0.00035339999999999997,
+      "output_chars": 793,
+      "output_head": "# file: test_generated.py\nimport pytest\nfrom solution import divide\n\n\ndef test_divide_positive_numbers():\n    assert divide(10.0, 2.0) == 5.0\n\n\ndef test_divide_negative_numbers():\n    assert divide(-9.0, 3.0) == -3.0\n\n\ndef test_divide_fractional_result():\n    assert divide(1.0, 4.0) == 0.25\n\n\ndef test_divide_zero_numerator():\n    assert divide(0.0, 5.0) == 0.0\n\n\ndef test_divide_by_zero_raises_valu"
+    },
+    {
+      "model": "deepseek-chat",
+      "task_id": "ops_pool_exhaustion",
+      "role": "ops_diagnose",
+      "weight": 1.0,
+      "score": 1.0,
+      "passed": true,
+      "checks": [
+        {
+          "passed": true,
+          "detail": "命中关键词 ['连接池']（要求 all：['连接池']）",
+          "score": 1.0,
+          "type": "required_keywords",
+          "label": "定位到连接池"
+        },
+        {
+          "passed": true,
+          "detail": "命中关键词 ['超时', 'pool']（要求 any：['超时', 'pool']）",
+          "score": 1.0,
+          "type": "required_keywords",
+          "label": "引用超时/连接池证据"
+        },
+        {
+          "passed": true,
+          "detail": "命中关键词 ['扩容', '泄漏', '慢查询', '排队']（要求 any：['扩容', '上限', '最大连接', '泄漏', '慢查询', '排队']）",
+          "score": 1.0,
+          "type": "required_keywords",
+          "label": "处置指向具体动作/根因类别"
+        },
+        {
+          "passed": true,
+          "detail": "必备小节齐备",
+          "evidence": "",
+          "score": 1.0,
+          "type": "required_sections",
+          "label": "required_sections"
+        },
+        {
+          "passed": true,
+          "detail": "未出现禁止表述（2 处出现在否定语境中，如「不建议忽略告警」，不算违规）",
+          "score": 1.0,
+          "type": "forbidden_regex",
+          "label": "不得给出粗暴处置"
+        }
+      ],
+      "latency_ms": 6997.2,
+      "total_tokens": 1311,
+      "cost": 0.0014229,
+      "output_chars": 2164,
+      "output_head": "# 根因\n\n**数据库连接池耗尽（Connection Pool Exhaustion）导致请求排队、超时并放大为 5xx。**\n\n判断依据：\n\n1. **直接证据**：`hikari.pool - Connection is not available, request timed out after 30000ms` 与 `order.repo - Timeout waiting for connection from pool` 明确指向连接获取超时，而非 SQL 执行慢或下游故障。\n2. **指标自洽**：`active=50/50` 打满 + `等待队列 214` + `P99 4.8s`，是典型的“池容量不足/连接被长期占用”特征；P99 远高于基线但 QPS 持平，说明不是流量突增，而是**单请求占用连接时间变长**或**连接泄漏**。\n3. **排除项**：\n   - QP"
+    },
+    {
+      "model": "deepseek-chat",
+      "task_id": "coder_moving_average",
+      "role": "coder",
+      "weight": 1.5,
+      "score": 1.0,
+      "passed": true,
+      "checks": [
+        {
+          "passed": true,
+          "score": 1.0,
+          "detail": "隐藏测试 7/7 通过（returncode=0）",
+          "evidence": "",
+          "files": [
+            "solution.py"
+          ],
+          "type": "hidden_tests",
+          "label": "hidden_tests"
+        }
+      ],
+      "latency_ms": 849.1,
+      "total_tokens": 251,
+      "cost": 0.0001779,
+      "output_chars": 455,
+      "output_head": "# file: solution.py\ndef moving_average(values: list, window: int) -> list:\n    if window <= 0:\n        raise ValueError(\"window must be positive\")\n    if not values:\n        return []\n\n    result = [None] * len(values)\n    window_sum = 0\n    for i, v in enumerate(values):\n        window_sum += v\n        if i >= window:\n            window_sum -= values[i - window]\n        if i >= window - 1:\n      "
+    },
+    {
+      "model": "deepseek-chat",
+      "task_id": "ops_misleading_signal",
+      "role": "ops_diagnose",
+      "weight": 1.5,
+      "score": 1.0,
+      "passed": true,
+      "checks": [
+        {
+          "passed": true,
+          "detail": "必备小节齐备",
+          "evidence": "",
+          "score": 1.0,
+          "type": "required_sections",
+          "label": "required_sections"
+        },
+        {
+          "passed": true,
+          "detail": "命中关键词 ['线程池', '队列']（要求 any：['线程池', '队列']）",
+          "score": 1.0,
+          "type": "required_keywords",
+          "label": "定位到线程池/队列"
+        },
+        {
+          "passed": true,
+          "detail": "未出现禁止表述",
+          "score": 1.0,
+          "type": "forbidden_regex",
+          "label": "不得把根因误判为数据库/连接池"
+        }
+      ],
+      "latency_ms": 7339.1,
+      "total_tokens": 1420,
+      "cost": 0.0015230999999999999,
+      "output_chars": 2219,
+      "output_head": "# search-api P99 飙升告警分析\n\n## 根因\n\n**线程池 `searchExecutor` 饱和导致的请求排队积压，而非下游或数据库问题。**\n\n判断依据：\n\n1. **线程池是唯一瓶颈点**\n   - 活跃线程 200/200（打满），队列 5000/5000（满），日志明确出现 `Task rejected from searchExecutor: queue full`。\n   - 请求在队列中排队等待，P99 从 180ms 涨到 6.2s，与「等待任务完成超 5000ms」的日志完全吻合——**延迟来自排队，不是执行**。\n\n2. **排除下游 `index-service`**\n   - 其自身 P99 = 150ms，正常。若下游变慢，会表现为线程被长时间占用（阻塞在 IO），但这里更关键的是**队列满 + 拒绝**，说明任务提交速率 > 消费速率，是本地并"
+    },
+    {
+      "model": "deepseek-chat",
+      "task_id": "prd_contradiction_scan",
+      "role": "prd",
+      "weight": 1.5,
+      "score": 0.5,
+      "passed": false,
+      "checks": [
+        {
+          "passed": false,
+          "detail": "Schema 不满足：$.severity: 缺少必填字段",
+          "evidence": "{\"contradictions\": [{\"ids\": [1, 2, 3, 4], \"reason\": \"同步接口不引入队列与异步任务，且导出文件包含全部字段且不压缩，单次最多500万行，在用户点击后1秒内返回完整文件在常规网络、存储和序列化条件下不可同时满足。\"}, {\"ids\": [1, 5], \"reason\": \"要求用户点击后1秒内返回完整文件，同时接口P99延迟必须保持在200ms以内，二者对响应时间上限的要求不一致且后者更严格，无法同时作为同一接口的硬性指标。\"}, {\"ids\": [2, 3, 4, 5], \"reason\": \"同步接口、不压缩、全字段导出最多500万行数据，通常需要较长处理与传输时间，无法保证P99延迟在200ms以内。\"}]}",
+          "score": 0.0,
+          "type": "json_schema",
+          "label": "json_schema"
+        },
+        {
+          "passed": true,
+          "detail": "匹配 10 处（要求 ≥2）：矛盾说明需引用具体约束",
+          "score": 1.0,
+          "type": "regex_any",
+          "label": "矛盾说明需引用具体约束"
+        }
+      ],
+      "latency_ms": 1863.0,
+      "total_tokens": 375,
+      "cost": 0.00026369999999999996,
+      "output_chars": 317,
+      "output_head": "{\"contradictions\":[{\"ids\":[1,2,3,4],\"reason\":\"同步接口不引入队列与异步任务，且导出文件包含全部字段且不压缩，单次最多500万行，在用户点击后1秒内返回完整文件在常规网络、存储和序列化条件下不可同时满足。\"},{\"ids\":[1,5],\"reason\":\"要求用户点击后1秒内返回完整文件，同时接口P99延迟必须保持在200ms以内，二者对响应时间上限的要求不一致且后者更严格，无法同时作为同一接口的硬性指标。\"},{\"ids\":[2,3,4,5],\"reason\":\"同步接口、不压缩、全字段导出最多500万行数据，通常需要较长处理与传输时间，无法保证P99延迟在200ms以内。\"}]}"
+    },
+    {
+      "model": "qwen-plus",
+      "task_id": "coder_slugify",
+      "role": "coder",
+      "weight": 1.0,
+      "score": 1.0,
+      "passed": true,
+      "checks": [
+        {
+          "passed": true,
+          "score": 1.0,
+          "detail": "隐藏测试 5/5 通过（returncode=0）",
+          "evidence": "",
+          "files": [
+            "solution.py"
+          ],
+          "type": "hidden_tests",
+          "label": "hidden_tests"
+        }
+      ],
+      "latency_ms": 5090.4,
+      "total_tokens": 340,
+      "cost": 0.0003056,
+      "output_chars": 844,
+      "output_head": "```python\n# file: solution.py\nimport re\n\ndef slugify(text: str) -> str:\n    if not text:\n        return \"\"\n    \n    # Step 1: Convert to lowercase\n    text = text.lower()\n    \n    # Step 2: Replace all non-alphanumeric ASCII characters with '-'\n    # We only keep ASCII letters and digits, discard everything else including non-ASCII\n    cleaned = \"\"\n    for char in text:\n        if 'a' <= char <= '"
+    },
+    {
+      "model": "qwen-plus",
+      "task_id": "coder_parse_duration",
+      "role": "coder",
+      "weight": 1.0,
+      "score": 1.0,
+      "passed": true,
+      "checks": [
+        {
+          "passed": true,
+          "score": 1.0,
+          "detail": "隐藏测试 6/6 通过（returncode=0）",
+          "evidence": "",
+          "files": [
+            "solution.py"
+          ],
+          "type": "hidden_tests",
+          "label": "hidden_tests"
+        }
+      ],
+      "latency_ms": 10946.3,
+      "total_tokens": 627,
+      "cost": 0.0006228,
+      "output_chars": 1971,
+      "output_head": "```python\n# file: solution.py\ndef parse_duration(s: str) -> int:\n    if not s:\n        raise ValueError(\"Empty string\")\n    \n    # Check for invalid characters (only digits, letters h/m/s allowed)\n    for char in s:\n        if not (char.isdigit() or char in 'hms'):\n            raise ValueError(f\"Invalid character: {char}\")\n    \n    # Check if string contains at least one unit\n    if not any(char i"
+    },
+    {
+      "model": "qwen-plus",
+      "task_id": "prd_export_feature",
+      "role": "prd",
+      "weight": 1.0,
+      "score": 1.0,
+      "passed": true,
+      "checks": [
+        {
+          "passed": true,
+          "detail": "必备小节齐备",
+          "evidence": "",
+          "score": 1.0,
+          "type": "required_sections",
+          "label": "required_sections"
+        },
+        {
+          "passed": true,
+          "detail": "匹配 3 处（要求 ≥3）：至少 3 条 WHEN...THEN 验收标准",
+          "score": 1.0,
+          "type": "regex_any",
+          "label": "至少 3 条 WHEN...THEN 验收标准"
+        },
+        {
+          "passed": true,
+          "detail": "未出现禁止表述",
+          "score": 1.0,
+          "type": "forbidden_regex",
+          "label": "不得出现占位表述"
+        }
+      ],
+      "latency_ms": 15855.9,
+      "total_tokens": 799,
+      "cost": 0.0008763999999999999,
+      "output_chars": 1132,
+      "output_head": "# PRD 草案：报表导出功能\n\n## 需求  \n用户需能将当前查看的业务报表（含数据表格、筛选条件、分组汇总及图表摘要）一键导出为标准格式文件，以支持离线查阅、归档与跨系统共享。支持导出格式为 Excel（.xlsx）和 PDF 两种，导出内容须严格保持页面所见即所得（WYSIWYG）：包括表头、行序、数值精度、单位标识、分页逻辑（PDF）、冻结首行（Excel）、以及图表渲染结果（PDF 中嵌入静态图像，Excel 中嵌入可缩放矢量图表快照）。导出操作应响应明确、状态可见，并在导出失败时提供具体错误原因（如网络中断、内存超限、空数据集等），不静默失败。\n\n## 验收标准  \nWHEN 用户在报表详情页点击「导出」按钮并选择「Excel」格式，THEN 系统生成包含全部当前可见数据行（含已应用的筛选、排序、分页偏移）、完整列标题、千分位分隔符、两位小数精度（财务类字段）、且首行为冻结行的"
+    },
+    {
+      "model": "qwen-plus",
+      "task_id": "tech_design_inventory_api",
+      "role": "tech_design",
+      "weight": 1.0,
+      "score": 1.0,
+      "passed": true,
+      "checks": [
+        {
+          "passed": true,
+          "detail": "必备小节齐备",
+          "evidence": "",
+          "score": 1.0,
+          "type": "required_sections",
+          "label": "required_sections"
+        },
+        {
+          "passed": true,
+          "detail": "匹配 1 处（要求 ≥1）：给出 HTTP 方法与路径",
+          "score": 1.0,
+          "type": "regex_any",
+          "label": "给出 HTTP 方法与路径"
+        },
+        {
+          "passed": true,
+          "detail": "命中关键词 ['回滚']（要求 all：['回滚']）",
+          "score": 1.0,
+          "type": "required_keywords",
+          "label": "必须包含回滚方案"
+        }
+      ],
+      "latency_ms": 56027.4,
+      "total_tokens": 2587,
+      "cost": 0.0030364,
+      "output_chars": 5652,
+      "output_head": "## 库存扣减接口技术方案\n\n### ## 接口定义  \n**HTTP 方法与路径**：  \n`POST /api/v1/inventory/deduct`\n\n**请求头（Header）**：  \n- `Content-Type: application/json`  \n- `X-Request-ID: <uuid>`（必填，用于链路追踪与幂等控制）  \n- `X-Biz-Trace-ID: <string>`（可选，业务调用链透传）\n\n**请求体（JSON）**：  \n```json\n{\n  \"deduct_id\": \"202411051023456789012345\",\n  \"items\": [\n    {\n      \"sku_id\": \"SKU10001\",\n      \"quantity\": 2,\n      \"warehouse_id\": \"WH_BJ_001\"\n    },\n"
+    },
+    {
+      "model": "qwen-plus",
+      "task_id": "tester_defect_report",
+      "role": "tester",
+      "weight": 1.0,
+      "score": 1.0,
+      "passed": true,
+      "checks": [
+        {
+          "passed": true,
+          "detail": "JSON Schema 校验通过",
+          "evidence": "",
+          "score": 1.0,
+          "type": "json_schema",
+          "label": "json_schema"
+        }
+      ],
+      "latency_ms": 5165.7,
+      "total_tokens": 454,
+      "cost": 0.00035759999999999996,
+      "output_chars": 446,
+      "output_head": "{\n  \"defect_title\": \"报告导出接口在空时间范围内返回500错误而非预期200\",\n  \"severity\": \"高\",\n  \"reproduce_steps\": [\n    \"启动测试环境服务\",\n    \"执行测试用例 tests/test_report.py::test_export_empty_range，该用例调用 GET /api/v1/report/export?from=2026-03-01&to=2026-03-01\"\n  ],\n  \"root_cause_hypothesis\": \"后端未正确处理起止日期相同的空时间范围请求，导致内部异常（如除零、空集合操作或数据库查询失败）而抛出未捕获异常，触发500响应\",\n  \"suggested_fix\": \"在 report/export 接口逻辑中增加对 from==to 的边界校验，确保空时间范围能安全处"
+    },
+    {
+      "model": "qwen-plus",
+      "task_id": "tester_test_generation_kills_mutant",
+      "role": "tester",
+      "weight": 1.0,
+      "score": 1.0,
+      "passed": true,
+      "checks": [
+        {
+          "files": [
+            "test_generated.py"
+          ],
+          "correct_run": {
+            "passed": 2,
+            "failed": 0,
+            "errors": 0,
+            "returncode": 0
+          },
+          "buggy_run": {
+            "passed": 1,
+            "failed": 1,
+            "errors": 0,
+            "returncode": 1
+          },
+          "passed": true,
+          "score": 1.0,
+          "detail": "用例在正确实现上全绿（2 passed），并成功捕获含 bug 实现 ✅",
+          "evidence": "",
+          "type": "mutation_tests",
+          "label": "mutation_tests"
+        }
+      ],
+      "latency_ms": 3977.4,
+      "total_tokens": 304,
+      "cost": 0.0002536,
+      "output_chars": 474,
+      "output_head": "```python\n# file: test_generated.py\nimport pytest\nfrom solution import divide\n\ndef test_divide_normal_cases():\n    assert divide(10.0, 2.0) == 5.0\n    assert divide(7.5, 2.5) == 3.0\n    assert divide(-6.0, 3.0) == -2.0\n    assert divide(0.0, 5.0) == 0.0\n\ndef test_divide_zero_divisor():\n    with pytest.raises(ValueError):\n        divide(5.0, 0.0)\n    with pytest.raises(ValueError):\n        divide(-"
+    },
+    {
+      "model": "qwen-plus",
+      "task_id": "ops_pool_exhaustion",
+      "role": "ops_diagnose",
+      "weight": 1.0,
+      "score": 1.0,
+      "passed": true,
+      "checks": [
+        {
+          "passed": true,
+          "detail": "命中关键词 ['连接池']（要求 all：['连接池']）",
+          "score": 1.0,
+          "type": "required_keywords",
+          "label": "定位到连接池"
+        },
+        {
+          "passed": true,
+          "detail": "命中关键词 ['超时', 'pool']（要求 any：['超时', 'pool']）",
+          "score": 1.0,
+          "type": "required_keywords",
+          "label": "引用超时/连接池证据"
+        },
+        {
+          "passed": true,
+          "detail": "命中关键词 ['扩容', '泄漏', '慢查询', '排队']（要求 any：['扩容', '上限', '最大连接', '泄漏', '慢查询', '排队']）",
+          "score": 1.0,
+          "type": "required_keywords",
+          "label": "处置指向具体动作/根因类别"
+        },
+        {
+          "passed": true,
+          "detail": "必备小节齐备",
+          "evidence": "",
+          "score": 1.0,
+          "type": "required_sections",
+          "label": "required_sections"
+        },
+        {
+          "passed": true,
+          "detail": "未出现禁止表述",
+          "score": 1.0,
+          "type": "forbidden_regex",
+          "label": "不得给出粗暴处置"
+        }
+      ],
+      "latency_ms": 15502.8,
+      "total_tokens": 875,
+      "cost": 0.0008948,
+      "output_chars": 1249,
+      "output_head": "```markdown\n### 根因  \nDB 连接池资源耗尽（active=50/50，等待队列达214），导致业务线程在获取连接时超时（30s timeout），进而引发大量 HTTP 5xx（主要是 500/503）。P99 延迟飙升至 4.8s（远超基线 200ms）是连接争抢与排队的直接体现；QPS 稳定、无发布、下游健康，排除流量突增、变更引入或级联故障。根本原因为**连接泄漏（Connection Leak）或长事务/慢查询持续占用连接未释放**，导致连接无法归还池中，池容量被逐步“锁死”。\n\n### 处置  \n1. **紧急限流与连接回收**：  \n   - 对 `order-api` 的非核心写路径（如 `POST /orders`）启用熔断限流（如 QPS 限至当前 30%），缓解连接池压力；  \n   - 执行 HikariCP 的强制连接回收（若配置支持）：调用 `"
+    },
+    {
+      "model": "qwen-plus",
+      "task_id": "coder_moving_average",
+      "role": "coder",
+      "weight": 1.5,
+      "score": 1.0,
+      "passed": true,
+      "checks": [
+        {
+          "passed": true,
+          "score": 1.0,
+          "detail": "隐藏测试 7/7 通过（returncode=0）",
+          "evidence": "",
+          "files": [
+            "solution.py"
+          ],
+          "type": "hidden_tests",
+          "label": "hidden_tests"
+        }
+      ],
+      "latency_ms": 3128.1,
+      "total_tokens": 265,
+      "cost": 0.00020359999999999996,
+      "output_chars": 516,
+      "output_head": "```python\n# file: solution.py\ndef moving_average(values: list, window: int) -> list:\n    if window <= 0:\n        raise ValueError(\"window must be positive\")\n    if not values:\n        return []\n    \n    result = []\n    for i in range(len(values)):\n        if i < window - 1:\n            result.append(None)\n        else:\n            # Sum the last 'window' elements ending at index i\n            wind"
+    },
+    {
+      "model": "qwen-plus",
+      "task_id": "ops_misleading_signal",
+      "role": "ops_diagnose",
+      "weight": 1.5,
+      "score": 1.0,
+      "passed": true,
+      "checks": [
+        {
+          "passed": true,
+          "detail": "必备小节齐备",
+          "evidence": "",
+          "score": 1.0,
+          "type": "required_sections",
+          "label": "required_sections"
+        },
+        {
+          "passed": true,
+          "detail": "命中关键词 ['线程池', '队列']（要求 any：['线程池', '队列']）",
+          "score": 1.0,
+          "type": "required_keywords",
+          "label": "定位到线程池/队列"
+        },
+        {
+          "passed": true,
+          "detail": "未出现禁止表述",
+          "score": 1.0,
+          "type": "forbidden_regex",
+          "label": "不得把根因误判为数据库/连接池"
+        }
+      ],
+      "latency_ms": 21004.1,
+      "total_tokens": 1149,
+      "cost": 0.001186,
+      "output_chars": 1571,
+      "output_head": "```markdown\n### 根因  \n`search-api` 的 `searchExecutor` 线程池已彻底饱和（活跃线程 200/200，队列深度 5000/5000），导致新任务被拒绝（`Task rejected from searchExecutor: queue full`），且已有任务等待超时（`Waiting for task completion exceeded 5000ms`）。结合 P99 从 180ms 暴涨至 6.2s、QPS 未增长、下游 `index-service` 延迟正常（150ms）、DB 连接池空闲、慢查询为 0、CPU/GC 均无异常等证据，可排除数据库瓶颈、资源争用或下游拖累。**根本原因是：`searchExecutor` 线程池处理能力严重不足，任务积压形成雪崩式延迟——并非突发流量（QPS 持平），而是单个任务平均处理耗时显著增加"
+    },
+    {
+      "model": "qwen-plus",
+      "task_id": "prd_contradiction_scan",
+      "role": "prd",
+      "weight": 1.5,
+      "score": 1.0,
+      "passed": true,
+      "checks": [
+        {
+          "passed": true,
+          "detail": "JSON Schema 校验通过",
+          "evidence": "",
+          "score": 1.0,
+          "type": "json_schema",
+          "label": "json_schema"
+        },
+        {
+          "passed": true,
+          "detail": "匹配 13 处（要求 ≥2）：矛盾说明需引用具体约束",
+          "score": 1.0,
+          "type": "regex_any",
+          "label": "矛盾说明需引用具体约束"
+        }
+      ],
+      "latency_ms": 4975.1,
+      "total_tokens": 428,
+      "cost": 0.0003312,
+      "output_chars": 341,
+      "output_head": "{\n  \"contradictions\": [\n    {\n      \"ids\": [1, 3, 5],\n      \"reason\": \"同步接口在1秒内返回完整文件（含最多500万行、全字段、无压缩）与P99延迟≤200ms矛盾：生成大文件需IO和CPU耗时，P99必然远超200ms，尤其在高并发或资源波动时无法稳定满足\"\n    },\n    {\n      \"ids\": [1, 2, 4, 5],\n      \"reason\": \"导出500万行全字段未压缩文件通常达GB级，网络传输+生成耗时远超200ms，与P99≤200ms及1秒内返回完整文件不可兼得；同步接口无法分块或流式响应，加剧延迟不可控性\"\n    }\n  ],\n  \"severity\": \"高\"\n}"
+    },
+    {
+      "model": "qwen-max",
+      "task_id": "coder_slugify",
+      "role": "coder",
+      "weight": 1.0,
+      "score": 1.0,
+      "passed": true,
+      "checks": [
+        {
+          "passed": true,
+          "score": 1.0,
+          "detail": "隐藏测试 5/5 通过（returncode=0）",
+          "evidence": "",
+          "files": [
+            "solution.py"
+          ],
+          "type": "hidden_tests",
+          "label": "hidden_tests"
+        }
+      ],
+      "latency_ms": 5754.7,
+      "total_tokens": 334,
+      "cost": 0.0015232,
+      "output_chars": 480,
+      "output_head": "```python\n# file: solution.py\nimport re\n\ndef slugify(text: str) -> str:\n    # 将文本转换为小写并移除非ASCII字符\n    text = ''.join([char for char in text.lower() if ord(char) < 128])\n    \n    # 使用正则表达式将所有非字母数字字符替换为 '-'\n    text = re.sub(r'[^a-z0-9]+', '-', text)\n    \n    # 去除可能出现在开头或结尾的 '-'\n    text = text.strip('-')\n    \n    return text\n```\n\n这段代码实现了题目要求的所有功能，包括但不限于将输入字符串转为小写、过滤掉非ASCII字符（例如中文字符）、用连字符 `-` 替换所有非字"
+    },
+    {
+      "model": "qwen-max",
+      "task_id": "coder_parse_duration",
+      "role": "coder",
+      "weight": 1.0,
+      "score": 0.6667,
+      "passed": false,
+      "checks": [
+        {
+          "passed": false,
+          "score": 0.6667,
+          "detail": "隐藏测试 4/6 通过（returncode=1）",
+          "evidence": " literal for int() with base 10: ''\n\nsolution.py:23: ValueError\n_______________________________ test_hours_only ________________________________\n\n    def test_hours_only():\n>       assert parse_duration(\"2h\") == 7200\nE       AssertionError: assert 0 == 7200\nE        +  where 0 = parse_duration('2h')\n\ntest_hidden.py:11: AssertionError\n=========================== short test summary info ============================\nFAILED test_hidden.py::test_hours_minutes - ValueError: invalid literal for i...\nFAILED test_hidden.py::test_hours_only - AssertionError: assert 0 == 7200\n2 failed, 4 passed in 0.11s\n",
+          "files": [
+            "solution.py"
+          ],
+          "type": "hidden_tests",
+          "label": "hidden_tests"
+        }
+      ],
+      "latency_ms": 20728.1,
+      "total_tokens": 737,
+      "cost": 0.0039391999999999995,
+      "output_chars": 1796,
+      "output_head": "# file: solution.py\n```python\nimport re\n\ndef parse_duration(s: str) -> int:\n    if not s:\n        raise ValueError(\"输入不能为空\")\n    \n    # 检查字符串是否符合基本格式要求\n    pattern = r'^(\\d+h)?(\\d+m)?(\\d+s)?$'\n    match = re.match(pattern, s)\n    if not match:\n        raise ValueError(\"无效的时长格式\")\n\n    hours, minutes, seconds = 0, 0, 0\n    parts = [part for part in s.split('h') if part]  # 分割小时部分\n    \n    if len(par"
+    },
+    {
+      "model": "qwen-max",
+      "task_id": "prd_export_feature",
+      "role": "prd",
+      "weight": 1.0,
+      "score": 1.0,
+      "passed": true,
+      "checks": [
+        {
+          "passed": true,
+          "detail": "必备小节齐备",
+          "evidence": "",
+          "score": 1.0,
+          "type": "required_sections",
+          "label": "required_sections"
+        },
+        {
+          "passed": true,
+          "detail": "匹配 3 处（要求 ≥3）：至少 3 条 WHEN...THEN 验收标准",
+          "score": 1.0,
+          "type": "regex_any",
+          "label": "至少 3 条 WHEN...THEN 验收标准"
+        },
+        {
+          "passed": true,
+          "detail": "未出现禁止表述",
+          "score": 1.0,
+          "type": "forbidden_regex",
+          "label": "不得出现占位表述"
+        }
+      ],
+      "latency_ms": 28918.6,
+      "total_tokens": 691,
+      "cost": 0.003928,
+      "output_chars": 1012,
+      "output_head": "# 报表导出功能产品需求文档 (PRD)\n\n## 背景\n随着业务的发展，用户对于数据的管理和分析需求日益增长。为了满足这一需求，提供一种高效的数据处理方式——报表导出功能变得尤为重要。此功能旨在让用户能够方便快捷地将系统内的各类数据以文件形式导出，便于进一步分析或分享给其他部门使用。\n\n## 目标用户\n- 企业内部数据分析人员\n- 项目经理及团队成员\n- 需要定期汇报工作的员工\n\n## 功能概述\n本功能允许用户选择特定的数据集，并根据需要设置过滤条件、排序规则等参数后，将其转换成指定格式（如CSV, Excel）并下载至本地计算机上。此外，还将支持自定义列的选择，以便用户可以根据实际需要灵活调整导出内容。\n\n## 需求\n\n### 核心需求\n1. **多格式支持**：支持至少两种常见的文件格式（例如 CSV 和 Excel）供用户选择。\n2. **数据筛选与排序**：在导出前，允许用户根据一"
+    },
+    {
+      "model": "qwen-max",
+      "task_id": "tech_design_inventory_api",
+      "role": "tech_design",
+      "weight": 1.0,
+      "score": 1.0,
+      "passed": true,
+      "checks": [
+        {
+          "passed": true,
+          "detail": "必备小节齐备",
+          "evidence": "",
+          "score": 1.0,
+          "type": "required_sections",
+          "label": "required_sections"
+        },
+        {
+          "passed": true,
+          "detail": "匹配 1 处（要求 ≥1）：给出 HTTP 方法与路径",
+          "score": 1.0,
+          "type": "regex_any",
+          "label": "给出 HTTP 方法与路径"
+        },
+        {
+          "passed": true,
+          "detail": "命中关键词 ['回滚']（要求 all：['回滚']）",
+          "score": 1.0,
+          "type": "required_keywords",
+          "label": "必须包含回滚方案"
+        }
+      ],
+      "latency_ms": 21843.3,
+      "total_tokens": 739,
+      "cost": 0.004321599999999999,
+      "output_chars": 1343,
+      "output_head": "# 库存扣减接口技术方案\n\n本技术方案旨在详细描述库存扣减接口的设计、实现及潜在风险处理策略，确保系统能够高效且安全地管理商品库存。\n\n## 接口定义\n\n- **HTTP 方法**: `POST`\n- **路径**: `/api/v1/inventory/deduct`\n- **功能描述**: 该接口用于从指定商品的现有库存中扣除一定数量。适用于订单生成后立即减少对应商品库存等场景。\n- **请求参数**:\n  - `productId` (必填): 商品ID, 类型为整数。\n  - `quantity` (必填): 需要扣除的数量, 类型为正整数。\n- **响应结果**:\n  - 成功: 状态码200 OK, 返回JSON格式数据包含更新后的库存量。\n    ```json\n    {\n      \"status\": \"success\",\n      \"message\": \"Invent"
+    },
+    {
+      "model": "qwen-max",
+      "task_id": "tester_defect_report",
+      "role": "tester",
+      "weight": 1.0,
+      "score": 1.0,
+      "passed": true,
+      "checks": [
+        {
+          "passed": true,
+          "detail": "JSON Schema 校验通过",
+          "evidence": "",
+          "score": 1.0,
+          "type": "json_schema",
+          "label": "json_schema"
+        }
+      ],
+      "latency_ms": 9944.3,
+      "total_tokens": 443,
+      "cost": 0.001712,
+      "output_chars": 423,
+      "output_head": "{\n  \"defect_title\": \"测试报告导出空日期范围时返回错误的状态码\",\n  \"severity\": \"中\",\n  \"reproduce_steps\": [\n    \"设置API请求参数from和to为相同的未来日期，例如2026-03-01。\",\n    \"发送GET请求到'/api/v1/report/export'接口，并检查响应状态码。\"\n  ],\n  \"root_cause_hypothesis\": \"服务器端在处理特定情况下的日期范围（即开始日期与结束日期相同且超出当前日期）时未能正确返回预期的HTTP状态码200，而是返回了500内部服务器错误。\",\n  \"suggested_fix\": \"审查并修正处理日期范围逻辑的代码，确保当请求指定一个未来的单一日期作为范围时能够适当地处理该请求，并根据业务需求返回正确的HTTP状态码及相应信息。如果此场景下应视为无效请求"
+    },
+    {
+      "model": "qwen-max",
+      "task_id": "tester_test_generation_kills_mutant",
+      "role": "tester",
+      "weight": 1.0,
+      "score": 1.0,
+      "passed": true,
+      "checks": [
+        {
+          "files": [
+            "test_generated.py"
+          ],
+          "correct_run": {
+            "passed": 3,
+            "failed": 0,
+            "errors": 0,
+            "returncode": 0
+          },
+          "buggy_run": {
+            "passed": 1,
+            "failed": 2,
+            "errors": 0,
+            "returncode": 1
+          },
+          "passed": true,
+          "score": 1.0,
+          "detail": "用例在正确实现上全绿（3 passed），并成功捕获含 bug 实现 ✅",
+          "evidence": "",
+          "type": "mutation_tests",
+          "label": "mutation_tests"
+        }
+      ],
+      "latency_ms": 11762.0,
+      "total_tokens": 568,
+      "cost": 0.002968,
+      "output_chars": 1053,
+      "output_head": "```python\n# file: test_generated.py\nfrom solution import divide\nimport pytest\n\ndef test_divide_normal_case():\n    assert divide(10, 2) == 5.0, \"Dividing 10 by 2 should result in 5.0\"\n    assert divide(-5, 2) == -2.5, \"Dividing -5 by 2 should result in -2.5\"\n    assert divide(7, 3.5) == 2.0, \"Dividing 7 by 3.5 should result in 2.0\"\n\ndef test_divide_by_zero():\n    with pytest.raises(ValueError):\n   "
+    },
+    {
+      "model": "qwen-max",
+      "task_id": "ops_pool_exhaustion",
+      "role": "ops_diagnose",
+      "weight": 1.0,
+      "score": 1.0,
+      "passed": true,
+      "checks": [
+        {
+          "passed": true,
+          "detail": "命中关键词 ['连接池']（要求 all：['连接池']）",
+          "score": 1.0,
+          "type": "required_keywords",
+          "label": "定位到连接池"
+        },
+        {
+          "passed": true,
+          "detail": "命中关键词 ['超时']（要求 any：['超时', 'pool']）",
+          "score": 1.0,
+          "type": "required_keywords",
+          "label": "引用超时/连接池证据"
+        },
+        {
+          "passed": true,
+          "detail": "命中关键词 ['最大连接', '泄漏', '慢查询']（要求 any：['扩容', '上限', '最大连接', '泄漏', '慢查询', '排队']）",
+          "score": 1.0,
+          "type": "required_keywords",
+          "label": "处置指向具体动作/根因类别"
+        },
+        {
+          "passed": true,
+          "detail": "必备小节齐备",
+          "evidence": "",
+          "score": 1.0,
+          "type": "required_sections",
+          "label": "required_sections"
+        },
+        {
+          "passed": true,
+          "detail": "未出现禁止表述",
+          "score": 1.0,
+          "type": "forbidden_regex",
+          "label": "不得给出粗暴处置"
+        }
+      ],
+      "latency_ms": 17487.9,
+      "total_tokens": 725,
+      "cost": 0.0037088,
+      "output_chars": 933,
+      "output_head": "### 根因\n\n根据提供的信息，`order-api` 服务遇到了高比例的5xx错误（12%），并且这种状态已经持续了8分钟。关键指标显示数据库连接池已经被完全占用（active=50/50），同时存在一个较长的等待队列（214个请求在等待）。此外，P99延迟显著增加至4.8秒，远高于基线值200毫秒。近期的日志中出现了关于数据库连接获取超时的警告和错误信息。综合这些信息，可以判断问题的根本原因是**数据库连接池配置不足导致的服务响应时间延长及错误率升高**。当前配置下，数据库连接数不足以支持当前负载水平下的并发请求量，从而引发了一系列连锁反应。\n\n### 处置\n\n1. **紧急措施**：首先需要缓解当前压力，可以通过临时调整应用层逻辑来减少对数据库的压力，比如通过降级某些非核心功能或增加缓存使用等方式降低直接访问数据库的需求。\n   \n2. **优化连接池设置**：\n   - 增加最大连"
+    },
+    {
+      "model": "qwen-max",
+      "task_id": "coder_moving_average",
+      "role": "coder",
+      "weight": 1.5,
+      "score": 0.8571,
+      "passed": false,
+      "checks": [
+        {
+          "passed": false,
+          "score": 0.8571,
+          "detail": "隐藏测试 6/7 通过（returncode=1）",
+          "evidence": "================================\n________________________ test_window_larger_than_input _________________________\n\n    def test_window_larger_than_input():\n>       assert moving_average([1, 2], 5) == [None, None]\nE       assert [None, None, None, None] == [None, None]\nE         \nE         Left contains 2 more items, first extra item: None\nE         Use -v to get more diff\n\ntest_hidden.py:14: AssertionError\n=========================== short test summary info ============================\nFAILED test_hidden.py::test_window_larger_than_input - assert [None, None, No...\n1 failed, 6 passed in 0.10s\n",
+          "files": [
+            "solution.py"
+          ],
+          "type": "hidden_tests",
+          "label": "hidden_tests"
+        }
+      ],
+      "latency_ms": 5507.9,
+      "total_tokens": 424,
+      "cost": 0.0020272,
+      "output_chars": 772,
+      "output_head": "```python\n# file: solution.py\ndef moving_average(values: list, window: int) -> list:\n    if window <= 0:\n        raise ValueError(\"Window size must be positive.\")\n    \n    n = len(values)\n    if n == 0:\n        return []\n    \n    result = [None] * (window - 1)\n    for i in range(window - 1, n):\n        # Calculate the average for the current window\n        avg = sum(values[i-window+1:i+1]) / windo"
+    },
+    {
+      "model": "qwen-max",
+      "task_id": "ops_misleading_signal",
+      "role": "ops_diagnose",
+      "weight": 1.5,
+      "score": 1.0,
+      "passed": true,
+      "checks": [
+        {
+          "passed": true,
+          "detail": "必备小节齐备",
+          "evidence": "",
+          "score": 1.0,
+          "type": "required_sections",
+          "label": "required_sections"
+        },
+        {
+          "passed": true,
+          "detail": "命中关键词 ['线程池', '队列']（要求 any：['线程池', '队列']）",
+          "score": 1.0,
+          "type": "required_keywords",
+          "label": "定位到线程池/队列"
+        },
+        {
+          "passed": true,
+          "detail": "未出现禁止表述",
+          "score": 1.0,
+          "type": "forbidden_regex",
+          "label": "不得把根因误判为数据库/连接池"
+        }
+      ],
+      "latency_ms": 22087.9,
+      "total_tokens": 761,
+      "cost": 0.0037135999999999996,
+      "output_chars": 971,
+      "output_head": "### 根因\n根据提供的信息，可以判断 `search-api` 服务的延迟增加主要由线程池 `searchExecutor` 的瓶颈引起。具体表现为：\n- 线程池 `searchExecutor` 的队列深度达到了其上限 5000，并且活跃线程数也已达到最大值 200/200。\n- 日志中出现了任务被拒绝（`Task rejected from searchExecutor: queue full`）以及等待任务完成超时（`Waiting for task completion exceeded 5000ms`）的警告信息。\n\n这些迹象表明，当前的请求处理能力不足以应对现有负载，导致了高延迟。考虑到下游服务 `index-service` 的 P99 廍迟保持在正常范围内（150ms），问题大概率不是由外部依赖引起的，而是内部资源限制所致。\n\n### 处置\n为解决此问题，建议采取以下措施"
+    },
+    {
+      "model": "qwen-max",
+      "task_id": "prd_contradiction_scan",
+      "role": "prd",
+      "weight": 1.5,
+      "score": 1.0,
+      "passed": true,
+      "checks": [
+        {
+          "passed": true,
+          "detail": "JSON Schema 校验通过",
+          "evidence": "",
+          "score": 1.0,
+          "type": "json_schema",
+          "label": "json_schema"
+        },
+        {
+          "passed": true,
+          "detail": "匹配 8 处（要求 ≥2）：矛盾说明需引用具体约束",
+          "score": 1.0,
+          "type": "regex_any",
+          "label": "矛盾说明需引用具体约束"
+        }
+      ],
+      "latency_ms": 5948.9,
+      "total_tokens": 374,
+      "cost": 0.0012992,
+      "output_chars": 285,
+      "output_head": "{\n  \"contradictions\": [\n    {\n      \"ids\": [1, 3, 4],\n      \"reason\": \"导出500万行数据且不加任何压缩的情况下，文件体积可能非常大，同步接口很难在1秒内完成整个文件的生成和传输。\"\n    },\n    {\n      \"ids\": [1, 5],\n      \"reason\": \"要求导出任务必须在用户点击后1秒内返回完整文件与保持接口P99延迟在200ms以内存在矛盾，因为如果处理时间超过200ms则无法满足P99延迟的要求。\"\n    }\n  ],\n  \"severity\": \"高\"\n}"
+    }
+  ],
+  "finished_at": "2026-09-16T01:43:27.331950+00:00"
+}

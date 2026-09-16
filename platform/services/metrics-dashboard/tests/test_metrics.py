@@ -34,3 +34,23 @@ def test_dashboard_html():
 
 def test_health():
     assert TestClient(app).get("/health").json()["service"] == "metrics-dashboard"
+
+
+def test_g7_gate_is_labeled():
+    """G7 流程改进闸门必须有中文标签与平台域归属（Phase 3 自进化提案闸门）。"""
+    from app.metrics import DOMAIN_OF_GATE, GATE_LABEL
+
+    assert GATE_LABEL["GATE_PROCESS_IMPROVEMENT"] == "G7 流程改进"
+    assert DOMAIN_OF_GATE["GATE_PROCESS_IMPROVEMENT"] == "平台域"
+    # 七个 Gate 全部有标签，避免新增 Gate 后漏配（回归：G7 曾缺失）
+    from app.metrics import GATE_LABEL as labels
+
+    assert len(labels) == 7
+    assert all(v.startswith(f"G{i} ") for i, v in enumerate(labels.values(), start=1))
+
+
+def test_collect_labels_g7_when_present():
+    """真实库里若有 G7 审批，面板必须显示中文标签而不是原始键名。"""
+    data = collect()
+    for g in data["gates"]:
+        assert not g["gate"].startswith("GATE_"), f"未映射标签：{g['gate']}"

@@ -60,7 +60,7 @@ def dashboard() -> str:
  th{{background:#fafbfc;color:#5c6470;font-weight:500}}
  .muted{{color:#8a919f;font-size:12px;margin-top:8px}}
 </style></head><body>
-<h1>平台度量面板 · 三域指标</h1>
+<h1>平台度量面板 · 四域 + 平台域指标</h1>
 <div class="cards">
  <div class="card"><div class="v">{d['approvals_total']}</div><div class="k">审批单总数</div></div>
  <div class="card"><div class="v">{avg}</div><div class="k">人审平均决策耗时</div></div>
@@ -68,7 +68,7 @@ def dashboard() -> str:
  <div class="card"><div class="v">{d['events_total']}</div><div class="k">时间线事件</div></div>
  <div class="card"><div class="v">{spend}</div><div class="k">LLM 累计成本</div></div>
 </div>
-<h2>Gate 决策（六大 Gate）</h2>
+<h2>Gate 决策（G1–G7，含平台域 G7 流程改进闸门）</h2>
 <table><tr><th>Gate</th><th>域</th><th>审批数</th><th>平均决策(s)</th></tr>{gate_rows}</table>
 <h2>任务（按域）</h2>
 <table><tr><th>域</th><th>任务数</th><th>完成</th></tr>{task_rows}</table>
