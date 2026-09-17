@@ -108,7 +108,7 @@ def main() -> int:
         }).json()
         gate = httpx.post(f"{gbase}/eng-gates/E1/check", headers=hdr, timeout=30, json={
             "task_ref": "wp10-task",
-            "context": {"prd_ref": "PRD v1", "sources": [{"kind": "chat", "ref": "feishu://x", "quote": "加导出"}],
+            "context": {"prd_ref": "PRD v1", "sources": [{"kind": "chat", "ref": "feishu://x", "quote": "加导出", "confirmed_by": "运营-张"}],
                         "change_targets": ["src/report/export.py"], "rollback_plan": "切回"},
             # 缺 impact_scope（critical）→ 应被阻断
         }).json()

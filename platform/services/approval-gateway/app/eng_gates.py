@@ -7,6 +7,7 @@ agent-runtime 已有 `APPROVAL_GATEWAY_URL` 客户端（零新接线），且可
 from __future__ import annotations
 
 import logging
+import os
 from typing import Optional
 
 from sqlalchemy import select
@@ -195,22 +196,58 @@ def record_feedback(db: Session, tenant: str, check_id: str, verdict: str, note:
     }
 
 
+# C3：指标可信门槛（业务确认：≥20 次阻断且反馈覆盖率 ≥80% 才看误拦率）
+MIN_JUDGED_FOR_RATE = int(os.getenv("GATE_MIN_JUDGED", "20"))
+MIN_COVERAGE_FOR_RATE = float(os.getenv("GATE_MIN_COVERAGE", "0.8"))
+# C4：误拦率超阈值时的处置（业务确认：退回 warn + 收缩规则，而不是整体放弃闸门）
+FALSE_POSITIVE_THRESHOLD = float(os.getenv("GATE_FALSE_POSITIVE_THRESHOLD", "0.1"))
+
+
 def feedback_stats(db: Session, tenant: str = "") -> dict:
-    """误拦率统计（计划 §8）：只看**被阻断**且已反馈的记录。"""
+    """误拦率统计（计划 §8）：只看**被阻断**且已反馈的记录。
+
+    **可信度**（C3）：样本不足时 `reliable=false` 且 `rate` 返回 None——
+    避免用三五条样本的比率做决策；覆盖率为已反馈/已阻断。
+    """
     stmt = select(GateCheck).where(GateCheck.blocked.is_(True))
     if tenant:
         stmt = stmt.where(GateCheck.tenant == tenant)
     rows = list(db.scalars(stmt))
     judged = [r for r in rows if r.feedback]
     false_positive = [r for r in judged if r.feedback == "false_positive"]
+    coverage = round(len(judged) / len(rows), 3) if rows else 0.0
+    reliable = len(judged) >= MIN_JUDGED_FOR_RATE and coverage >= MIN_COVERAGE_FOR_RATE
+    rate = round(len(false_positive) / len(judged), 3) if judged else None
+    reasons = []
+    if len(judged) < MIN_JUDGED_FOR_RATE:
+        reasons.append(f"已反馈样本 {len(judged)} < 门槛 {MIN_JUDGED_FOR_RATE}")
+    if coverage < MIN_COVERAGE_FOR_RATE:
+        reasons.append(f"反馈覆盖率 {coverage:.0%} < 门槛 {MIN_COVERAGE_FOR_RATE:.0%}")
     return {
         "blocked_total": len(rows),
         "judged": len(judged),
         "pending_feedback": len(rows) - len(judged),
+        "coverage": coverage,
         "false_positive": len(false_positive),
-        "false_positive_rate": round(len(false_positive) / len(judged), 3) if judged else None,
+        "false_positive_rate": rate,
+        "reliable": reliable,
+        "unreliable_reasons": reasons,
+        "threshold": FALSE_POSITIVE_THRESHOLD,
+        # C4：达到可信度后按阈值给出**建议动作**（而不是自动改配置）
+        "recommended_action": _recommend_action(reliable, rate),
         "by_code": _feedback_by_code(judged),
     }
+
+
+def _recommend_action(reliable: bool, rate: Optional[float]) -> str:
+    if not reliable:
+        return "样本不足：继续收集反馈，暂不据此调整闸门宽严"
+    if rate is None:
+        return "无反馈数据"
+    if rate > FALSE_POSITIVE_THRESHOLD:
+        return (f"误拦率 {rate:.0%} 超阈值 {FALSE_POSITIVE_THRESHOLD:.0%}："
+                f"建议退回 warn 模式并收缩对应规则（而非整体放弃闸门）")
+    return f"误拦率 {rate:.0%} 在阈值内：可维持当前规则"
 
 
 def _feedback_by_code(rows: list[GateCheck]) -> dict:

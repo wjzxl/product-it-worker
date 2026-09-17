@@ -16,9 +16,16 @@
 """
 from __future__ import annotations
 
+import logging
+import os
 import re
 from dataclasses import asdict, dataclass, field
+from pathlib import Path
 from typing import Optional
+
+import yaml
+
+logger = logging.getLogger(__name__)
 
 # 每条规则：(id, 触发正则, 已明确则抑制的正则, 为什么模糊, 该问什么, 建议默认值)
 #
@@ -135,6 +142,55 @@ DEFAULT_TEMPLATE: list[dict] = [
 ]
 
 
+def tunables_path() -> Path:
+    """业务侧可调文件（B1 抑制词 / B2 追加规则 / B4 容忍偏好）。"""
+    env = os.getenv("AMBIGUITY_TUNABLES", "")
+    return Path(env) if env else Path(__file__).resolve().parents[3] / "ambiguity-tunables.yaml"
+
+
+def load_tunables(path: Optional[Path] = None) -> dict:
+    """读取可调项；文件缺失或非法时回退内置默认（并在返回里标注，便于排查）。"""
+    path = path or tunables_path()
+    default = {"prefer": "miss", "already_specified": [], "extra_patterns": [], "loaded": False, "path": str(path)}
+    if not path.exists():
+        return default
+    try:
+        doc = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError as exc:
+        logger.warning("模糊词表可调文件解析失败（%s），使用默认：%s", path, exc)
+        return default
+    prefer = str(doc.get("prefer") or "miss").lower()
+    if prefer not in ("miss", "report"):
+        logger.warning("ambiguity-tunables.prefer=%r 非法（miss/report），按 miss 处理", prefer)
+        prefer = "miss"
+    extra = []
+    for item in doc.get("extra_patterns") or []:
+        if not (item.get("id") and item.get("pattern")):
+            logger.warning("跳过非法的追加规则（缺 id/pattern）：%s", item)
+            continue
+        try:
+            re.compile(str(item["pattern"]))
+        except re.error as exc:
+            logger.warning("跳过非法正则 %r：%s", item.get("pattern"), exc)
+            continue
+        extra.append({
+            "id": str(item["id"]),
+            "pattern": str(item["pattern"]),
+            "unless": str(item.get("unless") or ""),
+            "why": str(item.get("why") or ""),
+            "question": str(item.get("question") or ""),
+            "suggested_defaults": [str(x) for x in (item.get("suggested_defaults") or [])],
+        })
+    return {
+        "prefer": prefer,
+        "already_specified": [str(x) for x in (doc.get("already_specified") or [])],
+        "extra_patterns": extra,
+        "loaded": True,
+        "path": str(path),
+        "version": doc.get("version"),
+    }
+
+
 @dataclass
 class Finding:
     """一条模糊表述的检测结果。"""
@@ -150,20 +206,38 @@ class Finding:
         return asdict(self)
 
 
-def detect(text: str) -> list[Finding]:
+def detect(text: str, tunables: Optional[dict] = None) -> list[Finding]:
     """检测模糊表述。
 
     - 同一规则多次命中只报一次（保留首次命中片段）；
-    - 命中 `unless`（说明该项其实已写清）则**不报**——宁可少报，避免误报侵蚀信任。
+    - 命中 `unless`（说明该项其实已写清）则**不报**——宁可少报，避免误报侵蚀信任；
+    - B1：`already_specified` 里的表述（你们已有 SOP 的"行话"）直接不报；
+    - B2：`extra_patterns` 追加你们业务高频的模糊话。
     """
-    findings: list[Finding] = []
+    tunables = tunables if tunables is not None else load_tunables()
     text = text or ""
-    for rule_id, pattern, unless, why, question, defaults in RULES:
+    # B1：把"已被业务确认够了"的短语在文本中的区间算出来；
+    # 只要命中位置落在这些区间内（而不是简单的子串包含），就不报——
+    # 例如抑制词是"按常规处理"，而规则命中片段只是"按常规"时也应被抑制。
+    suppressed_spans: list[tuple[int, int]] = []
+    for phrase in (tunables.get("already_specified") or []):
+        if not phrase:
+            continue
+        for m in re.finditer(re.escape(phrase), text):
+            suppressed_spans.append((m.start(), m.end()))
+    findings: list[Finding] = []
+
+    for rule_id, pattern, unless, why, question, defaults in list(RULES) + [
+        (r["id"], r["pattern"], r["unless"], r["why"], r["question"], r["suggested_defaults"])
+        for r in (tunables.get("extra_patterns") or [])
+    ]:
         m = re.search(pattern, text, re.IGNORECASE)
         if not m:
             continue
         if unless and re.search(unless, text, re.IGNORECASE):
             continue
+        if any(start <= m.start() < end for start, end in suppressed_spans):
+            continue                      # B1：业务已确认"够了"的行话
         findings.append(
             Finding(
                 rule_id=rule_id,
@@ -221,9 +295,11 @@ def explicit_defaults(keys: Optional[list[str]] = None) -> list[dict]:
     return [dict(item) for item in DEFAULT_TEMPLATE if item["key"] in keys]
 
 
-def summarize(text: str, sources: Optional[list[dict]] = None, extra_notes: str = "") -> dict:
+def summarize(text: str, sources: Optional[list[dict]] = None, extra_notes: str = "",
+              tunables: Optional[dict] = None) -> dict:
     """澄清节点输出：模糊清单 + 待确认问题 + 明示默认值 + 来源。"""
-    findings = attach_sources(detect(text), sources)
+    tunables = tunables if tunables is not None else load_tunables()
+    findings = attach_sources(detect(text, tunables), sources)
     checklist = clarification_checklist(findings)
     return {
         "requirement": text,
@@ -234,6 +310,9 @@ def summarize(text: str, sources: Optional[list[dict]] = None, extra_notes: str 
         "sources": sources or [],
         "extra_notes": extra_notes,
         "needs_clarification": bool(findings),
+        # 记录本轮用的是哪份词表（B1/B2 改了之后可核对生效情况）
+        "tunables": {"path": tunables.get("path", ""), "prefer": tunables.get("prefer", "miss"),
+                     "loaded": bool(tunables.get("loaded")), "version": tunables.get("version")},
     }
 
 

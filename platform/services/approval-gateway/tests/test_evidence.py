@@ -123,7 +123,8 @@ class TestE3Binding:
 
     def _pass_e1_e2(self, client, task_ref: str):
         e1 = client.post("/eng-gates/E1/check", json={"task_ref": task_ref, "context": {
-            "prd_ref": "PRD v1", "sources": [{"kind": "chat", "ref": "feishu://x", "quote": "导出"}],
+            "prd_ref": "PRD v1",
+            "sources": [{"kind": "chat", "ref": "feishu://x", "quote": "导出", "confirmed_by": "运营-张"}],
             "change_targets": ["src/a.py"], "impact_scope": "仅新增", "rollback_plan": "切回"}}).json()
         e2 = client.post("/eng-gates/E2/check", json={"task_ref": task_ref, "context": {
             "design_docs": self.DESIGN, "ux_states": self.UX,

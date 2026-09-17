@@ -2,7 +2,7 @@
 """WP2 工程闸门 E1 **真实拦截演练**：证明"闸门会真的阻止推进"，不是事后提示。
 
 验收口径（17-FOD 计划 WP2）：
-  ① 4/5 项通过但 critical 的 impact_scope 缺失 → **仍然拒绝**；
+  ① 多数项通过但 critical 的 impact_scope 缺失 → **仍然拒绝**；
   ② warn 模式只记录不阻断（灰度）；
   ③ 条件补齐后放行；
   ④ 每次判定都有留痕（含规则版本/指纹）；
@@ -86,17 +86,17 @@ def main() -> int:
         # 场景 1：4/5 通过，critical 的 impact_scope 缺失
         partial = {
             "prd_ref": PRD,
-            "sources": [VOICE_SOURCE],
+            "sources": [VOICE_SOURCE],           # 业务方载体 + confirmed_by（A1）
             "change_targets": ["src/report/export.py"],
             "rollback_plan": "保留上一版本，按灰度指标验证后一键切回",
-            # impact_scope 故意缺失
+            # impact_scope 故意缺失（critical）
         }
         r = httpx.post(f"{base}/eng-gates/E1/check", json={"task_ref": "wp2-drill-1", "context": partial},
                        headers={"X-Tenant": "drill"}, timeout=30).json()
-        check("① 4/5 通过但 critical 缺失 → 拒绝", r["passed"] is False and r["blocked"] is True,
+        check("① 多数通过但 critical 缺失 → 拒绝", r["passed"] is False and r["blocked"] is True,
               f"passed={r['passed']} blocked={r['blocked']} critical_missing={r['critical_missing']}")
         passed_ids = [x["id"] for x in r["results"] if x["passed"]]
-        check("② 其余 4 项确实通过（不是全盘拒绝）", len(passed_ids) == 4, f"通过项：{passed_ids}")
+        check("② 其余 5 项确实通过（不是全盘拒绝）", len(passed_ids) == 5, f"通过项：{passed_ids}")
         gaps = {g["id"]: g for g in r["gaps"]}
         check("③ 缺口给出可执行建议", "impact_scope" in gaps and bool(gaps["impact_scope"].get("hint")),
               f"hint={gaps.get('impact_scope', {}).get('hint', '')[:40]}")
@@ -132,7 +132,7 @@ def main() -> int:
         auto = httpx.post(f"{base}/eng-gates/E1/check", json={"task_ref": "wp2-drill-4", "context": {}},
                           headers={"X-Tenant": "drill"}, timeout=30).json()
         gap_ids = [g["id"] for g in auto["gaps"]]
-        check("⑦ 上下文自动补齐（来源/PRD 取自审批）", "source_provenance" not in gap_ids and "requirement_basis" not in gap_ids,
+        check("⑦ 上下文自动补齐（来源/PRD 取自审批）", "business_source" not in gap_ids and "requirement_basis" not in gap_ids,
               f"剩余缺口：{gap_ids}")
 
         # 场景 5：历史留痕（度量原始数据）

@@ -2,7 +2,7 @@
 """闸门度量管线的真实演练（M1）：证明 §8 的指标能被算出来。
 
 场景设计（同一 task_ref 走完整链路，才能配对"被拦 → 补齐通过"的时长）：
-  E1 被拦 → 补齐 impact_scope → E1 通过
+  E1 被拦 → 补齐 impact_scope → E1 通过（v2 规则共 6 项、3 项 critical）
   E2 被拦（前端未定义）→ 补齐 → E2 通过
   E3 被拦（证据缺失）→ 上传证据 → E3 通过
 随后用 scripts/gate_metrics.py 的采集逻辑统计：拦截率、缺口分布、补齐时长。
@@ -83,7 +83,7 @@ def main() -> int:
             return 1
 
         # E1：被拦 → 补齐 → 通过（同一 task_ref，可配对补齐时长）
-        e1_ctx = {"prd_ref": "PRD v1", "sources": [{"kind": "chat", "ref": "feishu://x", "quote": "加导出"}],
+        e1_ctx = {"prd_ref": "PRD v1", "sources": [{"kind": "chat", "ref": "feishu://x", "quote": "加导出", "confirmed_by": "运营-张"}],
                   "change_targets": ["src/report/export.py"], "rollback_plan": "一键切回"}
         e1_bad = httpx.post(f"{base}/eng-gates/E1/check", json={"task_ref": TASK, "context": e1_ctx}, headers=hdr, timeout=30).json()
         step("E1 被拦（缺影响范围）", e1_bad["blocked"] is True, f"gaps={[g['id'] for g in e1_bad['gaps']]}")

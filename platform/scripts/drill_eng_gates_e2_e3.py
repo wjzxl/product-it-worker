@@ -144,7 +144,7 @@ def main() -> int:
         check("⑥ E3 拒绝：E1/E2 尚未执行（不许跳着交）", bool(prior_gap), prior_gap.get("detail", ""))
 
         # 场景 5：补齐前序闸门 → E3 自动认账并放行
-        e1_ctx = {"prd_ref": "PRD v1", "sources": [{"kind": "chat", "ref": "feishu://x", "quote": "加个导出"}],
+        e1_ctx = {"prd_ref": "PRD v1", "sources": [{"kind": "chat", "ref": "feishu://x", "quote": "加个导出", "confirmed_by": "运营-张"}],
                   "change_targets": ["src/report/export.py"], "impact_scope": "仅新增导出接口，不影响既有调用方",
                   "rollback_plan": "保留上一版本，一键切回"}
         e1 = httpx.post(f"{base}/eng-gates/E1/check", json={"task_ref": "wp3-chain", "context": e1_ctx},

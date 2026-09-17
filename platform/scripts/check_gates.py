@@ -30,7 +30,7 @@ from app import gate_rules  # noqa: E402
 # CI 自检样例：4 项具备、critical 的 impact_scope 缺失 → 必须阻断
 SELFTEST_CONTEXT_PARTIAL = {
     "prd_ref": "PRD v1",
-    "sources": [{"kind": "chat", "ref": "feishu://x", "quote": "加个导出"}],
+    "sources": [{"kind": "chat", "ref": "feishu://x", "quote": "加个导出", "confirmed_by": "运营-张"}],
     "change_targets": ["src/a.py"],
     "rollback_plan": "切回上一版本",
 }

@@ -37,6 +37,10 @@ SUPPORTED_REQUIRE = (
     "ux_states_defined",      # 空态/报错态/加载态定义（课程图 31、41）
     "items_with_evidence",    # 每个验收项都要有证据，或显式"不适用 + 原因"
     "prior_gates_passed",     # 前序工程闸门确实通过过（交付前不能跳过 E1/E2）
+    # 业务确认后的细化判定（A1/A2/A3/A4）
+    "business_source_present",  # 来源链里必须有**业务方载体**且填了确认人
+    "conditional_required",     # 仅在触发条件下必填（如"涉及数据迁移 → 必须有回滚脚本"）
+    "required_unless",          # 除非满足豁免条件否则必填；豁免时仍需降级说明
 )
 SEVERITIES = ("critical", "major", "minor")
 
@@ -58,6 +62,9 @@ class Check:
     keys: list[str] = field(default_factory=list)
     severity: str = "major"
     hint: str = ""
+    when_keys: list[str] = field(default_factory=list)      # conditional_required：触发条件（任一非空即触发）
+    unless_keys: list[str] = field(default_factory=list)     # required_unless：豁免条件（任一非空即豁免）
+    fallback_keys: list[str] = field(default_factory=list)   # 豁免时仍需提供的降级说明
 
 
 @dataclass
@@ -73,7 +80,9 @@ class GateRule:
     def fingerprint(self) -> str:
         payload = yaml.safe_dump(
             {"code": self.code, "mode": self.mode,
-             "checks": [{"id": c.id, "require": c.require, "keys": c.keys, "severity": c.severity} for c in self.checks]},
+             "checks": [{"id": c.id, "require": c.require, "keys": c.keys, "severity": c.severity,
+                         "when_keys": c.when_keys, "unless_keys": c.unless_keys,
+                         "fallback_keys": c.fallback_keys} for c in self.checks]},
             sort_keys=True, allow_unicode=True,
         )
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
@@ -159,9 +168,20 @@ def parse_rule(raw: dict, source_path: str = "<inline>") -> GateRule:
         _require(severity in SEVERITIES, name, code, f"{cid}: severity 必须是 {SEVERITIES}，收到 {severity!r}")
         keys = item.get("keys") or []
         _require(isinstance(keys, list), name, code, f"{cid}: keys 必须是列表")
+        def _keys(field_name: str) -> list[str]:
+            raw_keys = item.get(field_name) or []
+            _require(isinstance(raw_keys, list), name, code, f"{cid}: {field_name} 必须是列表")
+            return [str(k) for k in raw_keys]
+
+        if require == "conditional_required":
+            _require(bool(item.get("when_keys")), name, code, f"{cid}: conditional_required 必须声明 when_keys（触发条件）")
+        if require == "required_unless":
+            _require(bool(item.get("unless_keys")), name, code, f"{cid}: required_unless 必须声明 unless_keys（豁免条件）")
         checks.append(Check(id=cid, ask=str(item.get("ask") or cid), require=require,
                             keys=[str(k) for k in keys], severity=severity,
-                            hint=str(item.get("hint") or "")))
+                            hint=str(item.get("hint") or ""),
+                            when_keys=_keys("when_keys"), unless_keys=_keys("unless_keys"),
+                            fallback_keys=_keys("fallback_keys")))
     return GateRule(
         code=code,
         title=str(raw.get("title") or code),
@@ -290,6 +310,66 @@ def _check_items_with_evidence(value: Any) -> tuple[bool, str, Any]:
     return True, f"{covered}/{len(items)} 个验收项均有证据或已声明不适用", {"items": len(items), "covered": covered}
 
 
+# 业务方载体（"人工录入 manual"不算：它只说明有人粘贴过，不说明业务方说过）
+BUSINESS_SOURCE_KINDS = ("chat", "voice", "image", "excel", "issue", "doc", "mail")
+
+
+def _check_business_source(context: dict, check: "Check") -> tuple[bool, str, Any]:
+    """A1：来源链里必须有业务方载体，且标明"谁说的"（confirmed_by）。
+
+    这条比"来源非空"严：挡住"人工粘贴一段自以为是的需求"当成业务依据。
+    同时支持豁免（`unless_keys`，如纯技术改动的 `tech_only`）——豁免时仍需 `fallback_keys` 说明原因，
+    这样"无业务需求"与"忘了写来源"能被区分开。
+    """
+    exempt = [k for k in (check.unless_keys or []) if not _is_blank(_resolve(context, [k]))]
+    if exempt:
+        fallback = check.fallback_keys or []
+        ok = [k for k in fallback if not _is_blank(_resolve(context, [k]))]
+        if fallback and not ok:
+            return False, f"因 {', '.join(exempt)} 豁免，但仍需说明：{', '.join(fallback)}", None
+        return True, f"因 {', '.join(exempt)} 豁免业务来源要求", None
+    sources = context.get("sources") if isinstance(context, dict) else context
+    if not sources:
+        return False, "来源链为空：需求没有可回溯的出处", None
+    biz = [s for s in sources if str((s or {}).get("kind") or "") in BUSINESS_SOURCE_KINDS]
+    if not biz:
+        kinds = sorted({str((s or {}).get("kind") or "?") for s in sources})
+        return False, f"来源均为 {kinds}，缺少业务方载体（{'/'.join(BUSINESS_SOURCE_KINDS)}）", None
+    unconfirmed = [s for s in biz if not str((s or {}).get("confirmed_by") or "").strip()]
+    if unconfirmed:
+        return False, f"{len(unconfirmed)} 条业务来源未填 confirmed_by（谁说的）", None
+    preview = [str(s.get("ref") or "") for s in biz[:3]]
+    return True, f"{len(biz)} 条业务方来源且均已标明确认人", preview
+
+
+def _check_conditional_required(context: dict, check: Check, keys: list[str]) -> tuple[bool, str, Any]:
+    """A3：仅在触发条件下必填（例如"涉及数据迁移 → 必须有回滚脚本"）。"""
+    triggers = [k for k in (check.when_keys or []) if not _is_blank(_resolve(context, [k]))]
+    if not triggers:
+        return True, f"本场景不适用（未触发：{', '.join(check.when_keys or [])}）", None
+    missing = [k for k in keys if _is_blank(_resolve(context, [k]))]
+    if missing:
+        return False, f"已触发 {', '.join(triggers)}，因此必须提供：{', '.join(missing)}", {"triggered_by": triggers}
+    return True, f"已触发 {', '.join(triggers)}，所需材料齐备", None
+
+
+def _check_required_unless(context: dict, check: Check, keys: list[str]) -> tuple[bool, str, Any]:
+    """A2/A4：除非满足豁免条件否则必填；豁免时**仍需**降级说明（如"如何下线"）。"""
+    exempt = [k for k in (check.unless_keys or []) if not _is_blank(_resolve(context, [k]))]
+    if exempt:
+        fallback = check.fallback_keys or []
+        if not fallback:
+            return True, f"因 {', '.join(exempt)} 豁免", None
+        ok = [k for k in fallback if not _is_blank(_resolve(context, [k]))]
+        if not ok:
+            return False, f"因 {', '.join(exempt)} 豁免必填，但仍需提供：{', '.join(fallback)}", None
+        return True, f"因 {', '.join(exempt)} 豁免必填，降级说明已提供（{ok[0]}）", None
+    missing = [k for k in keys if _is_blank(_resolve(context, [k]))]
+    if missing:
+        return False, f"未提供（需要：{', '.join(missing)}）", None
+    return True, "已提供", None
+
+
 def _check_prior_gates(value: Any, keys: list[str]) -> tuple[bool, str, Any]:
     """交付前必须确认前序工程闸门真的过了——不能"跳着交"。"""
     prior = value if isinstance(value, dict) else {}
@@ -337,6 +417,12 @@ def evaluate_check(check: Check, context: dict) -> dict:
         passed, detail, preview = _check_items_with_evidence(context.get("acceptance_items"))
     elif check.require == "prior_gates_passed":
         passed, detail, preview = _check_prior_gates(context.get("prior_gates"), keys)
+    elif check.require == "business_source_present":
+        passed, detail, preview = _check_business_source(context, check)
+    elif check.require == "conditional_required":
+        passed, detail, preview = _check_conditional_required(context, check, keys)
+    elif check.require == "required_unless":
+        passed, detail, preview = _check_required_unless(context, check, keys)
     else:  # pragma: no cover - 由 load 阶段拦截
         passed, detail, preview = False, f"未知 require：{check.require}", None
 

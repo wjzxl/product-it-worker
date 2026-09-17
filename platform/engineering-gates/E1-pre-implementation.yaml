@@ -1,31 +1,42 @@
 # E1 工程闸门：动手之前（Pre-Implementation Gate）
 #
-# 对应《从 vibe coding 到 FDE 交付》图 40：即使五项中已有四项通过，只要「影响哪些已有接口」
+# 对应《从 vibe coding 到 FDE 交付》图 40：即使多数项已通过，只要「影响哪些已有接口」
 # 这类关键项不明，就不应开始修改——关键未知不能用多数通过抵消。
 #
 # 判定者是代码（app/gate_rules.py），不是提示词：`mode: block` 时存在缺口即阻断推进。
-# 灰度：ENG_GATES_MODE=off|warn|block 可全局降级（默认 warn，见计划 §7）。
+# 灰度：ENG_GATES_MODE=off|warn|block 可全局降级。
+#
+# 本版按业务确认调整（A1–A5）：
+#   A1 来源链必须有**业务方载体**且标明确认人（人工录入不算）
+#   A2 纯技术改动（无业务需求）可豁免需求依据，但必须写明原因
+#   A3 新增第二条 critical：涉及数据迁移必须有回滚脚本
+#   A4 纯新增功能可豁免回滚方案，但仍需说明"如何下线"
 code: E1
 title: 动手之前
-version: "1"
+version: "2"
 mode: block
 description: >
-  在生成/修改代码之前检查"是否具备安全实施条件"：需求依据、引用规则、改动对象、
-  影响范围、回滚方式。任一项缺失都应补齐后再动手，而不是先写一版再让业务承受返工。
+  在生成/修改代码之前检查"是否具备安全实施条件"：需求依据、业务方来源、改动对象、
+  影响范围、迁移回滚、回滚方式。任一项缺失都应补齐后再动手，
+  而不是先写一版再让业务承受返工。
 
 checks:
   - id: requirement_basis
     ask: 本次需求的已确认依据（PRD 链接 + 来源条目）
-    require: all_of
+    require: required_unless
     keys: ["prd_ref", "sources"]
+    unless_keys: ["tech_only"]            # 纯技术改动（依赖升级/CI/重构）豁免
+    fallback_keys: ["tech_only_reason"]   # 但必须写明"为什么不需要业务需求"
     severity: major
-    hint: 先走产品域澄清，把需求与出处固化后再进入实现
+    hint: 先走产品域澄清固化需求；若是纯技术改动，请填 tech_only=true + tech_only_reason
 
-  - id: source_provenance
-    ask: 需求来源链（谁、何时、在哪句话里提出的）
-    require: source_present
-    severity: major
-    hint: 用 /requirements/{task_ref}/provenance 反查并补齐出处
+  - id: business_source
+    ask: 需求来源是否为业务方载体（群聊/语音/截图/表格/issue/文档/邮件）且标明"谁说的"
+    require: business_source_present
+    unless_keys: ["tech_only"]            # 与 requirement_basis 一致：纯技术改动同样豁免
+    fallback_keys: ["tech_only_reason"]   # 豁免时仍需说明"为什么不需要业务需求"
+    severity: critical
+    hint: 人工录入（manual）不算业务依据；请补 confirmed_by（谁确认的这句话）
 
   - id: change_targets
     ask: 本次要改动哪些文件/模块
@@ -41,9 +52,19 @@ checks:
     severity: critical
     hint: 答不上来就停下——这是课程图 40 明确要求阻断的那一项
 
+  - id: migration_rollback
+    ask: 涉及数据迁移/删除时，是否提供迁移与回滚脚本
+    require: conditional_required
+    when_keys: ["data_migration"]         # 仅在声明涉及数据迁移时触发
+    keys: ["migration_rollback_script"]
+    severity: critical
+    hint: 生产事故多半出在数据变更：迁移脚本与回滚脚本必须同时给
+
   - id: rollback_plan
     ask: 回滚方式与回滚后的验证口径
-    require: non_empty
+    require: required_unless
     keys: ["rollback_plan"]
+    unless_keys: ["is_pure_addition"]     # 纯新增（可整体下线）豁免
+    fallback_keys: ["offline_plan", "rollback_plan"]   # 但要说清"如何下线"
     severity: major
-    hint: 提供可执行的回滚步骤与验证方法（如保留上一版本、一键切回）
+    hint: 提供可执行的回滚步骤与验证方法；纯新增请填 is_pure_addition=true 并给出下线方式

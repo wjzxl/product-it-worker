@@ -89,6 +89,22 @@ class FlowContext:
         self.tools = tools        # WP8 工具注册表（执行期鉴权；由 create_app 注入）
 
 
+def _self_review_with_clarification(state: FlowState) -> str:
+    """B3：把"还有几处待确认"写进三要素的自评里——审批人必须看得见，而不是埋在流程日志。
+
+    不阻断 G1（避免在无真实样本时硬拦），但让"带着未确认项送审"这件事**显式**：
+    审批人可以据此选择退回（revise）而不是默认放行。
+    """
+    clar = state.get("clarification") or {}
+    count = int(clar.get("ambiguity_count") or 0)
+    base = "验收标准已 EARS 化；边界情况待评审补充"
+    if not count:
+        return base
+    questions = clar.get("questions") or []
+    head = "；".join(str(q.get("question", ""))[:40] for q in questions[:3])
+    return f"{base}｜**待确认 {count} 处**：{head}（明细见澄清结果）"
+
+
 def _build_approval_payload(state: FlowState, version: int) -> dict:
     """构造 G1 审批请求（三要素：做了什么/依据/风险自评，schema 层强校验）。"""
     return {
@@ -104,7 +120,7 @@ def _build_approval_payload(state: FlowState, version: int) -> dict:
                 "知识库：历史需求检索结果（Phase 0 占位，T0.6 接入后替换）",
             ],
             "risk": {"score": 40, "level": "L2", "factors": ["影响面:纯新增", "不可逆:可回滚"]},
-            "self_review": "验收标准已 EARS 化；边界情况待评审补充",
+            "self_review": _self_review_with_clarification(state),
             # WP1：把需求来源链随审批一起落库，争论口径时可回查出处
             "sources": state.get("sources") or [],
         },
@@ -750,6 +766,28 @@ def build_ops_graph(ctx: FlowContext, checkpointer=None):
 
     def execute(state: OpsState) -> dict:
         if state.get("change_type") == "fix_code" and state.get("fix_branch"):
+            # A5：AI 直接改生产代码这条路风险更高，进入合并前同样过 E1 工程闸门。
+            # 缺陷修复场景的上下文能从既有信息推断（改动范围=失败测试反推的文件；
+            # 影响范围与回滚方式仍需显式提供，答不上来就停在 G5 之前）。
+            if ctx.gate_api is not None:
+                from .apis import GateAPI  # noqa: F401  (保持类型可见)
+
+                e1_ctx = {
+                    "prd_ref": f"告警处置 {(state.get('alert') or {}).get('title', '')}",
+                    "sources": [{"kind": "issue", "ref": (state.get("alert") or {}).get("id", "alert"),
+                                 "quote": state.get("diagnosis", "")[:120],
+                                 "confirmed_by": "运维值班"}],
+                    "change_targets": [state.get("fix_branch", "")],
+                    "impact_scope": (state.get("alert") or {}).get("impact_scope", ""),
+                    "rollback_plan": (state.get("alert") or {}).get("rollback_plan", ""),
+                }
+                e1 = ctx.gate_api.check("E1", task_ref=state.get("task_ref", ""),
+                                        context=e1_ctx, checked_by="agent:ops-fix")
+                if e1.get("blocked"):
+                    return {
+                        "execution": "E1 闸门未通过，已停止合并修复代码",
+                        "logs": [f"step:execute blocked by E1: {[g.get('id') for g in e1.get('gaps', [])]}"],
+                    }
             # 真实合入修复（push 模式）；测试模式仅记录
             mr = ctx.gitlab_api.create_mr(
                 state.get("project_id", "sandbox/prodesgin"),

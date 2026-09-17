@@ -98,13 +98,19 @@ def main() -> int:
         check("证据库服务健康", True)
 
         # 前置：E1/E2 通过（E3 要求前序闸门已过）
-        httpx.post(f"{base}/eng-gates/E1/check", headers=hdr, timeout=30, json={"task_ref": TASK, "context": {
-            "prd_ref": "PRD v1", "sources": [{"kind": "voice", "ref": "feishu://x", "quote": "成本列运营不能看"}],
+        e1 = httpx.post(f"{base}/eng-gates/E1/check", headers=hdr, timeout=30, json={"task_ref": TASK, "context": {
+            "prd_ref": "PRD v1",
+            "sources": [{"kind": "voice", "ref": "feishu://x", "quote": "成本列运营不能看",
+                         "confirmed_by": "运营负责人-李"}],
             "change_targets": ["src/report/export.py"], "impact_scope": "仅新增导出接口",
-            "rollback_plan": "保留上一版本一键切回"}})
-        httpx.post(f"{base}/eng-gates/E2/check", headers=hdr, timeout=30, json={"task_ref": TASK, "context": {
+            "rollback_plan": "保留上一版本一键切回"}}).json()
+        e2 = httpx.post(f"{base}/eng-gates/E2/check", headers=hdr, timeout=30, json={"task_ref": TASK, "context": {
             "design_docs": DESIGN, "ux_states": UX, "api_contract_ref": "api-protocol.md",
-            "data_dictionary_ref": "data-dictionary.md"}})
+            "data_dictionary_ref": "data-dictionary.md"}}).json()
+        if not (e1.get("passed") and e2.get("passed")):
+            print(f"❌ 前置闸门未通过：E1 gaps={[g['id'] for g in e1.get('gaps', [])]}，"
+                  f"E2 gaps={[g['id'] for g in e2.get('gaps', [])]}", file=sys.stderr)
+            return 1
 
         items = [{"id": item} for item, _k, _f, _c in EVIDENCES]
         e3_ctx = {"artifacts": ["src/report/export.py", "docs/report-export.md"],
@@ -133,8 +139,9 @@ def main() -> int:
         # ③ E3 自动绑定证据库 → 放行
         after = httpx.post(f"{base}/eng-gates/E3/check", headers=hdr, timeout=30,
                            json={"task_ref": TASK, "context": e3_ctx}).json()
-        check("③ 证据齐备后 E3 放行（自动绑定，不需调用方自报）", after["passed"] is True,
-              f"检查项 {len(after['results'])} 项全过")
+        e3_detail = (f"检查项 {len(after['results'])} 项全过" if after["passed"]
+                     else f"仍有缺口：{[g['id'] for g in after['gaps']]}")
+        check("③ 证据齐备后 E3 放行（自动绑定，不需调用方自报）", after["passed"] is True, e3_detail)
 
         # ④ 独立复验：新会话、只凭元数据重新下载并核对 hash
         listing = httpx.get(f"{base}/evidence", headers=hdr, params={"task_ref": TASK}, timeout=30).json()

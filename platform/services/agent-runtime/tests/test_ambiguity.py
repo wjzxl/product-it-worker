@@ -130,3 +130,61 @@ class TestSummary:
         findings = detect("常用格式，数据量大")
         checklist = clarification_checklist(findings)
         assert [c["id"] for c in checklist] == [f"q-{i+1}" for i in range(len(findings))]
+
+
+class TestTunables:
+    """B1/B2/B4：词表是业务方言，可通过 ambiguity-tunables.yaml 调整。"""
+
+    def test_real_tunables_load(self):
+        from app.ambiguity import load_tunables
+        t = load_tunables()
+        assert t["loaded"] is True and t["prefer"] in ("miss", "report")
+        assert len(t["extra_patterns"]) >= 5
+
+    def test_extra_patterns_detected(self):
+        """B2：补的高频模糊话能被识别。"""
+        cases = {
+            "按上次那样做": "precedent_vague",
+            "跟老系统保持一致": "legacy_parity_vague",
+            "先做一版看看效果": "protoype_vague",
+            "这个简单，顺手改一下": "effort_vague",
+            "自动判断即可": "implicit_auto_vague",
+        }
+        for text, rule_id in cases.items():
+            found = [f.rule_id for f in detect(text)]
+            assert rule_id in found, f"{text} 未命中 {rule_id}（实际 {found}）"
+
+    def test_already_specified_suppresses(self, tmp_path, monkeypatch):
+        """B1：业务已确认"够了"的行话不再追问。"""
+        import yaml as _yaml
+
+        from app.ambiguity import detect as _detect
+
+        cfg = tmp_path / "tunables.yaml"
+        cfg.write_text(_yaml.safe_dump({
+            "version": 1, "prefer": "miss",
+            "already_specified": ["按常规处理"],
+            "extra_patterns": [],
+        }, allow_unicode=True), encoding="utf-8")
+        t = __import__("app.ambiguity", fromlist=["x"]).load_tunables(cfg)
+        assert _detect("权限按常规处理", t) == []          # 被抑制
+        from app.ambiguity import load_tunables as _load
+        assert [f.rule_id for f in _detect("按常规处理", _load(None))] != []   # 默认（未抑制）仍会报
+
+    def test_invalid_tunables_fall_back(self, tmp_path, caplog):
+        from app.ambiguity import load_tunables
+        bad = tmp_path / "bad.yaml"
+        bad.write_text("prefer: 乱写\nextra_patterns:\n  - id: x\n    pattern: '([bad'\n", encoding="utf-8")
+        t = load_tunables(bad)
+        assert t["prefer"] == "miss"                       # 非法偏好回退
+        assert t["extra_patterns"] == []                   # 非法正则被跳过，不炸
+
+    def test_summary_records_tunables_source(self):
+        result = summarize("加个导出")
+        assert result["tunables"]["loaded"] is True and result["tunables"]["path"]
+
+    def test_env_override_path(self, tmp_path, monkeypatch):
+        from app.ambiguity import load_tunables, tunables_path
+        monkeypatch.setenv("AMBIGUITY_TUNABLES", str(tmp_path / "nope.yaml"))
+        assert tunables_path() == tmp_path / "nope.yaml"
+        assert load_tunables()["loaded"] is False          # 缺失不炸，回退默认

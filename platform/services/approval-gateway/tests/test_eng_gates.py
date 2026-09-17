@@ -47,12 +47,75 @@ def client():
         yield c
 
 
+class TestNewSemantics:
+    """A1–A4：业务确认后的细化判定。"""
+
+    BASE = {
+        "prd_ref": "PRD v1", "change_targets": ["src/a.py"], "impact_scope": "仅新增",
+        "rollback_plan": "切回上一版本", "sources": [VOICE_SOURCE],
+    }
+
+    def test_business_source_requires_business_carrier(self):
+        """A1：人工录入不算业务依据。"""
+        ctx = dict(self.BASE, sources=[{"kind": "manual", "ref": "x", "confirmed_by": "张三"}])
+        result = gate_rules.evaluate(gate_rules.load_rule("E1"), ctx, mode_override="block")
+        gap = next(g for g in result["gaps"] if g["id"] == "business_source")
+        assert "业务方载体" in gap["detail"] and result["blocked"] is True
+
+    def test_business_source_requires_confirmer(self):
+        ctx = dict(self.BASE, sources=[{"kind": "voice", "ref": "v1", "quote": "按月分仓"}])
+        result = gate_rules.evaluate(gate_rules.load_rule("E1"), ctx, mode_override="block")
+        gap = next(g for g in result["gaps"] if g["id"] == "business_source")
+        assert "confirmed_by" in gap["detail"]
+
+    def test_tech_only_exempts_requirement_basis_with_reason(self):
+        """A2：纯技术改动豁免需求依据，但必须写明原因。"""
+        base = {k: v for k, v in self.BASE.items() if k not in ("prd_ref", "sources")}
+        exempt_ok = gate_rules.evaluate(gate_rules.load_rule("E1"),
+                                        {**base, "tech_only": True,
+                                         "tech_only_reason": "依赖安全升级，无业务变更"},
+                                        mode_override="block")
+        assert exempt_ok["passed"] is True, exempt_ok["gaps"]
+        missing_reason = gate_rules.evaluate(gate_rules.load_rule("E1"), {**base, "tech_only": True},
+                                             mode_override="block")
+        gap = next(g for g in missing_reason["gaps"] if g["id"] == "requirement_basis")
+        assert "tech_only_reason" in gap["detail"]
+
+    def test_migration_rollback_only_triggers_on_migration(self):
+        """A3：不涉及迁移时不适用；涉及则必须有回滚脚本。"""
+        rule = gate_rules.load_rule("E1")
+        not_applicable = gate_rules.evaluate(rule, self.BASE, mode_override="block")
+        assert not_applicable["passed"] is True  # 未声明迁移 → 该项不适用
+        triggered = gate_rules.evaluate(rule, {**self.BASE, "data_migration": True}, mode_override="block")
+        gap = next(g for g in triggered["gaps"] if g["id"] == "migration_rollback")
+        assert "data_migration" in gap["detail"] and triggered["blocked"] is True
+        ok = gate_rules.evaluate(rule, {**self.BASE, "data_migration": True,
+                                        "migration_rollback_script": "migrations/001.up.sql + down.sql"},
+                                 mode_override="block")
+        assert ok["passed"] is True
+
+    def test_pure_addition_exempts_rollback_but_needs_offline_plan(self):
+        """A4：纯新增豁免回滚方案，但仍需说明如何下线。"""
+        rule = gate_rules.load_rule("E1")
+        base = {k: v for k, v in self.BASE.items() if k != "rollback_plan"}
+        exempt_ok = gate_rules.evaluate(rule, {**base, "is_pure_addition": True,
+                                               "offline_plan": "下掉入口即可，无数据残留"},
+                                        mode_override="block")
+        assert exempt_ok["passed"] is True, exempt_ok["gaps"]
+        no_plan = gate_rules.evaluate(rule, {**base, "is_pure_addition": True}, mode_override="block")
+        gap = next(g for g in no_plan["gaps"] if g["id"] == "rollback_plan")
+        assert "如何下线" in gap["detail"] or "offline_plan" in gap["detail"]
+
+
 class TestRuleLoading:
     def test_e1_rule_loads_with_expected_checks(self):
         rule = gate_rules.load_rule("E1")
         ids = [c.id for c in rule.checks]
-        assert ids == ["requirement_basis", "source_provenance", "change_targets", "impact_scope", "rollback_plan"]
-        assert next(c for c in rule.checks if c.id == "impact_scope").severity == "critical"
+        assert ids == ["requirement_basis", "business_source", "change_targets",
+                       "impact_scope", "migration_rollback", "rollback_plan"]
+        # A1/A3：来源质量与迁移回滚都是 critical
+        assert [c.id for c in rule.checks if c.severity == "critical"] == [
+            "business_source", "impact_scope", "migration_rollback"]
         assert rule.mode == "block"
         assert rule.fingerprint()
 
@@ -88,9 +151,9 @@ class TestEvaluation:
         result = gate_rules.evaluate(rule, FULL_CONTEXT_EXCEPT_IMPACT, mode_override="block")
         assert result["passed"] is False
         assert result["blocked"] is True
-        assert result["critical_missing"] == ["impact_scope"]
+        assert result["critical_missing"] == ["impact_scope"]   # 来源已带确认人，故只缺影响范围
         passed_ids = [r["id"] for r in result["results"] if r["passed"]]
-        assert len(passed_ids) == 4, passed_ids
+        assert len(passed_ids) == 5, passed_ids        # 6 项中 5 项通过（仅缺影响范围）
         assert "关键未知不能被多数通过抵消" in gate_rules.render_gaps_text(result)
 
     def test_warn_mode_records_without_blocking(self):
@@ -134,7 +197,8 @@ class TestApi:
         assert body["rule_version"] and body["fingerprint"]
 
         hist = client.get("/eng-gates/checks", params={"task_ref": "wp2-a"}).json()
-        assert len(hist) == 1 and hist[0]["blocked"] is True and hist[0]["gap_ids"] == ["impact_scope"]
+        assert len(hist) == 1 and hist[0]["blocked"] is True
+        assert hist[0]["gap_ids"] == ["impact_scope"]
 
     def test_context_auto_filled_from_approval(self, client):
         """只给 task_ref，来源链/prd_ref 从审批记录自动补齐 → 少两项缺口。"""
@@ -154,7 +218,7 @@ class TestApi:
         body = client.post("/eng-gates/E1/check", json={"task_ref": "wp2-b", "context": {}}).json()
         gap_ids = [g["id"] for g in body["gaps"]]
         assert "requirement_basis" not in gap_ids, "prd_ref 应从审批自动补齐"
-        assert "source_provenance" not in gap_ids, "来源链应从审批自动补齐"
+        assert "business_source" not in gap_ids, "业务来源应从审批自动补齐（含确认人）"
         assert set(gap_ids) == {"change_targets", "impact_scope", "rollback_plan"}
 
     def test_mode_override_warn(self, client):
@@ -314,3 +378,89 @@ class TestE3:
         assert e3["blocked"] is True
         detail = next(g["detail"] for g in e3["gaps"] if g["id"] == "acceptance_evidence")
         assert "acc-1" in detail
+
+
+class TestFeedbackReliability:
+    """C3/C4：样本不足时不得用误拦率做决策；达标后给出处置建议。
+
+    每个用例用**独立租户**隔离（共享库下统计按 X-Tenant 过滤），避免相互污染。
+    """
+
+    @staticmethod
+    def _seed(tenant: str, prefix: str, n_blocked: int, n_judged: int, n_false: int):
+        from sqlalchemy.orm import Session
+
+        from app.db import engine
+        from app.models import GateCheck
+
+        with Session(engine) as db:
+            for i in range(n_blocked):
+                db.add(GateCheck(tenant=tenant, code="E1", task_ref=f"{prefix}-{i}",
+                                 mode="warn", passed=False, blocked=True,
+                                 gaps=[{"id": "impact_scope"}], rule_version="v2"))
+            db.commit()
+            rows = db.query(GateCheck).filter(GateCheck.task_ref.like(f"{prefix}-%")).all()
+            for i, row in enumerate(rows[:n_judged]):
+                row.feedback = "false_positive" if i < n_false else "valid"
+            db.commit()
+
+    def test_insufficient_samples_are_not_reliable(self, client):
+        self._seed("fb-small", "fb-small-task", n_blocked=3, n_judged=2, n_false=1)
+        stats = client.get("/eng-gates/feedback/stats", headers={"X-Tenant": "fb-small"}).json()
+        assert stats["blocked_total"] == 3 and stats["judged"] == 2
+        assert stats["reliable"] is False
+        assert any("门槛" in r for r in stats["unreliable_reasons"])
+        assert "样本不足" in stats["recommended_action"]
+
+    def test_high_false_positive_rate_recommends_rollback(self, client, monkeypatch):
+        monkeypatch.setenv("GATE_MIN_JUDGED", "5")
+        monkeypatch.setenv("GATE_MIN_COVERAGE", "0.8")
+        import importlib
+
+        from app import eng_gates as eg
+        importlib.reload(eg)
+        try:
+            self._seed("fb-big", "fb-big-task", n_blocked=20, n_judged=16, n_false=4)
+            stats = client.get("/eng-gates/feedback/stats", headers={"X-Tenant": "fb-big"}).json()
+            assert stats["judged"] == 16 and stats["coverage"] >= 0.8
+            assert stats["reliable"] is True
+            assert stats["false_positive_rate"] == 0.25
+            assert "退回 warn" in stats["recommended_action"]
+        finally:
+            monkeypatch.delenv("GATE_MIN_JUDGED", raising=False)
+            monkeypatch.delenv("GATE_MIN_COVERAGE", raising=False)
+            importlib.reload(eg)
+
+    def test_coverage_below_threshold_blocks_reliability(self, client, monkeypatch):
+        monkeypatch.setenv("GATE_MIN_JUDGED", "5")
+        monkeypatch.setenv("GATE_MIN_COVERAGE", "0.8")
+        import importlib
+
+        from app import eng_gates as eg
+        importlib.reload(eg)
+        try:
+            self._seed("fb-lowcov", "fb-lowcov-task", n_blocked=20, n_judged=6, n_false=0)
+            stats = client.get("/eng-gates/feedback/stats", headers={"X-Tenant": "fb-lowcov"}).json()
+            assert stats["reliable"] is False
+            assert any("覆盖率" in r for r in stats["unreliable_reasons"])
+        finally:
+            monkeypatch.delenv("GATE_MIN_JUDGED", raising=False)
+            monkeypatch.delenv("GATE_MIN_COVERAGE", raising=False)
+            importlib.reload(eg)
+
+    def test_low_false_positive_rate_allows_keeping_rules(self, client, monkeypatch):
+        monkeypatch.setenv("GATE_MIN_JUDGED", "5")
+        monkeypatch.setenv("GATE_MIN_COVERAGE", "0.8")
+        import importlib
+
+        from app import eng_gates as eg
+        importlib.reload(eg)
+        try:
+            self._seed("fb-good", "fb-good-task", n_blocked=20, n_judged=18, n_false=1)
+            stats = client.get("/eng-gates/feedback/stats", headers={"X-Tenant": "fb-good"}).json()
+            assert stats["reliable"] is True and stats["false_positive_rate"] < 0.1
+            assert "维持当前规则" in stats["recommended_action"]
+        finally:
+            monkeypatch.delenv("GATE_MIN_JUDGED", raising=False)
+            monkeypatch.delenv("GATE_MIN_COVERAGE", raising=False)
+            importlib.reload(eg)
