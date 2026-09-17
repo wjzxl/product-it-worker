@@ -1,6 +1,6 @@
 # WP10 驾驶舱演练报告
 
-- 执行时间：2026-09-17T01:58:53.498974+00:00
+- 执行时间：2026-09-17T02:01:59.877125+00:00
 - 队列快照：`{'approvals': 1, 'gate_blocks': 1, 'run_waits': 0, 'total': 2}`｜上游错误：`['运行归档不可用']`
 - 误拦统计：`{'blocked_total': 1, 'judged': 1, 'pending_feedback': 0, 'false_positive': 1, 'false_positive_rate': 1.0, 'by_code': {'E1': {'judged': 1, 'false_positive': 1}}}`
 - 对应课程：图 67/68（驾驶舱显示进度与待决策事项、点击直达上下文）
