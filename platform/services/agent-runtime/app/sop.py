@@ -60,7 +60,8 @@ class FlowState(TypedDict, total=False):
 
 
 class FlowContext:
-    def __init__(self, llm, approval_api, gitlab_api, coder=None, tester=None, knowledge=None, executor=None):
+    def __init__(self, llm, approval_api, gitlab_api, coder=None, tester=None, knowledge=None, executor=None,
+                 gate_api=None):
         self.llm = llm
         self.approval_api = approval_api
         self.gitlab_api = gitlab_api
@@ -68,6 +69,7 @@ class FlowContext:
         self.tester = tester  # 测试域执行引擎（可选）
         self.knowledge = knowledge  # 知识库检索（Runbook RAG，可选）
         self.executor = executor  # 操作类变更执行器（可选：dryrun/webhook）
+        self.gate_api = gate_api  # 工程闸门客户端（WP2：E1 在生成代码前拦截）
 
 
 def _build_approval_payload(state: FlowState, version: int) -> dict:

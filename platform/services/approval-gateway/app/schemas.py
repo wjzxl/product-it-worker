@@ -126,6 +126,33 @@ class ApprovalRequestOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class GateCheckIn(BaseModel):
+    """工程闸门检查请求（WP2）。上下文交由判定器按规则取用，故为自由结构。"""
+
+    task_ref: str = ""
+    context: dict[str, Any] = Field(default_factory=dict)
+    mode: Optional[Literal["off", "warn", "block"]] = None  # 覆盖灰度（不传则用规则/全局配置）
+    checked_by: str = ""
+    persist: bool = True
+
+
+class GateCheckOut(BaseModel):
+    """判定结果即契约：blocked=true 时调用方**必须**停止推进。"""
+
+    check_id: str = ""
+    code: str
+    title: str = ""
+    mode: str
+    passed: bool
+    blocked: bool
+    gaps: list[dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
+    critical_missing: list[str] = []
+    rule_version: str = ""
+    fingerprint: str = ""
+    source_path: str = ""
+
+
 class ImCardCallback(BaseModel):
     """IM 交互卡片回调：卡片按钮 → 决策。"""
 

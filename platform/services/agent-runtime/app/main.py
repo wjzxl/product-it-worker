@@ -13,7 +13,7 @@ from fastapi import FastAPI, HTTPException
 from langgraph.types import Command
 from pydantic import BaseModel, Field
 
-from .apis import ApprovalAPI, GitLabAPI, KnowledgeAPI
+from .apis import ApprovalAPI, GateAPI, GitLabAPI, KnowledgeAPI
 from .coder import Coder
 from .executors import executor_from_env
 from .llm import llm_from_env
@@ -144,14 +144,18 @@ def create_app(
     tester=None,
     knowledge_api=None,
     executor=None,
+    gate_api=None,
 ) -> FastAPI:
     llm = llm or llm_from_env()
     gitlab_api = gitlab_api or GitLabAPI(os.getenv("GITLAB_BRIDGE_URL", "http://localhost:8001"))
+    # WP2：工程闸门客户端（E1 在生成代码前拦截）
+    gate_api = gate_api if gate_api is not None else GateAPI(os.getenv("APPROVAL_GATEWAY_URL", "http://localhost:8000"))
     coder = coder or Coder(
         llm=llm,
         gitlab_url=os.getenv("GITLAB_URL", "https://gitlab.com"),
         gitlab_token=os.getenv("GITLAB_TOKEN", ""),
         project_path=os.getenv("DEMO_PROJECT", "sandbox/prodesgin"),
+        gate_api=gate_api,
     )
     tester = tester or TestEngine(
         llm=llm,
@@ -171,6 +175,7 @@ def create_app(
         tester=tester,
         knowledge=knowledge,
         executor=executor,
+        gate_api=gate_api,
     )
     graphs = {
         SOP_PRODUCT: build_graph(ctx),

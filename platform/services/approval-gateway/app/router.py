@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from . import eng_gates, gate_rules
 from .db import get_db
 from .events import new_event, publisher_from_env
 from .models import ApprovalRequest, Decision, utcnow
@@ -24,6 +25,8 @@ from .schemas import (
     ApprovalRequestOut,
     DecisionIn,
     DecisionOut,
+    GateCheckIn,
+    GateCheckOut,
     ImCardCallback,
 )
 
@@ -395,3 +398,55 @@ def admin_sweep(db: Session = Depends(get_db), principal=Depends(current_princip
 
     handled = sweep(db)
     return {"handled": len(handled), "items": handled}
+
+
+# --------------------------------------------------------------------------------------
+# 工程闸门（WP2，E1–E3）：机器判定"实施条件是否具备"，与人审 G 闸门互补
+# --------------------------------------------------------------------------------------
+@router.get("/eng-gates")
+def eng_gates_list() -> list[dict]:
+    """列出已定义的工程闸门规则（含规则指纹，便于确认判定依据的版本）。"""
+    return eng_gates.list_rules()
+
+
+@router.post("/eng-gates/{code}/check", response_model=GateCheckOut)
+def eng_gate_check(
+    code: str,
+    payload: GateCheckIn,
+    db: Session = Depends(get_db),
+    tenant: str = Depends(current_tenant),
+    principal=Depends(current_principal),
+) -> dict:
+    """执行工程闸门检查。
+
+    **调用方契约**：返回 `blocked=true` 时必须停止推进（不得"只提示继续做"）。
+    上下文可只给关键字段，来源链/依据会按 task_ref 从审批记录自动补齐。
+    """
+    code = code.upper()
+    if code not in eng_gates.KNOWN_CODES:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"未知工程闸门 {code}（可用：{', '.join(eng_gates.KNOWN_CODES)}）")
+    try:
+        return eng_gates.run_check(
+            db,
+            code=code,
+            task_ref=payload.task_ref,
+            tenant=tenant,
+            context=payload.context,
+            mode=payload.mode,
+            checked_by=payload.checked_by or principal.sub,
+            persist=payload.persist,
+        )
+    except gate_rules.GateRuleError as exc:
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, f"规则加载失败：{exc}") from exc
+
+
+@router.get("/eng-gates/checks")
+def eng_gate_history(
+    task_ref: str = "",
+    code: str = "",
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    tenant: str = Depends(current_tenant),
+) -> list[dict]:
+    """检查历史（计划 §8 度量：拦截率、缺口补齐时长、误拦反馈的原始数据）。"""
+    return eng_gates.history(db, tenant=tenant, task_ref=task_ref, code=code.upper(), limit=limit)

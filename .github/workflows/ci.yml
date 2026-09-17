@@ -36,3 +36,22 @@ jobs:
           pip install -e ".[dev]"
       - name: Test
         run: pytest -q
+
+  # 规则即代码：工程闸门规则必须在**不启动服务**的情况下就能被校验
+  # （否则规则写错只能等线上拦截时才发现）——见 17 号计划 WP2
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+          cache: pip
+      - name: Install (approval-gateway deps)
+        working-directory: platform/services/approval-gateway
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: 工程闸门规则自检
+        working-directory: platform
+        run: python scripts/check_gates.py --selftest

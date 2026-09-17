@@ -3,7 +3,13 @@ from __future__ import annotations
 
 from typing import Any
 
+import logging
+import os
+
 import httpx
+
+
+logger = logging.getLogger(__name__)
 
 
 class ApprovalAPI:
@@ -20,6 +26,54 @@ class ApprovalAPI:
 
     def get_approval(self, approval_id: str) -> dict:
         resp = self._client.get(f"{self.base_url}/approvals/{approval_id}")
+        resp.raise_for_status()
+        return resp.json()
+
+
+class GateAPI:
+    """工程闸门客户端（WP2，E1–E3）。
+
+    设计约定：**闸门服务不可用时按"未阻断"处理但显著告警**——闸门是质量增强，
+    不应因自身故障把整条流水线拖停（是否收紧由 ENG_GATES_REQUIRED=1 决定）。
+    """
+
+    def __init__(self, base_url: str, transport: httpx.BaseTransport | None = None, required: bool | None = None):
+        self.base_url = base_url.rstrip("/")
+        self._client = httpx.Client(timeout=30, transport=transport)
+        self.required = (
+            required if required is not None
+            else os.getenv("ENG_GATES_REQUIRED", "0") == "1"
+        )
+
+    def check(self, code: str, task_ref: str = "", context: dict | None = None, mode: str | None = None,
+              checked_by: str = "") -> dict:
+        payload: dict = {"task_ref": task_ref, "context": context or {}, "checked_by": checked_by}
+        if mode:
+            payload["mode"] = mode
+        try:
+            resp = self._client.post(f"{self.base_url}/eng-gates/{code}/check", json=payload)
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as exc:
+            logger.warning("工程闸门 %s 检查失败（%s: %s）", code, type(exc).__name__, exc)
+            if self.required:
+                return {
+                    "code": code, "mode": "block", "passed": False, "blocked": True,
+                    "gaps": [{"id": "gate_unavailable", "ask": f"{code} 闸门不可用",
+                              "severity": "critical", "detail": f"{type(exc).__name__}: {exc}",
+                              "hint": "按 ENG_GATES_REQUIRED=1 的约定，闸门不可用视为未通过"}],
+                    "results": [], "critical_missing": ["gate_unavailable"],
+                    "rule_version": "", "fingerprint": "", "check_id": "",
+                }
+            return {
+                "code": code, "mode": "warn", "passed": True, "blocked": False,
+                "gaps": [], "results": [], "critical_missing": [],
+                "rule_version": "", "fingerprint": "", "check_id": "",
+                "unavailable": f"{type(exc).__name__}: {exc}",
+            }
+
+    def history(self, task_ref: str = "", code: str = "") -> list[dict]:
+        resp = self._client.get(f"{self.base_url}/eng-gates/checks", params={"task_ref": task_ref, "code": code})
         resp.raise_for_status()
         return resp.json()
 

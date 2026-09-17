@@ -49,6 +49,7 @@ class Coder:
         workdir: str | None = None,
         push: bool = True,
         runner=None,
+        gate_api=None,
     ):
         self.llm = llm
         self.gitlab_url = gitlab_url.rstrip("/")
@@ -59,6 +60,7 @@ class Coder:
         self.workdir = workdir  # 预置 checkout（测试用）；为空则 clone
         self.push = push
         self.runner = runner or get_runner()  # 执行沙箱（host / docker）
+        self.gate_api = gate_api  # 工程闸门客户端（WP2）：E1 在生成代码前拦截
 
     # ---------- 对外主流程 ----------
     def implement(
@@ -76,6 +78,15 @@ class Coder:
         issue_ref = task.get("task_ref") or task.get("issue_ref", "")
         iid = str(issue_ref).split("#")[-1] or "0"
         branch = f"{branch_prefix}{iid}{branch_suffix}"
+
+        # WP2 工程闸门 E1「动手之前」：条件不齐时**在调用 LLM / 改动仓库之前**停止。
+        # 课程图 40：关键项（影响范围）未知时不得开始修改，不能用"多数项已通过"抵消。
+        gate = self._pre_implementation_gate(task, prd, tech_design, only_src=only_src,
+                                             allowed_files=allowed_files)
+        if gate.get("blocked"):
+            raise CodingError(
+                "E1 工程闸门未通过，已停止生成代码：\n" + gate.get("_text", "")
+            )
         repo = workdir or self.workdir or tempfile.mkdtemp(prefix="coder-")
         push = self.push if push is None else push
         self._repo = repo  # prompt 附带文件全文用
@@ -128,6 +139,43 @@ class Coder:
         }
 
     # ---------- 内部实现 ----------
+    # ---------- 工程闸门（WP2） ----------
+    def _pre_implementation_gate(self, task: dict, prd: str, tech_design: str,
+                                 only_src: bool = False,
+                                 allowed_files: list[str] | None = None) -> dict:
+        """调用 E1 工程闸门，返回判定结果（附 `_text` 供报错信息使用）。
+
+        上下文里**能自动推断的都填上**，只把真正需要人给的部分留给闸门判缺口：
+        - prd_ref / sources：来自任务与 PRD（需求依据）
+        - change_targets：缺陷修复模式下来自失败测试反推的文件；否则由 task 显式提供
+        - impact_scope / rollback_plan：必须由调用方给（这正是 E1 要拦的地方）
+        """
+        if self.gate_api is None:
+            return {"blocked": False, "passed": True, "mode": "off", "gaps": [], "_text": ""}
+        context = {
+            "prd_ref": (prd or "")[:200] if prd else task.get("prd_ref", ""),
+            "sources": task.get("sources") or [],
+            "change_targets": allowed_files or (["src/**（缺陷修复范围）"] if only_src else task.get("change_targets") or []),
+            "impact_scope": task.get("impact_scope", ""),
+            "rollback_plan": task.get("rollback_plan", ""),
+        }
+        result = self.gate_api.check(
+            "E1",
+            task_ref=str(task.get("task_ref") or task.get("issue_ref") or ""),
+            context=context,
+            mode=task.get("gate_mode") or None,
+            checked_by="agent:coder",
+        )
+        try:
+            from .gate_text import render_gaps  # 本地渲染，避免跨服务依赖
+
+            result["_text"] = render_gaps(result)
+        except Exception:  # 渲染失败不影响判定
+            result["_text"] = str(result.get("gaps"))
+        logger.info("E1 闸门：passed=%s blocked=%s gaps=%s", result.get("passed"), result.get("blocked"),
+                    [g.get("id") for g in result.get("gaps") or []])
+        return result
+
     def _clone_url(self) -> str:
         host = self.gitlab_url.split("://")[1]
         return f"https://oauth2:{self.gitlab_token}@{host}/{self.project_path}.git"
