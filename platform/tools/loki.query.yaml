@@ -1,0 +1,18 @@
+id: loki.query
+title: 查询日志样本
+kind: api
+provider: loki
+description: 按服务与时间窗拉取日志行（限条数，避免拉爆上下文）
+read_only: true
+idempotent: true
+permission: logs:read
+audit: standard
+params:
+  service: {type: string, required: true}
+  window: {type: string, required: true}
+  limit: {type: integer, required: false, default: 200}
+result:
+  type: object
+  properties: {lines: {type: array}}
+failure_modes:
+  - 日志服务不可用 → 抛出；诊断必须在缺少日志时降低置信度而不是硬编根因

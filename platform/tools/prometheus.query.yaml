@@ -1,0 +1,28 @@
+# 工具注册（WP8）：每个工具登记"能做什么、要什么权限、是否可改数据"
+#
+# 对应课程图 59「两种边界」：
+#   看不见 = 工具不在岗位允许列表（执行期拒绝，而不是提示词劝阻）
+#   不能改 = 工具标记 read_only / 或要求 approval_gate（需人审后才能执行）
+id: prometheus.query
+title: 查询 Prometheus 指标
+kind: api                       # api / cli / mcp / internal
+provider: prometheus
+description: 按服务、指标与时间窗拉取时间序列，用于区分"数据未就绪"与"业务异常"
+read_only: true                 # 只读：不得修改任何被观测系统
+idempotent: true
+permission: metrics:read        # 需要的权限点（岗位通过 skills 绑定后由执行期校验）
+audit: standard                 # none / standard / strict（strict=全参数留痕）
+endpoint: "${PROMETHEUS_URL}/api/v1/query_range"
+params:
+  service: {type: string, required: true}
+  metric: {type: string, required: true}
+  window: {type: string, required: true, description: 如 30m / 2h}
+  step: {type: string, required: false, default: "60s"}
+result:
+  type: object
+  properties:
+    series: {type: array}
+    count: {type: integer}
+failure_modes:
+  - 指标不存在 → 返回空序列（视为数据未就绪，不得判定为故障）
+  - 数据源超时 → 抛出并记录，由编排层决定重试或等待

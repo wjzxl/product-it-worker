@@ -1,0 +1,26 @@
+id: ops.execute
+title: 执行运维变更动作（重启/扩容/回滚）
+kind: api
+provider: platform-executor
+description: 对生产服务执行变更动作；**必须先经 G5 人审**并把 approval_ref 一并传入
+read_only: false
+requires_approval: true           # 课程图 59「不能改」：能计算、能解释，但不能自己动手改
+approval_gate: GATE_CHANGE_APPROVAL
+idempotent: false
+permission: ops:execute
+audit: strict                     # 生产动作，全参数留痕
+endpoint: "${OPS_EXECUTOR_URL}"
+params:
+  action: {type: string, required: true, description: restart / scale / rollback}
+  target: {type: string, required: true, description: 如 order-api}
+  params: {type: object, required: false}
+  # 不在此处标 required：是否必须由**执行期鉴权**决定（requires_approval），
+  # 这样 allow_ungated 的内部/演练路径不会被参数校验卡住，正常路径仍拿不到审批号就拒绝。
+  approval_ref: {type: string, required: false, description: 对应 G5 审批单号（由鉴权强制）}
+result:
+  type: object
+  properties: {executed: {type: boolean}, detail: {type: object}}
+failure_modes:
+  - 无 approval_ref → 执行期拒绝（ToolDenied: approval_required）
+  - 执行器未配置（OPS_EXECUTOR=dryrun）→ 只记录不真执行，如实回报 dryrun
+  - 目标不在岗位 scope.services 内 → 岗位工具列表不含本工具，直接不可见

@@ -1,0 +1,20 @@
+id: sandbox.pytest
+title: 沙箱内执行测试
+kind: cli
+provider: platform-sandbox
+description: 在无网络容器内执行 pytest（AI 生成的代码只在这里跑）
+read_only: false
+requires_approval: false          # 沙箱内执行（--network none）不触达生产；合入仍受 G3 约束
+idempotent: true
+permission: code:execute
+audit: strict
+command: "python -m pytest -q {target}"
+sandbox: docker                # 必须走沙箱执行（--network none）
+params:
+  target: {type: string, required: true}
+  timeout_s: {type: integer, required: false, default: 300}
+result:
+  type: object
+  properties: {returncode: {type: integer}, stdout: {type: string}, stderr: {type: string}}
+failure_modes:
+  - 超时 → returncode=124（编排层据此判定"未通过"，不得算通过）

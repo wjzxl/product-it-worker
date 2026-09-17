@@ -77,7 +77,7 @@ class FlowState(TypedDict, total=False):
 
 class FlowContext:
     def __init__(self, llm, approval_api, gitlab_api, coder=None, tester=None, knowledge=None, executor=None,
-                 gate_api=None):
+                 gate_api=None, tools=None):
         self.llm = llm
         self.approval_api = approval_api
         self.gitlab_api = gitlab_api
@@ -86,6 +86,7 @@ class FlowContext:
         self.knowledge = knowledge  # 知识库检索（Runbook RAG，可选）
         self.executor = executor  # 操作类变更执行器（可选：dryrun/webhook）
         self.gate_api = gate_api  # 工程闸门客户端（WP2：E1 在生成代码前拦截）
+        self.tools = tools        # WP8 工具注册表（执行期鉴权；由 create_app 注入）
 
 
 def _build_approval_payload(state: FlowState, version: int) -> dict:
@@ -765,11 +766,32 @@ def build_ops_graph(ctx: FlowContext, checkpointer=None):
             }
         # operational：经操作执行器下发（dryrun 记录 / webhook 真实调用）
         action, target = _parse_action(state.get("diagnosis", ""))
-        result = (
-            ctx.executor.execute(action, target, {"alert": (state.get("alert") or {}).get("id", "")})
-            if ctx.executor is not None
-            else {"ok": True, "mode": "none", "detail": "未配置执行器（记录式）"}
-        )
+        # WP8：执行前经**工具注册表**鉴权——写类工具（ops.execute）要求带 G5 审批依据，
+        # 这就是课程图 59「不能改」在真实路径上的落点，而不是靠提示词劝阻。
+        gate_ref = state.get("approval_id_g5", "")
+        auth_error = ""
+        if ctx.tools is not None:
+            from .tools import ToolDenied
+
+            try:
+                ctx.tools.invoke(
+                    "ops.execute",
+                    {"action": action, "target": target, "approval_ref": gate_ref},
+                    role="ops-duty",
+                    role_tools=["ops.execute"],   # 流程内执行路径（岗位助理自身仍不可见该工具）
+                    approval_ref=gate_ref,
+                )
+            except ToolDenied as exc:
+                auth_error = f"{exc.reason}: {exc}"
+                logger.warning("运维变更执行被工具层拒绝：%s", auth_error)
+            except Exception as exc:  # 工具未注册不阻断既有链路，但记录
+                logger.warning("工具鉴权异常（不阻断执行器）：%s", exc)
+        if auth_error:
+            result = {"ok": False, "mode": "denied", "detail": f"工具层拒绝：{auth_error}"}
+        elif ctx.executor is not None:
+            result = ctx.executor.execute(action, target, {"alert": (state.get("alert") or {}).get("id", "")})
+        else:
+            result = {"ok": True, "mode": "none", "detail": "未配置执行器（记录式）"}
         change_issue = ctx.gitlab_api.create_issue(
             state.get("project_id", "sandbox/prodesgin"),
             title=f"变更: {(state.get('alert') or {}).get('title', '')}",

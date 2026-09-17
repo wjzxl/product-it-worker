@@ -1,0 +1,22 @@
+id: gitlab.branch_mr
+title: 建分支与合并请求
+kind: api
+provider: gitlab-bridge
+description: 在项目内建分支并开 MR（不合并；合入必须经 G3 人审）
+read_only: false
+idempotent: false
+permission: repo:write
+audit: strict
+requires_approval: false          # 建分支/开 MR 属正常开发流程（平台在 G3 之前就要开 MR）；
+                                  # 真正需要授权的动作是**合入**（merge）：那一步必须经 G3 人审，
+                                  # 由 G3 闸门与 agent-runtime 的 merge 节点强制，不在本工具内实现。
+endpoint: "${GITLAB_BRIDGE_URL}/gitlab/merge_requests"
+params:
+  project: {type: string, required: true}
+  branch: {type: string, required: true}
+  title: {type: string, required: true}
+result:
+  type: object
+  properties: {mr_iid: {type: integer}, mr_url: {type: string}}
+failure_modes:
+  - 分支已存在 → 复用既有分支（幂等保护）

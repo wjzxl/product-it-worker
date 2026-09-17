@@ -1,0 +1,15 @@
+id: rules.read
+title: 读取项目规则包
+kind: internal
+provider: agent-runtime
+description: 读取约束/设计/完整性三层规则与指纹（Agent 据此约束产出）
+read_only: true
+idempotent: true
+permission: rules:read
+audit: none
+params: {}
+result:
+  type: object
+  properties: {fingerprint: {type: string}, files: {type: object}}
+failure_modes:
+  - 规则包缺失 → 返回 available=false；调用方应告警而不是假装有规则

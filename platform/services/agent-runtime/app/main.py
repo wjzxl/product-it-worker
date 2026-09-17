@@ -8,14 +8,17 @@ from __future__ import annotations
 import logging
 import os
 import uuid
+from datetime import datetime, timedelta, timezone
 
 from fastapi import FastAPI, HTTPException
 from langgraph.types import Command
 from pydantic import BaseModel, Field
 
+from . import ambiguity
 from . import roles as role_registry
 from . import runs
 from . import rules_pack
+from .tools import ToolDenied, ToolError, ToolRegistry
 from .apis import ApprovalAPI, GateAPI, GitLabAPI, KnowledgeAPI
 from .checkpointer import build as build_checkpointer
 from .checkpointer import describe as checkpointer_describe
@@ -51,6 +54,16 @@ class RunIn(BaseModel):
     alert: dict = Field(default_factory=dict)   # 运维域：告警载荷
     context: str = ""       # 运维域：日志/指标上下文
     runbook: str = ""       # 运维域：Runbook 文本
+
+
+class ToolInvokeIn(BaseModel):
+    """工具调用请求（WP8）：role 用于执行期鉴权。"""
+
+    tool: str
+    params: dict = Field(default_factory=dict)
+    role: str = ""
+    approval_ref: str = ""        # 写类工具需带人审依据
+    allow_ungated: bool = False   # 仅用于演练/平台内部，需显式开启
 
 
 class WakeIn(BaseModel):
@@ -226,6 +239,8 @@ def create_app(
     gitlab_api = gitlab_api or GitLabAPI(os.getenv("GITLAB_BRIDGE_URL", "http://localhost:8001"))
     # WP2：工程闸门客户端（E1 在生成代码前拦截）
     gate_api = gate_api if gate_api is not None else GateAPI(os.getenv("APPROVAL_GATEWAY_URL", "http://localhost:8000"))
+    # WP8：工具注册表（先建表，handler 在 ctx 就绪后绑定）
+    tool_registry = ToolRegistry()
     coder = coder or Coder(
         llm=llm,
         gitlab_url=os.getenv("GITLAB_URL", "https://gitlab.com"),
@@ -252,10 +267,58 @@ def create_app(
         knowledge=knowledge,
         executor=executor,
         gate_api=gate_api,
+        tools=tool_registry,
     )
+    # WP8：工具注册表（岗位技能引用的工具必须已注册，执行期据此鉴权）
+
     # WP7：一个应用实例共用一个 checkpointer（PostgresSaver 持有连接，不能每次编译新建）；
     # 由 checkpointer 模块按 CHECKPOINTER 灰度决定 memory / postgres。
     checkpointer = build_checkpointer()
+    # 把平台已有能力绑定为工具实现——"登记了但没接线"不算能力（课程图 62）
+    def _tool_kb_search(query: str, source_prefix: str = "", limit: int = 5):
+        hits = ctx.knowledge.search(query, limit=limit) if ctx.knowledge is not None else []
+        if source_prefix:
+            hits = [h for h in hits if str(h.get("source", "")).startswith(source_prefix)]
+        return {"chunks": hits, "count": len(hits)}
+
+    def _tool_rules_read():
+        return rules_pack.stats()
+
+    def _tool_approval_create(gate: str, context_snapshot: dict, task_ref: str = ""):
+        payload = {
+            "type": gate, "stage": f"Agent 工具调用 {gate}", "requester": "Agent@tool",
+            "task_ref": task_ref, "context_snapshot": context_snapshot,
+            "options": ["approve", "reject", "revise"],
+            "deadline": (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat(),
+            "escalation_policy": {"remind_after_hours": 8, "escalate_to": "team_lead", "timeout_action": "reject"},
+        }
+        created = ctx.approval_api.create_approval(payload)
+        return {"approval_id": created.get("id", ""), "status": created.get("status", "")}
+
+    def _tool_doc_write(structured: str, sources=None):
+        return {"doc": structured, "sources": sources or [], "note": "文档写入由调用方落地（演练实现）"}
+
+    def _tool_ambiguity_detect(text: str):
+        result = ambiguity.summarize(text, sources=[])
+        return {"findings": result["findings"], "questions": result["questions"],
+                "defaults_to_confirm": result["defaults_to_confirm"]}
+
+    def _tool_source_read(task_ref: str):
+        return {"sources": [], "note": "材料读取依赖多模态归集（WP11）；当前从审批来源链取"}
+
+    for tool_id, handler in {
+        "kb.search": _tool_kb_search,
+        "rules.read": _tool_rules_read,
+        "approval.create": _tool_approval_create,
+        "doc.write": _tool_doc_write,
+        "ambiguity.detect": _tool_ambiguity_detect,
+        "source.read": _tool_source_read,
+    }.items():
+        try:
+            tool_registry.register_handler(tool_id, handler)
+        except ToolError as exc:   # 工具未注册不阻断启动（但会在 /tools 与日志里显形）
+            logger.warning("工具实现绑定失败：%s", exc)
+
     graphs = {
         SOP_PRODUCT: build_graph(ctx, checkpointer=checkpointer),
         SOP_DEV: build_dev_graph(ctx, checkpointer=checkpointer),
@@ -270,6 +333,7 @@ def create_app(
     )
     app.state.ctx = ctx
     app.state.graphs = graphs
+    app.state.tools = tool_registry
 
     @app.post("/runs")
     def start_run(body: RunIn) -> dict:
@@ -397,6 +461,44 @@ def create_app(
             raise HTTPException(status_code=404, detail=f"无归档记录：{thread_id}")
         return item
 
+    @app.get("/tools")
+    def tools_info(role: str = "") -> dict:
+        """工具注册表（WP8）：能力清单 + 写类/需人审清单。
+
+        `?role=ops-duty` 时额外返回该岗位实际被允许的工具（取交集），
+        用于核对"岗位边界与工具授权是否一致"（课程图 55：边界要与实际能力一致）。
+        """
+        info = tool_registry.summary()
+        if role:
+            spec = role_registry.load_role(role)
+            info["role"] = role
+            info["role_tools"] = tool_registry.allowed_for(spec.tool_ids)
+            info["denied_for_role"] = sorted(t for t in spec.tool_ids if t not in tool_registry.ids)
+        return info
+
+    @app.post("/tools/invoke")
+    def invoke_tool(body: "ToolInvokeIn") -> dict:
+        """执行期鉴权下的工具调用（未授权/缺参数/未过人审都会被拒并留审计）。"""
+        spec = None
+        role_tools = None
+        if body.role:
+            role_spec = role_registry.load_role(body.role)
+            role_tools = role_spec.tool_ids
+        try:
+            return tool_registry.invoke(
+                body.tool, body.params, role=body.role, role_tools=role_tools,
+                approval_ref=body.approval_ref, allow_ungated=body.allow_ungated,
+            )
+        except ToolDenied as exc:
+            raise HTTPException(status_code=403, detail={"error": str(exc), "reason": exc.reason}) from exc
+        except ToolError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @app.get("/tools/audit")
+    def tools_audit(limit: int = 50) -> dict:
+        """工具调用审计（含被拒记录）——课程图 59：边界要能查证。"""
+        return {"count": len(tool_registry.audit_log), "entries": tool_registry.audit_log[-limit:]}
+
     @app.get("/roles")
     def roles_info(role: str = "", include_prompt: bool = False) -> dict:
         """岗位注册表（WP6）：三件套汇总 + 校验结果。
@@ -405,9 +507,17 @@ def create_app(
         便于核对"岗位边界到底写了什么"（课程图 55）。
         """
         if role:
-            item = role_registry.load_role(role).to_dict(include_prompt=True)
+            item = role_registry.load_role(role, known_tools=tool_registry.ids).to_dict(include_prompt=True)
             return {"role": item}
-        return role_registry.summary()
+        roles, errors = [], []
+        for path in sorted(role_registry.roles_dir().iterdir()):
+            if not path.is_dir():
+                continue
+            try:
+                roles.append(role_registry.load_role(path.name, known_tools=tool_registry.ids).to_dict())
+            except role_registry.RoleError as exc:
+                errors.append(str(exc))
+        return {"dir": str(role_registry.roles_dir()), "count": len(roles), "roles": roles, "errors": errors}
 
     @app.get("/rules-pack")
     def rules_pack_info() -> dict:

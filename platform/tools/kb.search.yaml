@@ -1,0 +1,19 @@
+id: kb.search
+title: 检索知识库（Runbook / 规范）
+kind: internal
+provider: knowledge-base
+description: 按来源前缀检索本产品线 Runbook 与平台规范（多产品线隔离）
+read_only: true
+idempotent: true
+permission: kb:read
+audit: standard
+params:
+  query: {type: string, required: true}
+  source_prefix: {type: string, required: false, description: 如 ops-duty/runbooks/}
+  limit: {type: integer, required: false, default: 5}
+result:
+  type: object
+  properties:
+    chunks: {type: array}
+failure_modes:
+  - 无命中 → 返回空列表；调用方**不得**在没有依据时编造处置步骤

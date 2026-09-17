@@ -1,0 +1,16 @@
+id: source.read
+title: 读取需求材料与出处
+kind: internal
+provider: agent-runtime
+description: 读取群聊/语音/截图/表格材料及其定位（消息ID、时间戳、单元格）
+read_only: true
+idempotent: true
+permission: source:read
+audit: strict               # 涉及原始材料，全参数留痕
+params:
+  task_ref: {type: string, required: true}
+result:
+  type: object
+  properties: {sources: {type: array}}
+failure_modes:
+  - 无材料 → 返回空列表；调用方必须走澄清流程，不得自行补写口径

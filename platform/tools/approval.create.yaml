@@ -1,0 +1,21 @@
+id: approval.create
+title: 提交人审审批单
+kind: api
+provider: approval-gateway
+description: 在指定 Gate 发起审批（三要素 + 来源链），不代替人做决定
+read_only: false
+requires_approval: false        # 提交审批**本身**就是获取人审的入口，若要求先有审批就成死循环；
+                                # 它只创建单据，不改变业务状态（真正的改动由人审后的工具执行）
+idempotent: false               # 每次提交都产生新单据
+permission: approval:create
+audit: strict
+endpoint: "${APPROVAL_GATEWAY_URL}/approvals"
+params:
+  gate: {type: string, required: true}
+  context_snapshot: {type: object, required: true}
+  task_ref: {type: string, required: false}
+result:
+  type: object
+  properties: {approval_id: {type: string}}
+failure_modes:
+  - 三要素缺失 → 422（schema 强校验），调用方必须补齐而不是绕过

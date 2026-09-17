@@ -1,0 +1,16 @@
+id: ambiguity.detect
+title: 模糊度检测
+kind: internal
+provider: agent-runtime
+description: 规则化检测模糊表述并生成待确认问题（可复现，不依赖模型）
+read_only: true
+idempotent: true
+permission: requirements:analyze
+audit: standard
+params:
+  text: {type: string, required: true}
+result:
+  type: object
+  properties: {findings: {type: array}, questions: {type: array}}
+failure_modes:
+  - 无命中 → 返回空列表（不代表需求已完备，仍需人确认范围与权限）

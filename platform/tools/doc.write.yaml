@@ -1,0 +1,19 @@
+id: doc.write
+title: 写文档（PRD / 设计）
+kind: internal
+provider: agent-runtime
+description: 生成或更新 PRD、设计文档；写入前需带来源行
+read_only: false
+requires_approval: false        # 写的是平台内文档（PRD/设计），其业务确认由 G1/G2 人审承担；
+                                # 不触达外部业务系统，故不额外要求审批依据
+idempotent: true
+permission: doc:write
+audit: standard
+params:
+  structured: {type: string, required: true}
+  sources: {type: array, required: false}
+result:
+  type: object
+  properties: {doc: {type: string}}
+failure_modes:
+  - 缺少来源 → 允许写入但必须标注"待确认"，不得声称已获批准
