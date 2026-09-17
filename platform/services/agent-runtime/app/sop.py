@@ -17,15 +17,30 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Optional, TypedDict
 
-from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
 from . import ambiguity
+from .checkpointer import build as _build_checkpointer
 from . import roles as role_registry
 from .prompts import get_prompt
 
 logger = logging.getLogger(__name__)
+
+_CHECKPOINTER = None
+
+
+def _checkpointer():
+    """进程内复用同一个 checkpointer（PostgresSaver 持有连接，不能每次编译都新建）。"""
+    global _CHECKPOINTER
+    if _CHECKPOINTER is None:
+        _CHECKPOINTER = _build_checkpointer()
+        logger.info("checkpointer 就绪：%s", getattr(_CHECKPOINTER, "kind", "unknown"))
+    return _CHECKPOINTER
+
+
+def checkpointer_kind() -> str:
+    return getattr(_checkpointer(), "kind", "unknown")
 
 # 澄清 Agent 兜底 Prompt（注册中心缺失时使用；正式内容见 platform/prompts/clarify_agent.v1.md）
 DEFAULT_CLARIFY_PROMPT = (
@@ -102,7 +117,7 @@ def _build_approval_payload(state: FlowState, version: int) -> dict:
     }
 
 
-def build_graph(ctx: FlowContext):
+def build_graph(ctx: FlowContext, checkpointer=None):
     def clarify(state: FlowState) -> dict:
         """需求澄清（WP1）：模糊度检测 + 待确认问题（带出处）+ 明示默认值。
 
@@ -213,7 +228,7 @@ def build_graph(ctx: FlowContext):
     builder.add_edge("create_issues", END)
     builder.add_edge("reject_end", END)
 
-    return builder.compile(checkpointer=MemorySaver())
+    return builder.compile(checkpointer=checkpointer or _checkpointer())
 
 
 # =====================================================================
@@ -263,7 +278,7 @@ def _dev_approval_payload(state: DevState, gate_type: str, stage: str, artifact_
     }
 
 
-def build_dev_graph(ctx: FlowContext):
+def build_dev_graph(ctx: FlowContext, checkpointer=None):
     def tech_design(state: DevState) -> dict:
         prompt = (
             f"为以下需求起草技术方案（模块拆分、接口设计、测试策略、风险）：\n"
@@ -393,7 +408,7 @@ def build_dev_graph(ctx: FlowContext):
     builder.add_edge("merge", END)
     builder.add_edge("reject_end", END)
 
-    return builder.compile(checkpointer=MemorySaver())
+    return builder.compile(checkpointer=checkpointer or _checkpointer())
 
 
 # =====================================================================
@@ -419,7 +434,7 @@ class TestState(TypedDict, total=False):
     logs: Annotated[list[str], operator.add]
 
 
-def build_test_graph(ctx: FlowContext):
+def build_test_graph(ctx: FlowContext, checkpointer=None):
     def plan(state: TestState) -> dict:
         prompt = (
             f"制定测试计划（测试策略/分层/重点风险）：\n标题：{state.get('title', '')}\n"
@@ -527,7 +542,7 @@ def build_test_graph(ctx: FlowContext):
     builder.add_edge("done_end", END)
     builder.add_edge("reject_end", END)
 
-    return builder.compile(checkpointer=MemorySaver())
+    return builder.compile(checkpointer=checkpointer or _checkpointer())
 
 
 # =====================================================================
@@ -544,6 +559,7 @@ class OpsState(TypedDict, total=False):
     context: str          # 日志/指标摘要（诊断输入）
     runbook: str          # Runbook 文本（入参兜底）
     runbook_sources: list  # Runbook RAG 命中的来源（引用留痕）
+    waits: Annotated[list[str], operator.add]  # WP7 等待/唤醒留痕
     diagnosis: str        # 诊断报告
     change_type: str      # fix_code / operational
     fix_branch: str
@@ -595,7 +611,32 @@ def _parse_diag_json(raw: str) -> dict | None:
         return None
 
 
-def build_ops_graph(ctx: FlowContext):
+def build_ops_graph(ctx: FlowContext, checkpointer=None):
+    def await_data(state: OpsState) -> dict:
+        """等待数据就绪（WP7）。
+
+        对应课程图 48：7:30 拉数、数据没到时先等待，到齐后接着跑——**不要求人从头下指令**。
+        判据：`alert.data_ready is False` 或 `alert.series` 为空 → 挂起等待；
+        被 `/runs/{id}/wake` 唤醒后（`Command(resume=...)`）把到齐的数据并入状态再继续。
+        """
+        alert = dict(state.get("alert") or {})
+        if alert.get("data_ready", True) is False:
+            resumed = interrupt({
+                "type": "wait_data",
+                "reason": "指标/日志尚未到齐，等待数据源就绪后唤醒",
+                "alert": alert.get("title", ""),
+            }) or {}
+            incoming = resumed.get("data") or {}
+            if incoming:
+                alert.update({k: v for k, v in incoming.items() if k != "data_ready"})
+            alert["data_ready"] = True
+            return {
+                "alert": alert,
+                "waits": [f"wake:{resumed.get('decision', 'data_ready')}"],
+                "logs": [f"step:await_data 唤醒并继续（并入 {len(incoming)} 项数据）"],
+            }
+        return {"alert": alert, "logs": ["step:await_data 数据已就绪，直接继续"]}
+
     def diagnose(state: OpsState) -> dict:
         alert = state.get("alert") or {}
         # Runbook RAG：优先知识库检索（带来源引用），失败回退入参 Runbook 文本
@@ -837,6 +878,7 @@ def build_ops_graph(ctx: FlowContext):
         return {"logs": [f"ops rejected: {state.get('gate5_comment') or state.get('gate6_comment', '')}"]}
 
     builder = StateGraph(OpsState)
+    builder.add_node("await_data", await_data)
     builder.add_node("diagnose", diagnose)
     builder.add_node("change_prepare", change_prepare)
     builder.add_node("g5_approval", g5_approval)
@@ -847,7 +889,8 @@ def build_ops_graph(ctx: FlowContext):
     builder.add_node("gate_g6", gate_g6)
     builder.add_node("done_end", done_end)
     builder.add_node("reject_end", reject_end)
-    builder.add_edge(START, "diagnose")
+    builder.add_edge(START, "await_data")
+    builder.add_edge("await_data", "diagnose")
     builder.add_edge("diagnose", "change_prepare")
     builder.add_edge("change_prepare", "g5_approval")
     builder.add_edge("g5_approval", "gate_g5")
@@ -863,4 +906,4 @@ def build_ops_graph(ctx: FlowContext):
     builder.add_edge("done_end", END)
     builder.add_edge("reject_end", END)
 
-    return builder.compile(checkpointer=MemorySaver())
+    return builder.compile(checkpointer=checkpointer or _checkpointer())

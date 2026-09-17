@@ -27,6 +27,12 @@ class LLMClient:
         self.api_key = api_key
         self.model = model
         self._client = httpx.Client(timeout=timeout, transport=transport)
+        # WP7：用量累计（归档与成本度量）
+        self.llm_calls = 0
+        self.prompt_tokens = 0
+        self.completion_tokens = 0
+        self.cost_usd = 0.0
+        self.unmetered_calls = 0
 
     def chat(self, messages: list[dict]) -> str:
         resp = self._client.post(
@@ -35,7 +41,46 @@ class LLMClient:
             json={"model": self.model, "messages": messages},
         )
         resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"]
+        body = resp.json()
+        self._record_usage(body, resp.headers)   # WP7：运行归档需要 token 与成本
+        return body["choices"][0]["message"]["content"]
+
+    # ---------- WP7 用量记账 ----------
+    def _record_usage(self, body: dict, headers) -> None:
+        """累计 token 与成本。成本取网关 `x-litellm-response-cost`；取不到就标 unmetered。
+
+        与评估夹具同一口径（见 app/eval.py）：**不估算、不编造**——
+        拿不到计费头就记 unmetered，让归档如实反映"这笔钱没被计量"。
+        """
+        usage = body.get("usage") or {}
+        self.llm_calls += 1
+        self.prompt_tokens += int(usage.get("prompt_tokens") or 0)
+        self.completion_tokens += int(usage.get("completion_tokens") or 0)
+        cost_raw = headers.get("x-litellm-response-cost") if headers is not None else None
+        if cost_raw in (None, ""):
+            self.unmetered_calls += 1
+            return
+        try:
+            self.cost_usd += float(cost_raw)
+        except (TypeError, ValueError):
+            self.unmetered_calls += 1
+
+    def usage(self) -> dict:
+        """本次运行（该客户端实例）的累计用量。"""
+        return {
+            "llm_calls": self.llm_calls,
+            "prompt_tokens": self.prompt_tokens,
+            "completion_tokens": self.completion_tokens,
+            "cost_usd": round(self.cost_usd, 6),
+            "cost_metered": self.unmetered_calls == 0,
+        }
+
+    def reset_usage(self) -> None:
+        self.llm_calls = 0
+        self.prompt_tokens = 0
+        self.completion_tokens = 0
+        self.cost_usd = 0.0
+        self.unmetered_calls = 0
 
 
 class TemplateLLM:

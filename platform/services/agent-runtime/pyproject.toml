@@ -15,6 +15,11 @@ dependencies = [
     "pydantic>=2.6",
     "langgraph==0.2.74",
     "langchain-core>=0.2,<0.4",
+    # WP7 持久化运行时（R3 已在 Python 3.9 + langgraph 0.2.74 下验证兼容）
+    "langgraph-checkpoint-postgres>=2.0",
+    "sqlalchemy>=2.0",
+    "psycopg[binary]>=3.1",
+    "apscheduler>=3.10,<4",
 ]
 
 [project.optional-dependencies]

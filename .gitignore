@@ -19,3 +19,6 @@ dist/
 
 # 证据工件（本地卷；元数据在 PG，工件不入库）
 platform/evidence/
+
+# WP7 运行归档（本地 sqlite；生产用 DATABASE_URL 指向 PG）
+platform/services/agent_runs.db

@@ -14,8 +14,12 @@ from langgraph.types import Command
 from pydantic import BaseModel, Field
 
 from . import roles as role_registry
+from . import runs
 from . import rules_pack
 from .apis import ApprovalAPI, GateAPI, GitLabAPI, KnowledgeAPI
+from .checkpointer import build as build_checkpointer
+from .checkpointer import describe as checkpointer_describe
+from .sop import checkpointer_kind
 from .coder import Coder
 from .executors import executor_from_env
 from .llm import llm_from_env
@@ -41,9 +45,19 @@ class RunIn(BaseModel):
     path_with_namespace: str = ""
     prd_doc: str = ""
     sources: list[dict] = Field(default_factory=list)  # WP1 需求来源链（材料出处，可空）
+    trigger: str = "manual"      # WP7 归档：manual/schedule/event/alert
+    tenant: str = "default"      # WP7 归档 + 多产品线统计
+    role: str = ""               # WP7 归档：岗位（空则按 SOP 推断）
     alert: dict = Field(default_factory=dict)   # 运维域：告警载荷
     context: str = ""       # 运维域：日志/指标上下文
     runbook: str = ""       # 运维域：Runbook 文本
+
+
+class WakeIn(BaseModel):
+    """数据/条件就绪后唤醒等待中的运行（WP7）。"""
+
+    data: dict = Field(default_factory=dict)   # 到齐的数据（如指标/日志）
+    comment: str = ""
 
 
 class ResumeIn(BaseModel):
@@ -51,14 +65,74 @@ class ResumeIn(BaseModel):
     comment: str = ""
 
 
+_ROLE_BY_SOP = {
+    "product-domain/prd-flow": "product-agent",
+    "dev-domain/issue-to-merge": "dev-agent",
+    "test-domain/release-gate": "tester-agent",
+    "ops-domain/alert-to-postmortem": "ops-duty",
+}
+
+
+def _locate_graph(graphs: dict, thread_id: str):
+    """按 thread_id 找到所属 SOP 的图（兼容尚无状态的新线程）。"""
+    for name, graph in graphs.items():
+        snap = graph.get_state(_config(thread_id, name))
+        if snap.values or snap.next:
+            return name, graph
+    return None, None
+
+
+def _role_of(sop: str) -> str:
+    """SOP → 岗位（WP6 三件套按岗位组织，归档按岗位统计）。"""
+    return _ROLE_BY_SOP.get(sop, "")
+
+
+def _usage_of(ctx) -> dict:
+    """LLM 用量：桩/未接计量的客户端如实返回 cost_metered=False（不冒充已计量）。"""
+    if hasattr(ctx.llm, "usage"):
+        return ctx.llm.usage()
+    return {"cost_metered": False, "unmetered_note": f"{type(ctx.llm).__name__} 未提供用量计量"}
+
+
+def _archive_progress(thread_id: str, status_body: dict, ctx) -> None:
+    """按运行状态归档：等待（人审/数据）、完成、失败。"""
+    status = status_body.get("status", "")
+    usage = _usage_of(ctx)
+    if status == "waiting_approval":
+        runs.finish_run(thread_id, "waiting", usage, {"gate": status_body.get("gate", "")})
+    elif status == "waiting_data":
+        runs.mark_waiting(thread_id, status_body.get("waiting_reason", "数据未就绪"))
+    elif status == "done":
+        runs.finish_run(thread_id, "done", usage, {"issue": status_body.get("issue", {})})
+    else:
+        runs.finish_run(thread_id, "running", usage)
+
+
 def _config(thread_id: str, sop: str = SOP_PRODUCT) -> dict:
-    return {"configurable": {"thread_id": thread_id, "sop": sop}}
+    """LangGraph 运行配置。
+
+    WP7：checkpoint 键必须**按 SOP 命名空间隔离**——共用持久化 checkpointer 时，
+    若两个不同 SOP 用了同一个 thread_id（例如都由 task_ref 派生），状态会互相覆盖。
+    对外暴露的 thread_id 保持不变，只在内部加前缀。
+    """
+    return {"configurable": {"thread_id": f"{sop}::{thread_id}", "sop": sop}}
 
 
 def _status(graph, thread_id: str, sop: str) -> dict:
     snap = graph.get_state(_config(thread_id, sop))
     values = snap.values or {}
     next_nodes = list(snap.next or [])
+
+    # WP7：数据等待（不是人审等待）需如实报告，否则上层无法区分"等人"与"等数据"
+    if "await_data" in next_nodes:
+        return {
+            "thread_id": thread_id,
+            "sop": sop,
+            "status": "waiting_data",
+            "waiting_reason": "指标/日志尚未到齐（await_data 挂起）",
+            "logs": values.get("logs", []),
+            "waits": values.get("waits", []),
+        }
 
     gate = next((g for g in ("gate_g1", "gate_g2", "gate_g3", "gate_g4", "gate_g5", "gate_g6") if g in next_nodes), None)
     if gate:
@@ -179,11 +253,14 @@ def create_app(
         executor=executor,
         gate_api=gate_api,
     )
+    # WP7：一个应用实例共用一个 checkpointer（PostgresSaver 持有连接，不能每次编译新建）；
+    # 由 checkpointer 模块按 CHECKPOINTER 灰度决定 memory / postgres。
+    checkpointer = build_checkpointer()
     graphs = {
-        SOP_PRODUCT: build_graph(ctx),
-        SOP_DEV: build_dev_graph(ctx),
-        SOP_TEST: build_test_graph(ctx),
-        SOP_OPS: build_ops_graph(ctx),
+        SOP_PRODUCT: build_graph(ctx, checkpointer=checkpointer),
+        SOP_DEV: build_dev_graph(ctx, checkpointer=checkpointer),
+        SOP_TEST: build_test_graph(ctx, checkpointer=checkpointer),
+        SOP_OPS: build_ops_graph(ctx, checkpointer=checkpointer),
     }
 
     app = FastAPI(
@@ -221,12 +298,23 @@ def create_app(
             init["alert"] = body.alert
             init["context"] = body.context
             init["runbook"] = body.runbook
+        # WP7：运行归档（谁触发、什么 sop、状态存哪里、用了多少 token/成本）
+        if hasattr(ctx.llm, "reset_usage"):
+            ctx.llm.reset_usage()
+        runs.start_run(
+            thread_id, sop=body.sop, trigger=body.trigger, tenant=body.tenant,
+            task_ref=body.task_ref, role=body.role or _role_of(body.sop),
+            checkpoint=checkpointer_kind(),
+        )
         try:
             graph.invoke(init, config)
         except Exception as exc:
             if "GraphInterrupt" not in type(exc).__name__:
+                runs.finish_run(thread_id, "failed", _usage_of(ctx), {"error": f"{type(exc).__name__}: {exc}"})
                 raise
-        return _status(graph, thread_id, body.sop)
+        body_out = _status(graph, thread_id, body.sop)
+        _archive_progress(thread_id, body_out, ctx)
+        return body_out
 
     @app.post("/runs/{thread_id}/resume")
     def resume_run(thread_id: str, body: ResumeIn) -> dict:
@@ -271,6 +359,44 @@ def create_app(
                 }
         raise HTTPException(status_code=404, detail=f"线程 {thread_id} 不存在")
 
+    @app.post("/runs/{thread_id}/wake")
+    def wake_run(thread_id: str, body: "WakeIn") -> dict:
+        """唤醒等待中的运行（WP7）：数据到了就继续，不必从头再来。
+
+        对应课程图 48「7:30 拉数 → 数据没到先等待 → 8:10 到齐接着跑」。
+        与 `/resume`（人审恢复）的区别：本端点是**数据/时间条件满足**后自动继续。
+        """
+        sop, graph = _locate_graph(graphs, thread_id)
+        if graph is None:
+            raise HTTPException(status_code=404, detail=f"线程 {thread_id} 不存在")
+        config = _config(thread_id, sop)
+        if hasattr(ctx.llm, "reset_usage"):
+            ctx.llm.reset_usage()
+        try:
+            graph.invoke(Command(resume={"decision": "data_ready", "data": body.data}), config)
+        except Exception as exc:
+            if "GraphInterrupt" not in type(exc).__name__:
+                runs.finish_run(thread_id, "failed", _usage_of(ctx), {"error": f"{type(exc).__name__}: {exc}"})
+                raise
+        out = _status(graph, thread_id, sop)
+        _archive_progress(thread_id, out, ctx)
+        return out
+
+    @app.get("/runs")
+    def list_runs(tenant: str = "", role: str = "", status: str = "", limit: int = 50) -> dict:
+        """运行归档（WP7）：可观测性与成本度量的数据源。"""
+        return {
+            "runs": runs.list_runs(tenant=tenant, role=role, status=status, limit=limit),
+            "stats": runs.stats(tenant=tenant),
+        }
+
+    @app.get("/runs/{thread_id}/archive")
+    def run_archive(thread_id: str) -> dict:
+        item = runs.get_run(thread_id)
+        if item is None:
+            raise HTTPException(status_code=404, detail=f"无归档记录：{thread_id}")
+        return item
+
     @app.get("/roles")
     def roles_info(role: str = "", include_prompt: bool = False) -> dict:
         """岗位注册表（WP6）：三件套汇总 + 校验结果。
@@ -311,7 +437,13 @@ def create_app(
 
     @app.get("/health")
     def health() -> dict:
-        return {"status": "ok", "service": "agent-runtime", "version": "0.2.0"}
+        return {
+            "status": "ok",
+            "service": "agent-runtime",
+            "version": "0.3.0",
+            # WP7：如实说明"状态存哪里"——内存态不能声称支持重启恢复
+            "checkpointer": checkpointer_describe(),
+        }
 
     return app
 
