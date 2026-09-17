@@ -4,6 +4,7 @@
 - 人在 Web 审批台或 IM 卡片上做决策；
 - 决策结果写审计留痕，并发布 approval.decided 事件（Phase 0 事件走回调/轮询）。
 """
+import json
 import logging
 from typing import Optional
 
@@ -80,7 +81,9 @@ def create_approval(
         stage=payload.stage,
         requester=payload.requester,
         task_ref=payload.task_ref,
-        context_snapshot=payload.context_snapshot.model_dump(),
+        context_snapshot=payload.context_snapshot.model_dump(mode="json"),
+        # WP1：来源链冗余到独立列，便于按来源/任务反查（空列表=存量数据，不算缺失）
+        sources=[s.model_dump(mode="json") for s in payload.context_snapshot.sources],
         options=[o for o in payload.options],
         deadline=payload.deadline,
         escalation_policy=payload.escalation_policy.model_dump(),
@@ -167,6 +170,59 @@ def list_approvals(
 @router.get("/approvals/{approval_id}", response_model=ApprovalRequestOut)
 def get_approval(approval_id: str, db: Session = Depends(get_db), tenant: str = Depends(current_tenant)) -> ApprovalRequest:
     return _get_or_404(db, approval_id, tenant=tenant)
+
+
+@router.get("/requirements/{task_ref}/provenance")
+def requirement_provenance(
+    task_ref: str,
+    db: Session = Depends(get_db),
+    tenant: str = Depends(current_tenant),
+) -> dict:
+    """需求来源链反查（WP1）：产物/task_ref → 当初是谁、在哪句话/哪个单元格里提出的。
+
+    对应课程图 11「每条需求都带出处」与图 33「证据要能复验」：
+    争论某个字段/口径为什么存在时，从这里回查，而不是翻聊天记录。
+
+    返回按 Gate 时间线聚合的来源条目（含未确认的候选），并给出**仍缺出处的 Gate**，
+    便于工程闸门 E1 直接消费。
+    """
+    stmt = (
+        select(ApprovalRequest)
+        .where(ApprovalRequest.task_ref == task_ref, ApprovalRequest.tenant == tenant)
+        .order_by(ApprovalRequest.created_at.asc())
+    )
+    rows = list(db.scalars(stmt))
+    if not rows:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"任务 {task_ref} 在本产品线无审批记录")
+
+    entries: list[dict] = []
+    seen: set[tuple] = set()
+    gates_without_sources: list[str] = []
+    for req in rows:
+        stored = req.sources or (req.context_snapshot or {}).get("sources") or []
+        if not stored:
+            gates_without_sources.append(req.type)
+            continue
+        for item in stored:
+            key = (item.get("kind"), item.get("ref"), json.dumps(item.get("locator") or {}, sort_keys=True))
+            if key in seen:      # 同一出处被多个 Gate 引用时只记一次，保留首次确认时间
+                continue
+            seen.add(key)
+            entries.append({**item, "gate": req.type, "approval_id": req.id, "recorded_at": req.created_at.isoformat()})
+
+    by_kind: dict[str, int] = {}
+    for item in entries:
+        by_kind[item.get("kind", "unknown")] = by_kind.get(item.get("kind", "unknown"), 0) + 1
+
+    return {
+        "task_ref": task_ref,
+        "tenant": tenant,
+        "gates": [r.type for r in rows],
+        "sources": entries,
+        "counts_by_kind": by_kind,
+        "gates_without_sources": sorted(set(gates_without_sources)),
+        "has_provenance": bool(entries),
+    }
 
 
 @router.post("/approvals/{approval_id}/decision", response_model=DecisionOut)

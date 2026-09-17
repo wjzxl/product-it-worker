@@ -1,25 +1,36 @@
 """产品域 SOP 流程（LangGraph）：澄清 → 起草 PRD → G1 人审挂起 → 建 Issue。
 
 对齐 02-核心SOP流程设计.md §1 与 contracts/sop-example.yaml。
-人审挂起用 LangGraph `interrupt()`：进程重启不丢状态（checkpoint），
-Phase 0 用 MemorySaver，生产换持久化 checkpointer（Postgres/Redis）。
+
+持久化现状（WP0 纠正，勿再误读）：
+  人审挂起用 LangGraph `interrupt()`，但四处 `compile()` 目前都传 `MemorySaver()`
+  —— **状态在内存里，进程重启即丢**，跨重启恢复做不到。
+  计划见 17-FDE范式落地开发计划.md 的 WP7：换 `PostgresSaver`
+  （`CHECKPOINTER=memory|postgres` 开关灰度），届时才能支持"等待数据 → 到齐继续"。
 """
 from __future__ import annotations
 
-import operator
-from datetime import datetime, timedelta, timezone
-from typing import Annotated, TypedDict
-
+import json
 import logging
+import operator
+import os
+from datetime import datetime, timedelta, timezone
+from typing import Annotated, Optional, TypedDict
 
 from langgraph.checkpoint.memory import MemorySaver
-
-from .prompts import get_prompt
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
+from . import ambiguity
+from .prompts import get_prompt
 
 logger = logging.getLogger(__name__)
+
+# 澄清 Agent 兜底 Prompt（注册中心缺失时使用；正式内容见 platform/prompts/clarify_agent.v1.md）
+DEFAULT_CLARIFY_PROMPT = (
+    "你是需求澄清助手。把「还要猜」的地方问出来，不要替业务方做决定。"
+    "每条问题必须挂出处（谁、何时、在哪句话里说的），并给出建议默认值待confirm。"
+)
 
 DEFAULT_DIAGNOSE_PROMPT = (
     "你是运维域诊断 Agent。基于告警、上下文与 Runbook 输出诊断报告（JSON）：\n"
@@ -37,6 +48,8 @@ class FlowState(TypedDict, total=False):
     path_with_namespace: str
     task_ref: str
     structured: str
+    sources: list[dict]        # WP1 需求来源链（材料出处，透传到审批）
+    clarification: dict        # WP1 澄清结果（模糊项/待确认问题/明示默认值）
     prd_doc: str
     version: int
     approval_id: str
@@ -73,6 +86,8 @@ def _build_approval_payload(state: FlowState, version: int) -> dict:
             ],
             "risk": {"score": 40, "level": "L2", "factors": ["影响面:纯新增", "不可逆:可回滚"]},
             "self_review": "验收标准已 EARS 化；边界情况待评审补充",
+            # WP1：把需求来源链随审批一起落库，争论口径时可回查出处
+            "sources": state.get("sources") or [],
         },
         "options": ["approve", "reject", "revise"],
         "deadline": (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat(),
@@ -86,11 +101,45 @@ def _build_approval_payload(state: FlowState, version: int) -> dict:
 
 def build_graph(ctx: FlowContext):
     def clarify(state: FlowState) -> dict:
-        structured = (
-            f"需求澄清结果：\n- 原始诉求：{state['requirement']}\n"
-            f"- 目标用户/场景：待补充（Phase 0 单轮澄清）\n- 非目标：本迭代不含移动端"
-        )
-        return {"structured": structured, "logs": ["step:clarify done"]}
+        """需求澄清（WP1）：模糊度检测 + 待确认问题（带出处）+ 明示默认值。
+
+        规则检测保证**可复现、可单测**（见 app/ambiguity.py），LLM 只在有 Key 时用于
+        组织语言；无论哪种方式，待确认问题与其出处都必须落到状态里，供 G1 审批与
+        E1 工程闸门消费。
+        """
+        sources = state.get("sources") or []
+        review = ambiguity.summarize(state["requirement"], sources=sources)
+        text = ambiguity.render_clarification_text(review)
+
+        # 有 LLM 时让澄清 Agent 在此基础上组织（prompt 走注册中心，可热更新）
+        if getattr(ctx, "llm", None) is not None and os.getenv("CLARIFY_USE_LLM", "1") != "0":
+            try:
+                system_prompt = get_prompt("clarify_agent", DEFAULT_CLARIFY_PROMPT)
+                answer = ctx.llm.chat(
+                    [
+                        {"role": "system", "content": system_prompt},
+                        {
+                            "role": "user",
+                            "content": (
+                                f"需求原文：{state['requirement']}\n\n"
+                                f"规则检测结果（必须全部保留，可补充，不可删除）：\n{text}\n\n"
+                                f"材料出处（引用时只可引用这里出现过的）：{json.dumps(sources, ensure_ascii=False)}"
+                            ),
+                        },
+                    ]
+                )
+                if answer and answer.strip():
+                    text = answer.strip()
+            except Exception:
+                logger.exception("澄清 Agent 调用失败，退回规则检测结果")
+
+        logs = [
+            f"step:clarify done（模糊项 {review['ambiguity_count']} 处，"
+            f"待确认问题 {len(review['questions'])} 条，出处 {len(sources)} 条）"
+        ]
+        if review["needs_clarification"]:
+            logs.append("step:clarify 需要业务方确认：" + "；".join(q["question"] for q in review["questions"][:3]))
+        return {"structured": text, "clarification": review, "sources": sources, "logs": logs}
 
     def draft_prd(state: FlowState) -> dict:
         version = state.get("version", 0) + 1

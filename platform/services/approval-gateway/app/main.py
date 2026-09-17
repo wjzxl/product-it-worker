@@ -35,7 +35,40 @@ def _ensure_tenant_column() -> None:
         logger.exception("tenant 列迁移失败")
 
 
+def _ensure_sources_column() -> None:
+    """WP1 轻量迁移：为既有库补 sources 列（需求来源链）。
+
+    只加列不删列；存量行 sources 为 NULL，读取时按空列表处理（不视为缺失）。
+    """
+    from sqlalchemy import inspect, text
+
+    try:
+        insp = inspect(engine)
+        cols = [c["name"] for c in insp.get_columns("approval_requests")]
+        if "sources" not in cols:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE approval_requests ADD COLUMN sources JSON"))
+            logger.info("已为 approval_requests 补充 sources 列（WP1 需求来源链迁移）")
+    except Exception:  # 迁移失败不阻断服务（表可能尚不存在）
+        logger.exception("sources 列迁移失败")
+
+
+def _ensure_gate_check_table() -> None:
+    """WP2 轻量迁移：工程闸门检查留痕表（E1–E3）。SQLAlchemy 建表，缺表即建。"""
+    from sqlalchemy import inspect
+
+    try:
+        insp = inspect(engine)
+        if "gate_checks" not in insp.get_table_names():
+            Base.metadata.tables["gate_checks"].create(bind=engine)
+            logger.info("已创建 gate_checks 表（WP2 工程闸门留痕）")
+    except Exception:
+        logger.exception("gate_checks 建表失败")
+
+
 _ensure_tenant_column()
+_ensure_sources_column()
+_ensure_gate_check_table()
 
 app = FastAPI(
     title="平台人审网关 approval-gateway",

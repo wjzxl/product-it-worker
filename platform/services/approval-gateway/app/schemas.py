@@ -22,14 +22,40 @@ class RiskSnapshot(BaseModel):
     factors: list[str] = Field(default_factory=list)
 
 
+SourceKind = Literal["chat", "voice", "image", "excel", "issue", "doc", "mail", "manual"]
+
+
+class SourceRef(BaseModel):
+    """需求来源引用（WP1 provenance）：让每条结论能回到原始材料的具体位置。
+
+    对应《从 vibe coding 到 FDE 交付》图 11「每条需求都带出处」：
+    消息 ID / 录音时间戳 / 图片区域 / 表格单元格——争论"这个字段为什么存在"时可回查。
+    """
+
+    kind: SourceKind = Field(description="材料载体类型")
+    ref: str = Field(min_length=1, description="材料定位（如 feishu://chat/oc_x/msg/om_y、GitLab issue URL）")
+    quote: str = Field(default="", max_length=2000, description="原话/原文摘录（证据的最小片段）")
+    locator: dict[str, Any] = Field(
+        default_factory=dict,
+        description="载体内的精确位置：voice→{start_ms,end_ms}；image→{bbox:[x,y,w,h]}；excel→{sheet,cell}；chat→{msg_id}",
+    )
+    captured_at: Optional[datetime] = Field(default=None, description="材料产生时间（非录入时间）")
+    confirmed_by: str = Field(default="", description="该出处的确认人（谁说了这句话/谁确认了这条）")
+
+
 class ContextSnapshot(BaseModel):
-    """三要素上下文：做了什么 / 依据 / 风险自评（缺一不可）。"""
+    """三要素上下文：做了什么 / 依据 / 风险自评（缺一不可）。
+
+    WP1 扩展：`sources` 为**可选**字段（默认空），存量审批与既有测试零破坏；
+    新流程（需求澄清 / 工程闸门 E1）会要求其非空。
+    """
 
     artifact_ref: str = Field(min_length=1)
     diff_summary: str = Field(min_length=1, description="① 做了什么")
     evidence: list[str] = Field(min_length=1, description="② 依据链接")
     risk: RiskSnapshot = Field(description="③ 风险自评")
     self_review: str = ""
+    sources: list[SourceRef] = Field(default_factory=list, description="④ 需求来源链（WP1）")
 
 
 class EscalationPolicy(BaseModel):

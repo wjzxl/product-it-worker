@@ -38,6 +38,7 @@ class RunIn(BaseModel):
     project_id: str = "sandbox/prodesgin"
     path_with_namespace: str = ""
     prd_doc: str = ""
+    sources: list[dict] = Field(default_factory=list)  # WP1 需求来源链（材料出处，可空）
     alert: dict = Field(default_factory=dict)   # 运维域：告警载荷
     context: str = ""       # 运维域：日志/指标上下文
     runbook: str = ""       # 运维域：Runbook 文本
@@ -78,6 +79,9 @@ def _status(graph, thread_id: str, sop: str) -> dict:
         if gate == "gate_g1":
             body["prd_version"] = values.get("version")
             body["prd_doc"] = values.get("prd_doc", "")
+            # WP1：把澄清结果与来源链一并返回，人审与工程闸门都据此判断
+            body["clarification"] = values.get("clarification", {})
+            body["sources"] = values.get("sources", [])
         if gate == "gate_g2":
             body["tech_design"] = values.get("tech_design", "")
         if gate == "gate_g3":
@@ -201,6 +205,7 @@ def create_app(
             "project_id": body.project_id,
             "path_with_namespace": body.path_with_namespace,
             "task_ref": body.task_ref,
+            "sources": body.sources,   # WP1：澄清与 G1 审批都基于这份出处
             "logs": [],
         }
         if body.sop == SOP_DEV:

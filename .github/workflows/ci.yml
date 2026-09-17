@@ -11,7 +11,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [approval-gateway, gitlab-bridge, task-center, agent-runtime, knowledge-base]
+        # WP0：补齐全部 7 个服务（此前漏了 metrics-dashboard 与 process-mining，
+        # 其 46 项测试从未在 CI 运行过）
+        service:
+          - approval-gateway
+          - gitlab-bridge
+          - task-center
+          - agent-runtime
+          - knowledge-base
+          - metrics-dashboard
+          - process-mining
     defaults:
       run:
         working-directory: platform/services/${{ matrix.service }}

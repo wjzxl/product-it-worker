@@ -11,7 +11,9 @@ from app.main import create_app
 def env():
     approval = MockApprovalAPI()
     gitlab = MockGitLabAPI()
-    llm = MockLLM(answers=["PRD v1 内容", "PRD v2 修订版内容"])
+    # WP1：澄清节点会先调用一次 LLM（clarify_agent），故答案队列首位是澄清输出，
+    # 之后才是 PRD v1 / v2——顺序与真实流程一致。
+    llm = MockLLM(answers=["## 需求理解\n待确认：导出格式/范围/权限", "PRD v1 内容", "PRD v2 修订版内容"])
     app = create_app(approval_api=approval, gitlab_api=gitlab, llm=llm)
     return {"client": TestClient(app), "approval": approval, "gitlab": gitlab, "llm": llm}
 

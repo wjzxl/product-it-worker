@@ -39,6 +39,10 @@ class ApprovalRequest(Base):
     # 三要素上下文快照（创建后不可变，审批人看到一致视图）
     context_snapshot: Mapped[dict] = mapped_column(JSON)
 
+    # WP1 需求来源链：从 context_snapshot.sources 冗余出的独立列，便于按来源反查
+    # （"这条需求当初是谁、在哪句话里提出的"）。空列表=存量数据，不视为缺失。
+    sources: Mapped[list] = mapped_column(JSON, default=list)
+
     options: Mapped[list] = mapped_column(JSON, default=list)          # ["approve","reject","revise"]
 
     deadline: Mapped[datetime] = mapped_column(DateTime(timezone=True))
@@ -81,3 +85,26 @@ class Decision(Base):
     decided_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     request: Mapped["ApprovalRequest"] = relationship(back_populates="decisions")
+
+
+class GateCheck(Base):
+    """工程闸门检查留痕（WP2，E1–E3）。
+
+    与 `ApprovalRequest` 的区别：**E 闸门是机器判定**（规则即代码，判定器可单测），
+    G 闸门是人做业务决策。两者共同构成双层闸门：E 管"实施条件是否具备"，G 管"业务是否同意"。
+    """
+
+    __tablename__ = "gate_checks"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: new_id("gck"))
+    tenant: Mapped[str] = mapped_column(String(64), default="default", index=True)
+    code: Mapped[str] = mapped_column(String(16), index=True)          # E1 / E2 / E3
+    task_ref: Mapped[str] = mapped_column(String(128), default="", index=True)
+    mode: Mapped[str] = mapped_column(String(16), default="warn")      # off / warn / block
+    passed: Mapped[bool] = mapped_column(default=False)
+    blocked: Mapped[bool] = mapped_column(default=False)               # 实际是否阻断了推进
+    gaps: Mapped[list] = mapped_column(JSON, default=list)             # 缺口清单（结构化）
+    context: Mapped[dict] = mapped_column(JSON, default=dict)          # 被检查的上下文快照
+    rule_version: Mapped[str] = mapped_column(String(64), default="")
+    checked_by: Mapped[str] = mapped_column(String(128), default="")
+    checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
