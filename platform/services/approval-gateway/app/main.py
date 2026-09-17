@@ -79,9 +79,38 @@ def _ensure_evidence_table() -> None:
         logger.exception("evidence_artifacts 建表失败")
 
 
+def _ensure_gate_feedback_columns() -> None:
+    """WP10 轻量迁移：为既有 gate_checks 补误拦反馈列（只加列不删列）。
+
+    误拦反馈是"误拦率 <10%"唯一的数据来源（M1 决策 D3）——没有它闸门只能靠感觉调宽严。
+    """
+    from sqlalchemy import inspect, text
+
+    try:
+        insp = inspect(engine)
+        if "gate_checks" not in insp.get_table_names():
+            return
+        cols = [c["name"] for c in insp.get_columns("gate_checks")]
+        additions = {
+            "feedback": "VARCHAR(32) DEFAULT ''",
+            "feedback_note": "TEXT DEFAULT ''",
+            "feedback_by": "VARCHAR(128) DEFAULT ''",
+            "feedback_at": "TIMESTAMP",
+        }
+        missing = {name: ddl for name, ddl in additions.items() if name not in cols}
+        if missing:
+            with engine.begin() as conn:
+                for name, ddl in missing.items():
+                    conn.execute(text(f"ALTER TABLE gate_checks ADD COLUMN {name} {ddl}"))
+            logger.info("已为 gate_checks 补充反馈列：%s", ", ".join(missing))
+    except Exception:
+        logger.exception("gate_checks 反馈列迁移失败")
+
+
 _ensure_tenant_column()
 _ensure_sources_column()
 _ensure_gate_check_table()
+_ensure_gate_feedback_columns()
 _ensure_evidence_table()
 
 app = FastAPI(

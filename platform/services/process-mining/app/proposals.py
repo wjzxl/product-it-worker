@@ -5,6 +5,8 @@
 - `gate_sla`：调整某 Gate 的 SLA 小时数
 - `prompt_version`：写入新 Prompt 版本并切换 active（`target`=Prompt 键，`value`=新 Prompt 全文）
 - `knowledge_ingest`：把新知识/规范入库（`target`=来源前缀如 runbooks，`value`=Markdown 内容）
+- `decision_broadcast`：把**已确认的决定**分发为各岗位动作规则（WP9，课程图 64/65）；
+  `value` 需含 decision/source/confirmed_by（讨论与提议不得当决定分发）
 - `advice`：建议类（不改配置，仅登记改进项）
 LLM 不可用时回退规则化提案（保证链路可用）。
 """
@@ -27,7 +29,7 @@ SYSTEM_PROMPT = (
     "规则：提案必须有数据依据；每次 1~3 条；只输出 JSON，不要解释。"
 )
 
-APPLIABLE_ACTIONS = ("trust_threshold", "gate_sla", "prompt_version", "knowledge_ingest")
+APPLIABLE_ACTIONS = ("trust_threshold", "gate_sla", "prompt_version", "knowledge_ingest", "decision_broadcast")
 
 
 def llm_from_env() -> Callable[[str], str] | None:

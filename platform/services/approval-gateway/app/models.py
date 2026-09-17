@@ -109,6 +109,13 @@ class GateCheck(Base):
     checked_by: Mapped[str] = mapped_column(String(128), default="")
     checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
 
+    # WP10 / M1 决策 D3：误拦反馈（人判断"这次其实该放行"）
+    # —— 计划 §8 的误拦率 <10% 是硬指标，没有这个字段就永远算不出来
+    feedback: Mapped[str] = mapped_column(String(32), default="")        # ""/valid/false_positive
+    feedback_note: Mapped[str] = mapped_column(Text, default="")
+    feedback_by: Mapped[str] = mapped_column(String(128), default="")
+    feedback_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
 
 class EvidenceArtifact(Base):
     """证据工件（WP5）：验收项 ↔ 可复验材料。

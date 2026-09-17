@@ -28,6 +28,7 @@ from .schemas import (
     DecisionOut,
     GateCheckIn,
     GateCheckOut,
+    GateFeedbackIn,
     ImCardCallback,
 )
 
@@ -524,3 +525,35 @@ def evidence_content(artifact_id: str, db: Session = Depends(get_db), tenant: st
     return Response(content=data, media_type="application/octet-stream",
                     headers={"Content-Disposition": f'attachment; filename="{row.filename}"',
                              "X-Evidence-Sha256": row.sha256})
+
+
+# --------------------------------------------------------------------------------------
+# 误拦反馈（WP10 / M1 决策 D3）：让"误拦率"成为可计算指标
+# --------------------------------------------------------------------------------------
+@router.post("/eng-gates/checks/{check_id}/feedback")
+def gate_check_feedback(
+    check_id: str,
+    payload: GateFeedbackIn,
+    db: Session = Depends(get_db),
+    tenant: str = Depends(current_tenant),
+    principal=Depends(current_principal),
+) -> dict:
+    """人对某次拦截给出判定：确实该拦（valid）／其实该放行（false_positive）。
+
+    计划 §8 约定误拦率 <10%；反馈覆盖率不足时该指标不可信（`feedback_stats` 会如实报出）。
+    """
+    try:
+        return eng_gates.record_feedback(
+            db, tenant=tenant, check_id=check_id, verdict=payload.verdict,
+            note=payload.note, by=principal.sub or payload.by,
+        )
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+    except LookupError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+
+
+@router.get("/eng-gates/feedback/stats")
+def gate_feedback_stats(db: Session = Depends(get_db), tenant: str = Depends(current_tenant)) -> dict:
+    """误拦率统计（计划 §8 度量；`false_positive_rate` 为 None 表示尚无足够反馈）。"""
+    return eng_gates.feedback_stats(db, tenant=tenant)

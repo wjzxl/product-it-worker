@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from . import gate_rules
 from .evidence import evidence_map
-from .models import GateCheck
+from .models import GateCheck, utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -161,3 +161,63 @@ def history(db: Session, tenant: str, task_ref: str = "", code: str = "", limit:
         }
         for r in db.scalars(stmt)
     ]
+
+FEEDBACK_VERDICTS = ("valid", "false_positive")
+
+
+def record_feedback(db: Session, tenant: str, check_id: str, verdict: str, note: str = "",
+                    by: str = "") -> dict:
+    """记录误拦反馈（WP10 / M1 决策 D3）：人判断这次拦截是否其实该放行。
+
+    这是"误拦率 <10%"唯一的数据来源——没有它，闸门只能靠感觉调宽严。
+    """
+    if verdict not in FEEDBACK_VERDICTS:
+        raise ValueError(f"verdict 必须是 {FEEDBACK_VERDICTS}，收到 {verdict!r}")
+    row = db.get(GateCheck, check_id)
+    if row is None or row.tenant != tenant:
+        raise LookupError(f"检查记录不存在：{check_id}")
+    row.feedback = verdict
+    row.feedback_note = (note or "")[:500]
+    row.feedback_by = by[:128]
+    row.feedback_at = utcnow()
+    db.commit()
+    db.refresh(row)
+    logger.info("误拦反馈：%s %s by=%s", check_id, verdict, by or "-")
+    return {
+        "check_id": row.id,
+        "code": row.code,
+        "feedback": row.feedback,
+        "feedback_note": row.feedback_note,
+        "feedback_by": row.feedback_by,
+        "feedback_at": row.feedback_at.isoformat() if row.feedback_at else "",
+        "blocked": row.blocked,
+        "gaps": [g.get("id") for g in (row.gaps or [])],
+    }
+
+
+def feedback_stats(db: Session, tenant: str = "") -> dict:
+    """误拦率统计（计划 §8）：只看**被阻断**且已反馈的记录。"""
+    stmt = select(GateCheck).where(GateCheck.blocked.is_(True))
+    if tenant:
+        stmt = stmt.where(GateCheck.tenant == tenant)
+    rows = list(db.scalars(stmt))
+    judged = [r for r in rows if r.feedback]
+    false_positive = [r for r in judged if r.feedback == "false_positive"]
+    return {
+        "blocked_total": len(rows),
+        "judged": len(judged),
+        "pending_feedback": len(rows) - len(judged),
+        "false_positive": len(false_positive),
+        "false_positive_rate": round(len(false_positive) / len(judged), 3) if judged else None,
+        "by_code": _feedback_by_code(judged),
+    }
+
+
+def _feedback_by_code(rows: list[GateCheck]) -> dict:
+    out: dict[str, dict] = {}
+    for row in rows:
+        entry = out.setdefault(row.code, {"judged": 0, "false_positive": 0})
+        entry["judged"] += 1
+        if row.feedback == "false_positive":
+            entry["false_positive"] += 1
+    return out

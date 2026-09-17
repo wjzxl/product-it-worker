@@ -136,6 +136,14 @@ class GateCheckIn(BaseModel):
     persist: bool = True
 
 
+class GateFeedbackIn(BaseModel):
+    """误拦反馈（WP10）：人判断这次拦截是否其实该放行。"""
+
+    verdict: Literal["valid", "false_positive"]
+    note: str = ""
+    by: str = ""
+
+
 class GateCheckOut(BaseModel):
     """判定结果即契约：blocked=true 时调用方**必须**停止推进。"""
 

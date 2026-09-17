@@ -86,6 +86,92 @@ def _apply_knowledge_ingest(target: str, value: object) -> dict:
             "chunks": body.get("chunks")}
 
 
+# --------------------------------------------------------------------------------------
+# WP9 决策分发（课程图 64/65：「给机器开会」——一个决定 → 各岗位动作规则）
+# --------------------------------------------------------------------------------------
+DEFAULT_ROLE_MAP = {
+    "dev-agent": "停止为该 SKU/需求排期与开发；已开分支保留但不再推进；MR 标注决策来源",
+    "ops-duty": "停止相关投放/容量调整；如涉及下线，走 G5 变更审批后再执行",
+    "product-agent": "在需求池标注该决定；后续同类需求直接引用该决定，不重复澄清",
+}
+
+
+def _decisions_dir() -> Path:
+    env = os.getenv("DECISIONS_DIR", "")
+    base = Path(env) if env else config_path().parent / "decisions"
+    base.mkdir(parents=True, exist_ok=True)
+    return base
+
+
+def apply_decision_broadcast(target: str, value: object) -> dict:
+    """把**已确认的决定**写入知识库，并生成各岗位的动作规则（保留共同来源）。
+
+    `value` 形如：
+        {"decision": "ASIN-B0XXX 清货不再补货", "scope": "全公司",
+         "source": "会议 2026-09-17 #决策项3", "confirmed_by": "运营负责人",
+         "roles": {"ops-duty": "停止补货并处理库存", ...}}   # roles 可选，缺省用 DEFAULT_ROLE_MAP
+
+    要点（对应课程整理稿的提醒）：
+    - 只分发**已确认的决定**，不把讨论/提议升级成命令；
+    - 每个岗位拿到的是"本岗位动作"，但都指向**同一权威来源**；
+    - 落成文件 + 写 KB，便于后续 Agent 查询到同一有效规则。
+    """
+    if not isinstance(value, dict) or not value.get("decision"):
+        return {"applied": False, "reason": "decision_broadcast 需要 value.decision（决定内容）"}
+    decision = str(value["decision"]).strip()
+    source = str(value.get("source") or "").strip()
+    confirmed_by = str(value.get("confirmed_by") or "").strip()
+    if not source or not confirmed_by:
+        return {"applied": False,
+                "reason": "必须提供 source（决定出处）与 confirmed_by（谁确认的）——讨论不能被当成决定分发"}
+
+    roles = dict(DEFAULT_ROLE_MAP)
+    roles.update({str(k): str(v) for k, v in (value.get("roles") or {}).items()})
+    record = {
+        "decision": decision,
+        "scope": str(value.get("scope") or "全公司"),
+        "source": source,
+        "confirmed_by": confirmed_by,
+        "confirmed_at": str(value.get("confirmed_at") or datetime.now(timezone.utc).isoformat()),
+        "role_rules": roles,
+    }
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    path = _decisions_dir() / f"{stamp}-{target or 'decision'}.yaml"
+    path.write_text(yaml.safe_dump(record, allow_unicode=True, sort_keys=False), encoding="utf-8")
+
+    # 写入知识库（权威条目）：各岗位读到同一来源
+    kb_result: dict = {"skipped": "未配置知识库"}
+    kb_url = os.getenv("KNOWLEDGE_BASE_URL", "")
+    if kb_url:
+        try:
+            import httpx
+
+            body = (
+                f"# 已确认决定：{decision}\n\n"
+                f"- 范围：{record['scope']}\n- 出处：{source}\n- 确认人：{confirmed_by}\n"
+                f"- 确认时间：{record['confirmed_at']}\n\n## 各岗位动作规则\n"
+                + "\n".join(f"- **{role}**：{rule}" for role, rule in roles.items())
+            )
+            resp = httpx.post(f"{kb_url.rstrip('/')}/documents",
+                              json={"source": f"platform/decisions/{path.name}", "content": body}, timeout=30)
+            resp.raise_for_status()
+            kb_result = {"ingested": True, "source": f"platform/decisions/{path.name}", "chunks": resp.json().get("chunks")}
+        except Exception as exc:
+            kb_result = {"ingested": False, "error": f"{type(exc).__name__}: {exc}"}
+
+    logger.info("决策已分发：%s → %d 个岗位（来源：%s）", decision[:40], len(roles), source)
+    return {
+        "applied": True,
+        "kind": "decision_broadcast",
+        "target": target,
+        "decision": decision,
+        "roles": sorted(roles),
+        "record": str(path),
+        "knowledge_base": kb_result,
+        "authoritative": True,
+    }
+
+
 def apply_action(action: dict) -> dict:
     """应用单个动作：trust_threshold / gate_sla 写配置；advice 仅登记。"""
     kind = action.get("type")
@@ -101,6 +187,9 @@ def apply_action(action: dict) -> dict:
 
     if kind == "knowledge_ingest":
         return {**_apply_knowledge_ingest(target, value), "config": f"kb:{os.getenv('KNOWLEDGE_BASE_URL', 'http://localhost:8004')}"}
+
+    if kind == "decision_broadcast":
+        return apply_decision_broadcast(target, value)
 
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     before = None
