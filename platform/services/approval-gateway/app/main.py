@@ -66,9 +66,23 @@ def _ensure_gate_check_table() -> None:
         logger.exception("gate_checks 建表失败")
 
 
+def _ensure_evidence_table() -> None:
+    """WP5 轻量迁移：证据工件表（缺表即建）。"""
+    from sqlalchemy import inspect
+
+    try:
+        insp = inspect(engine)
+        if "evidence_artifacts" not in insp.get_table_names():
+            Base.metadata.tables["evidence_artifacts"].create(bind=engine)
+            logger.info("已创建 evidence_artifacts 表（WP5 证据库）")
+    except Exception:
+        logger.exception("evidence_artifacts 建表失败")
+
+
 _ensure_tenant_column()
 _ensure_sources_column()
 _ensure_gate_check_table()
+_ensure_evidence_table()
 
 app = FastAPI(
     title="平台人审网关 approval-gateway",

@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import gate_rules
+from .evidence import evidence_map
 from .models import GateCheck
 
 logger = logging.getLogger(__name__)
@@ -73,6 +74,22 @@ def build_context(db: Session, task_ref: str, tenant: str, inline: Optional[dict
                 "rule_version": chk.rule_version,
             }
         context.setdefault("prior_gates", prior)
+
+        # WP5：把**证据库里的真实证据**绑定到验收项（E3 不再依赖调用方自报 evidence）
+        # 规则：验收项若在证据库里已有证据，则自动补齐 evidence_ids；调用方仍可显式声明"不适用"。
+        mapping = evidence_map(db, tenant, task_ref)
+        items = context.get("acceptance_items")
+        if isinstance(items, list) and mapping:
+            patched = []
+            for index, item in enumerate(items):
+                item = dict(item) if isinstance(item, dict) else {"id": f"item-{index + 1}"}
+                ident = str(item.get("id") or f"item-{index + 1}")
+                if not item.get("evidence") and mapping.get(ident):
+                    item["evidence"] = [f"evidence://{eid}" for eid in mapping[ident]]
+                    item["evidence_source"] = "evidence-store"
+                patched.append(item)
+            context["acceptance_items"] = patched
+        context["evidence_binding"] = {k: len(v) for k, v in mapping.items()}
     context.setdefault("task_ref", task_ref)
     context.setdefault("tenant", tenant)
     return context

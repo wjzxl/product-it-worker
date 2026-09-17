@@ -8,11 +8,12 @@ import json
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi import (APIRouter, Depends, File, Form, Header, HTTPException, Request,
+                     Response, UploadFile, status)
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import eng_gates, gate_rules
+from . import eng_gates, evidence, gate_rules
 from .db import get_db
 from .events import new_event, publisher_from_env
 from .models import ApprovalRequest, Decision, utcnow
@@ -450,3 +451,76 @@ def eng_gate_history(
 ) -> list[dict]:
     """检查历史（计划 §8 度量：拦截率、缺口补齐时长、误拦反馈的原始数据）。"""
     return eng_gates.history(db, tenant=tenant, task_ref=task_ref, code=code.upper(), limit=limit)
+
+
+# --------------------------------------------------------------------------------------
+# 证据库（WP5）：验收项 ↔ 可复验工件（课程图 33）
+# --------------------------------------------------------------------------------------
+@router.post("/evidence", status_code=status.HTTP_201_CREATED)
+async def upload_evidence(
+    request: Request,
+    task_ref: str = Form(...),
+    acceptance_item: str = Form(...),
+    kind: str = Form("other"),
+    note: str = Form(""),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    tenant: str = Depends(current_tenant),
+    principal=Depends(current_principal),
+) -> dict:
+    """上传一件证据（multipart）。必须指明对应的验收项，否则无法用于交付判定。"""
+    content = await file.read()
+    try:
+        return evidence.store(
+            db,
+            tenant=tenant,
+            task_ref=task_ref,
+            acceptance_item=acceptance_item,
+            kind=kind,
+            filename=file.filename or "evidence",
+            content=content,
+            created_by=principal.sub,
+            note=note,
+        )
+    except evidence.EvidenceError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+
+
+@router.get("/evidence")
+def list_evidence(task_ref: str = "", db: Session = Depends(get_db), tenant: str = Depends(current_tenant)) -> dict:
+    """按任务列出证据 + 验收项覆盖情况（E3 直接消费）。"""
+    items = evidence.list_for_task(db, tenant, task_ref) if task_ref else []
+    return {
+        "task_ref": task_ref,
+        "tenant": tenant,
+        "evidence": items,
+        "by_acceptance_item": evidence.evidence_map(db, tenant, task_ref) if task_ref else {},
+    }
+
+
+@router.get("/evidence/verify")
+def verify_evidence(task_ref: str, db: Session = Depends(get_db), tenant: str = Depends(current_tenant)) -> dict:
+    """复验：逐件校验 sha256（课程图 33：证据要能复验，不能只写"已测"）。"""
+    return evidence.verify(db, tenant, task_ref)
+
+
+@router.get("/evidence/{artifact_id}")
+def evidence_meta(artifact_id: str, db: Session = Depends(get_db), tenant: str = Depends(current_tenant)) -> dict:
+    row = evidence.get(db, tenant, artifact_id)
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"证据 {artifact_id} 不存在")
+    return evidence.to_dict(row)
+
+
+@router.get("/evidence/{artifact_id}/content")
+def evidence_content(artifact_id: str, db: Session = Depends(get_db), tenant: str = Depends(current_tenant)):
+    row = evidence.get(db, tenant, artifact_id)
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"证据 {artifact_id} 不存在")
+    try:
+        data = evidence.read_content(row)
+    except evidence.EvidenceError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    return Response(content=data, media_type="application/octet-stream",
+                    headers={"Content-Disposition": f'attachment; filename="{row.filename}"',
+                             "X-Evidence-Sha256": row.sha256})

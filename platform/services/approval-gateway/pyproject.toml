@@ -17,6 +17,7 @@ dependencies = [
     "pyyaml>=6.0",
     "pyjwt>=2.8",
     "cryptography>=41,<45",  # 本机 Python 3.9 需预编译 wheel（>=45 无 wheel）
+    "python-multipart>=0.0.9",  # WP5 证据上传（Form/File）
 ]
 
 [project.optional-dependencies]

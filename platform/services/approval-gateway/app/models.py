@@ -108,3 +108,26 @@ class GateCheck(Base):
     rule_version: Mapped[str] = mapped_column(String(64), default="")
     checked_by: Mapped[str] = mapped_column(String(128), default="")
     checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+class EvidenceArtifact(Base):
+    """证据工件（WP5）：验收项 ↔ 可复验材料。
+
+    对应课程图 33：需求、代码产物与测试证据要互相对应，半年后接手的人要能复验。
+    元数据在 PG（租户隔离 + 审计），工件本体在本地卷（EVIDENCE_DIR，可换对象存储）。
+    """
+
+    __tablename__ = "evidence_artifacts"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: new_id("evd"))
+    tenant: Mapped[str] = mapped_column(String(64), default="default", index=True)
+    task_ref: Mapped[str] = mapped_column(String(128), default="", index=True)
+    acceptance_item: Mapped[str] = mapped_column(String(128), default="", index=True)  # 对应哪个验收项
+    kind: Mapped[str] = mapped_column(String(32), default="other")                     # export/log/screenshot/...
+    filename: Mapped[str] = mapped_column(String(200), default="")
+    path: Mapped[str] = mapped_column(Text, default="")
+    sha256: Mapped[str] = mapped_column(String(64), default="")                        # 复验用
+    size: Mapped[int] = mapped_column(default=0)
+    created_by: Mapped[str] = mapped_column(String(128), default="")
+    note: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)

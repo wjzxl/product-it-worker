@@ -16,3 +16,6 @@ venv/
 # Node（未来 Web 控制台）
 node_modules/
 dist/
+
+# 证据工件（本地卷；元数据在 PG，工件不入库）
+platform/evidence/
