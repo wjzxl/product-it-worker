@@ -1,0 +1,42 @@
+# E2 工程闸门：解构之后（Post-Decomposition Gate）
+#
+# 对应《从 vibe coding 到 FDE 交付》图 41：数据、业务、接口都写了，界面的空态/报错态没定义，
+# 仍要打回——完整性必须覆盖用户实际会遇到的状态，而不是只覆盖最顺利的演示路径。
+#
+# 本闸门检查"设计是否足够完整"，不检查实现质量（那是 E3 与 G3/G4 的事）。
+code: E2
+title: 解构之后
+version: "1"
+mode: block
+description: >
+  在进入实现之前检查设计的完整性与一致性：五份配套设计（数据/业务/接口/前端/测试）、
+  界面状态（空态/报错态/加载态）、统一接口协议与数据字典。
+  "确实不需要"的项必须显式声明 not_applicable: true 并写明 reason——区分
+  「经过确认的空」与「漏掉的空」（课程图 30）。
+
+checks:
+  - id: design_docs_complete
+    ask: 每个模块五份配套设计（data/business/api/frontend/test）齐备，或显式声明不适用并说明原因
+    require: design_complete
+    severity: critical
+    hint: '无界面的模块把 frontend 写成 {"not_applicable": true, "reason": "后台任务，无页面"}'
+
+  - id: ux_states_defined
+    ask: 空态、报错态、加载态是否定义（或声明不适用并说明原因）
+    require: ux_states_defined
+    severity: critical
+    hint: 课程图 41 的打回案例：只写主流程、没定义界面状态不算设计完成
+
+  - id: api_contract_unified
+    ask: 接口是否遵循统一返回结构（如 code/msg/data）与分页约定
+    require: non_empty
+    keys: ["api_contract_ref"]
+    severity: major
+    hint: 引用 project-rules/constraints/api-protocol.md，禁止各模块自创返回格式（课程图 26）
+
+  - id: data_dictionary
+    ask: 涉及的数据对象/字段是否已进数据字典（含业务含义与来源）
+    require: non_empty
+    keys: ["data_dictionary_ref"]
+    severity: major
+    hint: 字段能倒查来源（课程图 34）：成本列为何存在、谁能看，都要能回到需求原话

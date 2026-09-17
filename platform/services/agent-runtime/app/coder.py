@@ -17,6 +17,7 @@ import subprocess
 import sys
 import tempfile
 
+from . import rules_pack
 from .prompts import get_prompt
 from .sandbox import get_runner
 
@@ -194,9 +195,18 @@ class Coder:
             if getattr(self, "_only_src", False)
             else ""
         )
+        # WP4：把项目规则包注入（课程图 22：Harness 是"能打开的文件夹"）。
+        # 摘要带指纹，"这轮用哪版规则"可核查；规则包缺失时不阻断（但会在日志告警）。
+        rules = ""
+        try:
+            rules = rules_pack.prompt_excerpt()
+        except Exception:
+            logger.exception("项目规则包加载失败（不阻断，但本轮缺少项目规则约束）")
+        rules_block = f"\n{rules}\n" if rules else ""
         return (
             f"# 任务\n标题：{task.get('title', '')}\n引用：{task.get('task_ref', '')}\n"
-            f"项目路径：{self.project_path}\n\n"
+            f"项目路径：{self.project_path}\n"
+            f"{rules_block}\n"
             f"# PRD（验收标准）\n{prd[:6000]}\n\n"
             f"# 技术方案\n{tech_design[:4000]}\n\n"
             f"# 仓库现状文件\n{chr(10).join(repo_files)}\n\n"

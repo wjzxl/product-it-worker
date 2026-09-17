@@ -1,0 +1,49 @@
+# E3 工程闸门：交付之前（Pre-Delivery Gate）
+#
+# 对应《从 vibe coding 到 FDE 交付》图 42：代码产物 6/6、证据 5/6 仍不算完成——
+# 缺的那份证据意味着某项需求没有被证明，不能用代码数量代替验收。
+#
+# 与 G4 放行决策的分工：E3 是**机器判定**"证据是否齐、前序闸门是否过、接手材料是否在"；
+# G4 是人做**业务判断**"能不能放行"。E3 不过，G4 就不该被发起。
+code: E3
+title: 交付之前
+version: "1"
+mode: block
+description: >
+  交付前检查：产物清单齐备、每个验收项都有可复验证据、实现与方案一致、接手材料完整，
+  且前序工程闸门（E1 动手前 / E2 解构后）确实通过过。
+
+checks:
+  - id: prior_gates_passed
+    ask: E1（动手前）与 E2（解构后）是否均已通过
+    require: prior_gates_passed
+    keys: ["E1", "E2"]
+    severity: critical
+    hint: 不允许"跳着交"：先补齐前序闸门的缺口再谈交付
+
+  - id: artifacts_complete
+    ask: 产物清单（代码/配置/迁移/文档）是否齐备
+    require: non_empty
+    keys: ["artifacts"]
+    severity: major
+    hint: 列出实际交付物，避免"代码写了但迁移脚本没给"
+
+  - id: acceptance_evidence
+    ask: 每个验收项是否有对应证据（或显式声明不适用并说明原因）
+    require: items_with_evidence
+    severity: critical
+    hint: 证据是导出文件/日志/截图等可复验材料，不能只写"已测"（课程图 33）
+
+  - id: plan_consistency
+    ask: 实现是否与已确认的方案一致（有无未申报的偏离）
+    require: non_empty
+    keys: ["plan_consistency"]
+    severity: major
+    hint: 有偏离就写清楚偏离内容与原因，而不是默默改设计
+
+  - id: handover_ready
+    ask: 接手材料（运行说明/回滚方式/已知限制）
+    require: non_empty
+    keys: ["handover"]
+    severity: major
+    hint: 半年后接手的人要能只看材料就复验（课程图 33）

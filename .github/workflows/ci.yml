@@ -55,3 +55,6 @@ jobs:
       - name: 工程闸门规则自检
         working-directory: platform
         run: python scripts/check_gates.py --selftest
+      - name: 项目规则包校验
+        working-directory: platform
+        run: python scripts/check_project_rules.py

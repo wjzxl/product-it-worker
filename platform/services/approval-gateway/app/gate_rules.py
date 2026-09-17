@@ -26,8 +26,24 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_DIR = Path(__file__).resolve().parents[3] / "engineering-gates"
 SUPPORTED_MODES = ("off", "warn", "block")
-SUPPORTED_REQUIRE = ("non_empty", "any_of", "all_of", "source_present", "evidence_ids_present")
+SUPPORTED_REQUIRE = (
+    "non_empty",
+    "any_of",
+    "all_of",
+    "source_present",
+    "evidence_ids_present",
+    # WP3 新增（E2 解构后 / E3 交付前）
+    "design_complete",        # 五份设计齐备，或显式声明"不适用 + 原因"
+    "ux_states_defined",      # 空态/报错态/加载态定义（课程图 31、41）
+    "items_with_evidence",    # 每个验收项都要有证据，或显式"不适用 + 原因"
+    "prior_gates_passed",     # 前序工程闸门确实通过过（交付前不能跳过 E1/E2）
+)
 SEVERITIES = ("critical", "major", "minor")
+
+# 每个模块必备的五份配套设计（课程图 29：数据/业务/接口/前端/测试，五个视角互相校验）
+DESIGN_FACETS = ("data", "business", "api", "frontend", "test")
+# 用户实际会遇到的状态（课程图 31：完整性最容易漏的就是"什么都没有/失败/还在加载"）
+UX_STATES = ("empty", "error", "loading")
 
 
 class GateRuleError(ValueError):
@@ -183,6 +199,111 @@ def _resolve(context: dict, keys: list[str]) -> Any:
     return None
 
 
+def _na_reason(entry: Any) -> Optional[str]:
+    """判断条目是否为"显式不适用"，返回其原因（未声明原因则返回空串，视为未通过）。"""
+    if isinstance(entry, dict) and entry.get("not_applicable"):
+        return str(entry.get("reason") or "")
+    return None
+
+
+def _has_content(entry: Any) -> bool:
+    """条目是否"有内容"：字符串/列表非空，或 dict 里除元信息外还有实质字段。"""
+    if _is_blank(entry):
+        return False
+    if isinstance(entry, dict):
+        meaningful = {k: v for k, v in entry.items() if k not in ("not_applicable", "reason", "note")}
+        return any(not _is_blank(v) for v in meaningful.values())
+    return True
+
+
+def _check_design_complete(value: Any) -> tuple[bool, str, Any]:
+    """课程图 29/30：每个模块五份设计齐备；确实不需要的必须显式声明「不适用 + 原因」。
+
+    区分「经过确认的空」与「漏掉的空」——两者表面都缺文件，但只有前者说明做过完整判断。
+    """
+    if _is_blank(value):
+        return False, "未提供设计清单（design_docs）", None
+    modules = value if isinstance(value, dict) else {}
+    missing: list[str] = []
+    na_without_reason: list[str] = []
+    na_declared: list[str] = []
+    for module, facets in modules.items():
+        facets = facets or {}
+        for facet in DESIGN_FACETS:
+            entry = facets.get(facet)
+            reason = _na_reason(entry)
+            if reason is not None:
+                (na_declared if reason.strip() else na_without_reason).append(f"{module}.{facet}")
+                continue
+            if not _has_content(entry):
+                missing.append(f"{module}.{facet}")
+    if missing:
+        return False, f"设计缺失：{', '.join(missing[:6])}", {"missing": missing}
+    if na_without_reason:
+        return False, f"声明不适用但未写原因：{', '.join(na_without_reason)}", {"no_reason": na_without_reason}
+    detail = f"{len(modules)} 个模块 × {len(DESIGN_FACETS)} 份设计齐备"
+    if na_declared:
+        detail += f"（其中 {len(na_declared)} 项显式声明不适用并说明原因）"
+    return True, detail, {"modules": sorted(modules), "not_applicable": na_declared}
+
+
+def _check_ux_states(value: Any) -> tuple[bool, str, Any]:
+    """课程图 41：数据/业务/接口都写了、界面状态没定义，仍要打回。"""
+    if _is_blank(value):
+        return False, "未定义界面/交互状态（空态、报错态、加载态）", None
+    states = value if isinstance(value, dict) else {}
+    missing = [s for s in UX_STATES if _is_blank(states.get(s)) and _na_reason(states.get(s)) is None]
+    no_reason = [s for s in UX_STATES if _na_reason(states.get(s)) == ""]
+    if missing:
+        return False, f"状态未定义：{', '.join(missing)}（或声明不适用并给原因）", {"missing": missing}
+    if no_reason:
+        return False, f"声明不适用但未写原因：{', '.join(no_reason)}", {"no_reason": no_reason}
+    return True, "空态/报错态/加载态均已定义", {"states": sorted(states)}
+
+
+def _check_items_with_evidence(value: Any) -> tuple[bool, str, Any]:
+    """课程图 32/33：验收清单从需求长出来，且每条都要有可复验证据（不能只写"已测"）。"""
+    if _is_blank(value):
+        return False, "未提供验收项清单（acceptance_items）", None
+    items = value if isinstance(value, list) else []
+    no_evidence: list[str] = []
+    na_without_reason: list[str] = []
+    covered = 0
+    for index, item in enumerate(items):
+        item = item if isinstance(item, dict) else {}
+        ident = str(item.get("id") or f"item-{index + 1}")
+        reason = _na_reason(item)
+        if reason is not None:
+            (na_without_reason if not reason.strip() else []).append(ident)
+            if reason.strip():
+                covered += 1
+            continue
+        evidence = item.get("evidence") or item.get("evidence_ids") or []
+        if _is_blank(evidence):
+            no_evidence.append(ident)
+        else:
+            covered += 1
+    if no_evidence:
+        return False, f"以下验收项没有证据：{', '.join(no_evidence[:8])}", {"missing_evidence": no_evidence}
+    if na_without_reason:
+        return False, f"声明不适用但未写原因：{', '.join(na_without_reason)}", {"no_reason": na_without_reason}
+    return True, f"{covered}/{len(items)} 个验收项均有证据或已声明不适用", {"items": len(items), "covered": covered}
+
+
+def _check_prior_gates(value: Any, keys: list[str]) -> tuple[bool, str, Any]:
+    """交付前必须确认前序工程闸门真的过了——不能"跳着交"。"""
+    prior = value if isinstance(value, dict) else {}
+    if _is_blank(prior):
+        return False, "无可用的前序闸门记录（E1/E2 未执行？）", None
+    missing = [code for code in keys if code not in prior]
+    failed = [code for code in keys if code in prior and not prior[code].get("passed")]
+    if missing:
+        return False, f"前序闸门未执行：{', '.join(missing)}", {"missing": missing}
+    if failed:
+        return False, f"前序闸门未通过：{', '.join(failed)}", {"failed": failed}
+    return True, f"前序闸门已通过：{', '.join(keys)}", {"passed": list(keys)}
+
+
 def evaluate_check(check: Check, context: dict) -> dict:
     """判定单条检查项，返回 {id, ask, severity, passed, detail, value_preview}。"""
     keys = check.keys or [check.id]
@@ -208,6 +329,14 @@ def evaluate_check(check: Check, context: dict) -> dict:
         passed = bool(evidence)
         detail = f"依据 {len(evidence)} 条" if passed else "缺少依据链接"
         preview = evidence[:3] if passed else None
+    elif check.require == "design_complete":
+        passed, detail, preview = _check_design_complete(context.get("design_docs"))
+    elif check.require == "ux_states_defined":
+        passed, detail, preview = _check_ux_states(context.get("ux_states"))
+    elif check.require == "items_with_evidence":
+        passed, detail, preview = _check_items_with_evidence(context.get("acceptance_items"))
+    elif check.require == "prior_gates_passed":
+        passed, detail, preview = _check_prior_gates(context.get("prior_gates"), keys)
     else:  # pragma: no cover - 由 load 阶段拦截
         passed, detail, preview = False, f"未知 require：{check.require}", None
 

@@ -32,9 +32,9 @@ def list_rules() -> list[dict]:
 
 
 def build_context(db: Session, task_ref: str, tenant: str, inline: Optional[dict] = None) -> dict:
-    """组装被检查的上下文：调用方显式给的字段 + 从审批/来源链**自动补齐**的部分。
+    """组装被检查的上下文：调用方显式给的字段 + 从审批/来源链/闸门历史**自动补齐**的部分。
 
-    自动补齐的价值：E1 不必依赖调用方"记得传"，来源链与依据直接从已有数据取。
+    自动补齐的价值：闸门不必依赖调用方"记得传"，来源链、依据、前序闸门结果直接从已有数据取。
     """
     from .models import ApprovalRequest
 
@@ -55,6 +55,24 @@ def build_context(db: Session, task_ref: str, tenant: str, inline: Optional[dict
                 context["prd_ref"] = (req.context_snapshot or {}).get("artifact_ref", "")
         context.setdefault("sources", sources)
         context.setdefault("evidence", evidence)
+
+        # 前序工程闸门结果（E3 的 prior_gates_passed 据此判定，避免"跳着交"）
+        prior: dict[str, dict] = {}
+        checks = list(db.scalars(
+            select(GateCheck)
+            .where(GateCheck.task_ref == task_ref, GateCheck.tenant == tenant)
+            .order_by(GateCheck.checked_at.asc())
+        ))
+        for chk in checks:
+            # 同名闸门多次检查时，以最后一次为准
+            prior[chk.code] = {
+                "passed": chk.passed,
+                "blocked": chk.blocked,
+                "mode": chk.mode,
+                "checked_at": chk.checked_at.isoformat(),
+                "rule_version": chk.rule_version,
+            }
+        context.setdefault("prior_gates", prior)
     context.setdefault("task_ref", task_ref)
     context.setdefault("tenant", tenant)
     return context

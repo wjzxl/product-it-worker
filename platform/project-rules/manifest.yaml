@@ -1,0 +1,56 @@
+# 项目规则包清单（manifest）
+#
+# 三层结构（对应《从 vibe coding 到 FDE 交付》图 23）：
+#   constraints  约束层：不许做什么（红线，能判定）
+#   design       设计层：具体怎么做（同一业务要求落到字段/规则/调用/页面）
+#   completeness 完整性层：到底做完没有（空态/报错/证据/接手）
+#
+# 校验：`python scripts/check_project_rules.py`
+#   - manifest 里声明的文件必须存在；目录里多出的规则文件必须登记（防止"写了没人用"）；
+#   - 每份规则必须含必备小节；
+#   - not_applicable 必须写 reason（区分“经过确认的空”与“漏掉的空”，课程图 30）。
+#
+# 本文件是**平台自身的规则包**（自举：先用它管平台自己的交付），
+# 被 agent-runtime 读取并注入设计/编码 Agent 的 prompt（PROJECT_RULES_DIR 可覆盖）。
+version: 1
+name: 产品研发智能化平台
+description: 平台自身的交付规则包（自举用法：平台先按 FDE 范式交付自己）
+
+layers:
+  constraints:
+    title: 约束层（不许做什么）
+    purpose: 表达为执行者能判定的要求，而不是"注意质量"这类无法判定的期望
+    files:
+      - path: constraints/api-protocol.md
+        required_sections: ["返回结构", "错误码", "分页"]
+      - path: constraints/naming-and-structure.md
+        required_sections: ["命名", "目录", "禁止事项"]
+      - path: constraints/boundaries.md
+        required_sections: ["必须停下来确认", "禁止动作"]
+  design:
+    title: 设计层（具体怎么做）
+    purpose: 同一业务要求一路落到字段、规则、调用与页面行为
+    files:
+      - path: design/five-design-docs.md
+        required_sections: ["五份配套设计", "不适用声明", "互相校验"]
+      - path: design/data-dictionary.md
+        required_sections: ["字段来源", "敏感字段", "命名约定"]
+  completeness:
+    title: 完整性层（到底做完没有）
+    purpose: 检查没人主动补的部分：空态、报错、加载、证据、接手
+    files:
+      - path: completeness/acceptance-and-evidence.md
+        required_sections: ["验收项", "证据类型", "复验方式"]
+      - path: completeness/ux-states.md
+        required_sections: ["空态", "报错态", "加载态"]
+
+# 模板：新模块按此生成五份设计骨架（缺失即报错，除非显式声明不适用）
+templates:
+  dir: templates
+  facets: ["data", "business", "api", "frontend", "test"]
+  files:
+    data: templates/data.md
+    business: templates/business.md
+    api: templates/api.md
+    frontend: templates/frontend.md
+    test: templates/test.md

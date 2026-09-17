@@ -13,6 +13,7 @@ from fastapi import FastAPI, HTTPException
 from langgraph.types import Command
 from pydantic import BaseModel, Field
 
+from . import rules_pack
 from .apis import ApprovalAPI, GateAPI, GitLabAPI, KnowledgeAPI
 from .coder import Coder
 from .executors import executor_from_env
@@ -268,6 +269,15 @@ def create_app(
                     "values": snap.values or {},
                 }
         raise HTTPException(status_code=404, detail=f"线程 {thread_id} 不存在")
+
+    @app.get("/rules-pack")
+    def rules_pack_info() -> dict:
+        """项目规则包状态（WP4）：文件清单 + 指纹。
+
+        指纹会随规则内容变化；prompt 里注入的正是这一版——用于核查"Agent 到底读没读规则"
+        （计划 WP4 验收③：规则包必须被实际引用，而不是放在仓库里没人用）。
+        """
+        return rules_pack.stats()
 
     @app.get("/prompts")
     def prompts_info() -> dict:
