@@ -65,23 +65,35 @@ def _as_list(value) -> list:
     return []
 
 
+class MetricsUnavailable(RuntimeError):
+    """无法度量（连接失败或表不存在）——必须与"确实没有数据"区分开。"""
+
+
 def _rows(conn, sql: str, params: tuple = ()) -> list[tuple]:
-    try:
-        return conn.execute(text(sql), params).fetchall()
-    except SQLAlchemyError:
-        return []
+    return conn.execute(text(sql), params).fetchall()   # 错误向上抛，由 collect 区分处理
 
 
 def collect(dsn: str) -> dict:
     """采集闸门度量。表不存在时返回空样本（而非报错），便于新旧库通用。"""
     out: dict = {"has_data": False, "checks_total": 0}
     engine = create_engine(dsn, future=True)
-    with engine.connect() as conn:
-        rows = _rows(
-            conn,
-            "select code, mode, passed, blocked, tenant, task_ref, gaps, rule_version, checked_at "
-            "from gate_checks order by checked_at asc",
-        )
+    try:
+        conn_ctx = engine.connect()
+    except SQLAlchemyError as exc:
+        raise MetricsUnavailable(f"数据库连接失败：{type(exc).__name__}: {str(exc)[:200]}") from exc
+    with conn_ctx as conn:
+        try:
+            rows = _rows(
+                conn,
+                "select code, mode, passed, blocked, tenant, task_ref, gaps, rule_version, checked_at "
+                "from gate_checks order by checked_at asc",
+            )
+        except SQLAlchemyError as exc:
+            # 表不存在 = 服务尚未用新代码对该库启动过（不是"没有拦截记录"）
+            raise MetricsUnavailable(
+                f"gate_checks 表不存在或不可读（{type(exc).__name__}）："
+                f"请先用 approval-gateway 连接该库启动一次以完成建表迁移"
+            ) from exc
         out["checks_total"] = len(rows)
         if not rows:
             out.update({"by_code": {}, "blocked_by_code": {}, "gap_counter": {}, "fill_times": [],
@@ -132,9 +144,13 @@ def collect(dsn: str) -> dict:
         out["fill_times"] = fill_times
         out["has_data"] = True
 
-        ev = _rows(conn, "select task_ref, count(*) from evidence_artifacts group by task_ref")
-        out["evidence_total"] = sum(r[1] for r in ev) if ev else 0
-        out["evidence_by_task"] = {r[0]: r[1] for r in ev} if ev else {}
+        try:
+            ev = _rows(conn, "select task_ref, count(*) from evidence_artifacts group by task_ref")
+            out["evidence_total"] = sum(r[1] for r in ev) if ev else 0
+            out["evidence_by_task"] = {r[0]: r[1] for r in ev} if ev else {}
+        except SQLAlchemyError:
+            out["evidence_total"] = None
+            out["evidence_by_task"] = {}
     return out
 
 
@@ -187,9 +203,11 @@ def main() -> int:
     args = parser.parse_args()
     try:
         data = collect(args.dsn)
-    except SQLAlchemyError as exc:
-        print(f"❌ 无法连接数据库：{exc}", file=sys.stderr)
-        return 1
+    except MetricsUnavailable as exc:
+        print(f"❌ 无法度量：{exc}", file=sys.stderr)
+        print("   提示：本脚本只读；'表不存在' 通常是服务尚未对该库启动过（建表在服务启动时执行）。",
+              file=sys.stderr)
+        return 2
     if args.json:
         print(json.dumps(data, ensure_ascii=False, indent=2, default=str))
     else:

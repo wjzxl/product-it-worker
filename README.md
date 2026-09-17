@@ -55,6 +55,17 @@ SANDBOX_MODE=host services/agent-runtime/.venv/bin/python scripts/model_eval.py 
     --models deepseek-chat,qwen-plus --tag cloud
 ```
 
+**本地起全栈（为收集闸门真实样本）**：
+
+```bash
+cd platform
+services/agent-runtime/.venv/bin/python scripts/run_local_stack.py --dry-run   # 先看将启动什么
+services/agent-runtime/.venv/bin/python scripts/run_local_stack.py             # 默认 ENG_GATES_MODE=warn
+# 跑完一条真实需求后看样本与就绪度：
+services/approval-gateway/.venv/bin/python scripts/gate_metrics.py
+services/approval-gateway/.venv/bin/python scripts/gate_readiness.py           # 能否切 block
+```
+
 最新评估结论（[报告](platform/reports/model-eval-cloud-v4-metered-20260916-014327.md)）：云模型能力均已够用，选型差异主要在**成本与延迟**（deepseek-chat P50 1.9s、$0.0076；qwen-plus $0.0081；qwen-max $0.0291）；私有化小模型接入前用同一夹具验收（弱模型桩实测 0/5 被挡）。Qwen 成本已接入 LiteLLM 计量（原先 unmetered），历史缺口可用 `scripts/qwen_cost_audit.py` 复盘。
 
 ## 文档导航

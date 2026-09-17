@@ -44,15 +44,26 @@ def _as_dt(value):
     return None
 
 
+class NotMeasurable(RuntimeError):
+    """连接失败或表不存在——不能当成"没有数据"，否则会给出错误的就绪结论。"""
+
+
 def collect(url: str) -> dict:
     engine = create_engine(url, future=True)
-    with engine.connect() as conn:
+    try:
+        conn_ctx = engine.connect()
+    except SQLAlchemyError as exc:
+        raise NotMeasurable(f"数据库连接失败：{type(exc).__name__}: {str(exc)[:200]}") from exc
+    with conn_ctx as conn:
         try:
             rows = conn.execute(text(
                 "select mode, blocked, feedback, checked_at from gate_checks order by checked_at asc"
             )).fetchall()
-        except SQLAlchemyError:
-            rows = []
+        except SQLAlchemyError as exc:
+            raise NotMeasurable(
+                f"gate_checks 表不存在或不可读（{type(exc).__name__}）："
+                f"请先用 approval-gateway 对该库启动一次完成建表"
+            ) from exc
     checks = [{"mode": r[0], "blocked": bool(r[1]), "feedback": r[2] or "", "at": _as_dt(r[3])} for r in rows]
     warn = [c for c in checks if c["mode"] == "warn"]
     blocked = [c for c in checks if c["blocked"]]
@@ -110,7 +121,11 @@ def main() -> int:
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
 
-    data = collect(args.dsn)
+    try:
+        data = collect(args.dsn)
+    except NotMeasurable as exc:
+        print(f"❌ 无法判定就绪度：{exc}", file=sys.stderr)
+        return 2
     verdict = assess(data, args.min_days, args.min_checks, args.max_rate, args.min_coverage)
 
     if args.json:
