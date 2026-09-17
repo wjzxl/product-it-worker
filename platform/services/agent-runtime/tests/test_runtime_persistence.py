@@ -103,3 +103,59 @@ class TestRunArchive:
         runs.start_run("a1", sop="x", tenant="line-a")
         runs.start_run("b1", sop="x", tenant="line-b")
         assert [r["thread_id"] for r in runs.list_runs(tenant="line-b")] == ["b1"]
+
+
+class TestScheduler:
+    """WP7 触发器：只负责"什么时候开始"，配置错必须报错而不是静默不触发。"""
+
+    def test_real_schedules_load(self):
+        from app.scheduler import load_schedules
+        jobs = load_schedules()
+        assert jobs, "至少应有一个启用的触发器"
+        assert all(j["cron"] and j["sop"] for j in jobs)
+        names = [j["name"] for j in jobs]
+        assert "ops-morning-health" in names
+        assert "ops-evening-summary" not in names      # 默认关闭
+
+    def test_invalid_schedule_rejected(self, tmp_path):
+        from app.scheduler import load_schedules
+        bad = tmp_path / "schedules.yaml"
+        bad.write_text("jobs:\n  - name: x\n    sop: y\n", encoding="utf-8")   # 缺 cron
+        with pytest.raises(ValueError, match="缺少 cron"):
+            load_schedules(bad)
+
+        bad.write_text("jobs:\n  - name: x\n    cron: '* * * * *'\n", encoding="utf-8")  # 缺 sop
+        with pytest.raises(ValueError, match="缺少 sop"):
+            load_schedules(bad)
+
+    def test_missing_file_is_not_fatal(self, tmp_path):
+        from app.scheduler import load_schedules
+        assert load_schedules(tmp_path / "nope.yaml") == []
+
+    def test_cron_registered_in_scheduler(self):
+        from app.scheduler import build_scheduler, load_schedules
+        jobs = load_schedules()
+        scheduler = build_scheduler("http://127.0.0.1:1", jobs)
+        registered = [j.id for j in scheduler.get_jobs()]
+        assert registered == [j["name"] for j in jobs]
+
+    def test_trigger_posts_schedule_payload(self, monkeypatch):
+        import httpx as _httpx
+
+        from app.scheduler import trigger
+
+        captured = {}
+
+        def handler(request: _httpx.Request) -> _httpx.Response:
+            import json as _json
+            captured.update(_json.loads(request.content))
+            return _httpx.Response(200, json={"status": "waiting_data", "thread_id": "t1"})
+
+        job = {"name": "j1", "sop": "ops-domain/alert-to-postmortem", "role": "ops-duty",
+               "alert": {"title": "T", "data_ready": False}}
+        monkeypatch.setattr(_httpx, "post", lambda url, **kw: _httpx.Client(
+            transport=_httpx.MockTransport(handler)).post(url, **kw))
+        body = trigger("http://gw", job)
+        assert body["status"] == "waiting_data"
+        assert captured["trigger"] == "schedule" and captured["role"] == "ops-duty"
+        assert captured["alert"]["data_ready"] is False

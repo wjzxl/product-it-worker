@@ -51,7 +51,7 @@ class AgentRun(Base):
     prompt_tokens: Mapped[int] = mapped_column(Integer, default=0)
     completion_tokens: Mapped[int] = mapped_column(Integer, default=0)
     cost_usd: Mapped[float] = mapped_column(default=0.0)                       # 网关计量；None 表示未计量
-    cost_metered: Mapped[bool] = mapped_column(default=True)                   # False=unmetered（不编造）
+    cost_metered: Mapped[bool] = mapped_column(default=False)                  # 缺省 False：没有用量信息就不声称已计量
     llm_calls: Mapped[int] = mapped_column(Integer, default=0)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     finished_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -122,8 +122,13 @@ def finish_run(thread_id: str, status: str, usage: dict | None = None, detail: d
         return _to_dict(row)
 
 
-def mark_waiting(thread_id: str, reason: str) -> dict:
-    """记录一次"等待"（对应课程图 48：数据没到就等，到齐再继续）。"""
+def mark_waiting(thread_id: str, reason: str, usage: dict | None = None) -> dict:
+    """记录一次"等待"（对应课程图 48：数据没到就等，到齐再继续）。
+
+    等待期间也可能已经产生 LLM 调用（如先做了一轮判断），故一并记录用量；
+    没有用量信息时保持 cost_metered=False（不冒充"已计量 $0"）。
+    """
+    usage = usage or {}
     with Session(engine()) as db:
         row = db.get(AgentRun, thread_id)
         if row is None:
@@ -132,6 +137,12 @@ def mark_waiting(thread_id: str, reason: str) -> dict:
         row.status = "waiting"
         row.waits = (row.waits or 0) + 1
         row.waiting_reason = reason[:500]
+        if usage:
+            row.prompt_tokens = int(usage.get("prompt_tokens") or 0)
+            row.completion_tokens = int(usage.get("completion_tokens") or 0)
+            row.cost_usd = float(usage.get("cost_usd") or 0.0)
+            row.cost_metered = bool(usage.get("cost_metered", False))
+            row.llm_calls = int(usage.get("llm_calls") or 0)
         db.commit()
         return _to_dict(row)
 

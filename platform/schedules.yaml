@@ -1,0 +1,37 @@
+# 岗位触发器（WP7）：什么时候开始干活
+#
+# 对应《从 vibe coding 到 FDE 交付》图 48「早上：7:30 自动拉数、数据没到就等、到齐继续」。
+# 触发器**只负责什么时候开始**，不替岗位做判断；判断在岗位三件套与知识库里。
+#
+# 校验：scheduler 启动时会校验 name/cron/sop（缺一项直接报错，避免"配了却不会触发"）。
+# 演练：`python -m app.scheduler --once` 立即触发一次（不等 cron）。
+version: 1
+jobs:
+  # 运维值班：每天 7:30 拉取服务健康数据（数据没到会进入 waiting_data，到齐后唤醒）
+  - name: ops-morning-health
+    title: 运维晨检（拉指标 → 异常诊断 → 需要时提 G5）
+    cron: "30 7 * * *"
+    sop: ops-domain/alert-to-postmortem
+    role: ops-duty
+    tenant: default
+    enabled: true
+    alert:
+      title: ScheduledHealthCheck
+      message: 每日晨检：拉取 order-api / search-api / report-api 的 5xx、P99 与连接池指标
+      data_ready: false          # 数据未到齐 → 由 await_data 节点挂起等待，不误判为故障
+    context: "晨检任务：等待监控数据到齐后判断是否存在真实异常"
+    runbook: "（由 Runbook RAG 检索补充）"
+
+  # 运维值班：18:00 生成当日运行小结（走复盘闸门 G6）
+  - name: ops-evening-summary
+    title: 运维日终小结
+    cron: "0 18 * * *"
+    sop: ops-domain/alert-to-postmortem
+    role: ops-duty
+    tenant: default
+    enabled: false               # 默认关闭：先让晨检跑稳（计划 D4「规则维持最小集」同理）
+    alert:
+      title: DailyOpsSummary
+      message: 汇总当日告警、处置与未闭环项，形成日终记录
+      data_ready: true
+    context: "日终小结：整理当日运行记录与待办"

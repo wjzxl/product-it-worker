@@ -101,7 +101,7 @@ def _archive_progress(thread_id: str, status_body: dict, ctx) -> None:
     if status == "waiting_approval":
         runs.finish_run(thread_id, "waiting", usage, {"gate": status_body.get("gate", "")})
     elif status == "waiting_data":
-        runs.mark_waiting(thread_id, status_body.get("waiting_reason", "数据未就绪"))
+        runs.mark_waiting(thread_id, status_body.get("waiting_reason", "数据未就绪"), _usage_of(ctx))
     elif status == "done":
         runs.finish_run(thread_id, "done", usage, {"issue": status_body.get("issue", {})})
     else:
