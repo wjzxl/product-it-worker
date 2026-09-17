@@ -13,6 +13,7 @@ from fastapi import FastAPI, HTTPException
 from langgraph.types import Command
 from pydantic import BaseModel, Field
 
+from . import roles as role_registry
 from . import rules_pack
 from .apis import ApprovalAPI, GateAPI, GitLabAPI, KnowledgeAPI
 from .coder import Coder
@@ -269,6 +270,18 @@ def create_app(
                     "values": snap.values or {},
                 }
         raise HTTPException(status_code=404, detail=f"线程 {thread_id} 不存在")
+
+    @app.get("/roles")
+    def roles_info(role: str = "", include_prompt: bool = False) -> dict:
+        """岗位注册表（WP6）：三件套汇总 + 校验结果。
+
+        `?role=ops-duty&include_prompt=true` 返回该岗位将注入 Agent 的完整提示词，
+        便于核对"岗位边界到底写了什么"（课程图 55）。
+        """
+        if role:
+            item = role_registry.load_role(role).to_dict(include_prompt=True)
+            return {"role": item}
+        return role_registry.summary()
 
     @app.get("/rules-pack")
     def rules_pack_info() -> dict:

@@ -22,6 +22,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
 from . import ambiguity
+from . import roles as role_registry
 from .prompts import get_prompt
 
 logger = logging.getLogger(__name__)
@@ -617,8 +618,16 @@ def build_ops_graph(ctx: FlowContext):
             f"# 告警\n{alert}\n\n# 上下文（日志/指标）\n{state.get('context', '')[:3000]}\n\n"
             f"# Runbook（知识库检索，含来源）\n{runbook_text[:3000]}\n"
         )
+        # WP6：把岗位三件套（角色边界/技能/判断标准）注入 system prompt——
+        # 课程图 55/59：边界要写到具体范围，"不负责什么"与"能用哪些能力"必须随任务下发。
+        system_prompt = get_prompt("ops_diagnose_agent", DEFAULT_DIAGNOSE_PROMPT)
+        try:
+            role_pack = role_registry.load_role("ops-duty").prompt_excerpt(max_chars=1500)
+            system_prompt = f"{system_prompt}\n\n{role_pack}"
+        except Exception as exc:  # 岗位缺失不阻断诊断，但显著告警（避免"以为有边界其实没有"）
+            logger.warning("岗位 ops-duty 加载失败，本轮诊断无岗位边界约束：%s", exc)
         raw = ctx.llm.chat([
-            {"role": "system", "content": get_prompt("ops_diagnose_agent", DEFAULT_DIAGNOSE_PROMPT)},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt},
         ])
         diag = _parse_diag_json(raw) or {}

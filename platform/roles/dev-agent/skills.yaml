@@ -1,0 +1,27 @@
+version: 1
+role: dev-agent
+skills:
+  - id: read_project_rules
+    tool: rules.read
+    description: 读取项目规则包（含指纹）
+    inputs: []
+    outputs: ["rules_excerpt"]
+    required: true
+  - id: create_branch_and_mr
+    tool: gitlab.branch_mr
+    description: 建分支与 MR
+    inputs: ["project", "branch", "title"]
+    outputs: ["mr_iid", "mr_url"]
+  - id: run_tests
+    tool: sandbox.pytest
+    description: 沙箱内执行 pytest（--network none）
+    inputs: ["repo_ref", "target"]
+    outputs: ["returncode", "stdout"]
+  - id: propose_approval
+    tool: approval.create
+    description: 发起审批（G3/G7）
+    inputs: ["gate", "context_snapshot"]
+    outputs: ["approval_id"]
+limits:
+  max_tool_calls_per_task: 40
+  max_iterations: 3

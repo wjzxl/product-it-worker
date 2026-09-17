@@ -1,0 +1,18 @@
+version: 1
+role: product-agent
+sources:
+  - prefix: product-agent/standards/
+    description: 需求书写标准（可执行 PRD 五件事、EARS 验收句式）
+    authority: 产品负责人
+    required: true
+  - prefix: platform/standards/
+    description: 平台级规范（统一接口协议、权限模型）
+    authority: 平台负责人
+judgement_rules:
+  - id: no_guessing
+    rule: 关键决定未明确时列"待确认"，不得由实现者补齐后当作客户意思
+    why: 课程图 19：判断标准是「还要不要猜」
+  - id: suggestion_is_not_approval
+    rule: 建议默认值不等于已获批准，必须取得确认
+    why: 课程图 15：「其他你们定」不能当无条件授权
+staleness_days: 365

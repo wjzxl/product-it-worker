@@ -1,0 +1,29 @@
+# 岗位三件套之三：知识（判断标准）
+#
+# 课程图 56：**业务标准由权威来源维护，不能被一次聊天中的随口要求覆盖**，
+# 否则岗位边界会失效。
+version: 1
+role: ops-duty
+sources:
+  - prefix: ops-duty/runbooks/
+    description: 本产品线运维手册（处置步骤、回滚方式）
+    authority: 运维负责人
+    required: true
+  - prefix: platform/standards/
+    description: 平台级规范（告警分级、变更审批要求）
+    authority: 平台负责人
+  - prefix: ops-duty/postmortems/
+    description: 历史复盘（同类故障的处理经验）
+    authority: 运维负责人
+    optional: true
+judgement_rules:
+  - id: no_runbook_no_action
+    rule: 没有命中 Runbook 时，只能给出"建议人工判断"，不得给出具体处置命令
+    why: 编造处置步骤比不处置更危险（课程图 71：AI 只放大成熟流程）
+  - id: authority_over_chat
+    rule: 聊天中出现的"这次特殊处理"不改变判断标准，需走 G5/知识更新流程
+    why: 公司规则由权威侧维护
+  - id: data_missing_vs_anomaly
+    rule: 指标缺失先按"数据未就绪"处理（等待/续跑），不得直接判定为故障
+    why: 课程图 48：应区分"缺数据"与"数据正常但业务表现异常"
+staleness_days: 180

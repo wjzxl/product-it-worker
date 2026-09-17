@@ -1,0 +1,27 @@
+version: 1
+role: product-agent
+skills:
+  - id: read_sources
+    tool: source.read
+    description: 读取材料与其出处（消息/语音时间戳/表格单元格）
+    inputs: ["task_ref"]
+    outputs: ["sources"]
+    required: true
+  - id: detect_ambiguity
+    tool: ambiguity.detect
+    description: 规则化模糊度检测（可复现，不依赖模型）
+    inputs: ["text"]
+    outputs: ["findings", "questions"]
+    required: true
+  - id: draft_prd
+    tool: doc.write
+    description: 写 PRD（五件事 + 来源行）
+    inputs: ["structured", "sources"]
+    outputs: ["prd_doc"]
+  - id: ask_confirmation
+    tool: approval.create
+    description: 发起 G1 需求评审
+    inputs: ["gate", "context_snapshot"]
+    outputs: ["approval_id"]
+limits:
+  max_tool_calls_per_task: 25

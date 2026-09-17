@@ -1,0 +1,32 @@
+# 岗位三件套之二：技能（课程图 56「skills 定能力，kb 定判断标准」）
+#
+# 原则：**没有挂载的能力不能靠口头宣称拥有**。这里列出的 tool 必须已登记在
+# platform/tools/*.yaml（WP8），执行期会校验 role → tool 允许列表。
+version: 1
+role: ops-duty
+skills:
+  - id: query_metrics
+    tool: prometheus.query
+    description: 按服务/指标/时间窗拉取时间序列
+    inputs: ["service", "metric", "window"]
+    outputs: ["series"]
+    failure_mode: "指标缺失时视为「数据未就绪」，进入等待而非判定故障"
+  - id: read_runbook
+    tool: kb.search
+    description: 检索本产品线 Runbook（按 source_prefix 隔离）
+    inputs: ["query"]
+    outputs: ["chunks"]
+    required: true          # 没有 Runbook 依据时不允许给出处置建议
+  - id: fetch_logs
+    tool: loki.query
+    description: 拉取日志样本（限时间窗与条数）
+    inputs: ["service", "window", "limit"]
+    outputs: ["lines"]
+  - id: propose_change
+    tool: approval.create
+    description: 提交 G5 变更审批（不是执行变更）
+    inputs: ["gate", "context_snapshot"]
+    outputs: ["approval_id"]
+limits:
+  max_tool_calls_per_task: 20     # 单任务工具调用上限（成本与失控保护）
+  max_log_lines: 500

@@ -1,0 +1,18 @@
+version: 1
+role: dev-agent
+sources:
+  - prefix: platform/standards/
+    description: 平台级研发规范（接口协议、命名、目录）
+    authority: 研发负责人
+    required: true
+  - prefix: dev-agent/lessons/
+    description: 研发经验与返工教训（如占位注释导致的返工）
+    authority: 研发负责人
+judgement_rules:
+  - id: gates_are_blocking
+    rule: 工程闸门返回 blocked=true 时必须停止，不得"先写了再说"
+    why: 课程图 40：关键未知不能被多数通过抵消
+  - id: minimal_change
+    rule: 只改动必要实现行，禁止顺手重构无关文件
+    why: 平台真实教训：重写无关模块导致既有测试失败
+staleness_days: 365
