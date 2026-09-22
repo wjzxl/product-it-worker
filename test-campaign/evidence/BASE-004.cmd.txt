@@ -1,0 +1,9 @@
+$ ID=$(curl -s -X POST http://127.0.0.1:18001/approvals -H 'Content-Type: application/json' -d '{"type":"GATE_REQUIREMENT_REVIEW","stage":"s","requester":"r","task_ref":"BASE-004","context_snapshot":{"artifact_ref":"a","diff_summary":"d","evidence":["e"],"risk":{"score":10,"level":"L2","factors":[]},"self_review":""},"deadline":"2026-12-31T00:00:00+00:00"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])'); C=$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:18001/approvals/$ID/decision -H 'Content-Type: application/json' -d '{"decision":"reject","decided_by":"x","comment":""}'); echo "reject without reason http=$C"; if [ "$C" != "422" ]; then echo 'FINDING: reject without a reason was accepted'; exit 1; fi; echo 'RESULT: PASS reject without a reason is rejected'
+exit: 0
+duration_ms: 118.0
+--- stdout ---
+reject without reason http=422
+RESULT: PASS reject without a reason is rejected
+
+--- stderr ---
+

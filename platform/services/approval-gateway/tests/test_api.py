@@ -96,14 +96,33 @@ class TestLifecycle:
         )
         assert r3.status_code == 200
 
-    def test_im_card_callback(self, client):
+    def test_im_card_callback(self, client, monkeypatch):
+        """IM 卡片回调：**必须带飞书签名**（BUG-001 修复后不再允许匿名批准）。"""
+        import json as _json
+        import time as _time
+
+        from app import im_auth
+
+        monkeypatch.setenv("IM_CALLBACK_SIGNING_KEY", "test-im-key")
         apv = client.post("/approvals", json=_payload()).json()
-        r = client.post(
-            "/callbacks/im/card",
-            json={"approval_id": apv["id"], "action": "approve", "operator": "产品负责人@Alice"},
-        )
-        assert r.status_code == 200
+        payload = {"approval_id": apv["id"], "action": "approve", "operator": "产品负责人@Alice"}
+        body = _json.dumps(payload).encode()
+        ts, nonce = str(int(_time.time())), "n-api"
+        headers = {"X-Lark-Request-Timestamp": ts, "X-Lark-Request-Nonce": nonce,
+                   "X-Lark-Signature": im_auth.compute_signature(ts, nonce, "test-im-key", body),
+                   "Content-Type": "application/json"}
+        r = client.post("/callbacks/im/card", content=body, headers=headers)
+        assert r.status_code == 200, r.text
         assert client.get(f"/approvals/{apv['id']}").json()["status"] == "approved"
+
+    def test_im_card_callback_without_signature_is_rejected(self, client, monkeypatch):
+        """同一端点：无签名 → 拒绝且单据保持 pending（人审不可被绕过）。"""
+        monkeypatch.setenv("IM_CALLBACK_SIGNING_KEY", "test-im-key")
+        apv = client.post("/approvals", json=_payload()).json()
+        r = client.post("/callbacks/im/card",
+                        json={"approval_id": apv["id"], "action": "approve", "operator": "attacker"})
+        assert r.status_code == 401
+        assert client.get(f"/approvals/{apv['id']}").json()["status"] == "pending"
 
     def test_double_decision_conflict(self, client):
         apv = client.post("/approvals", json=_payload()).json()

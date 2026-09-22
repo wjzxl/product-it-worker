@@ -76,39 +76,56 @@ def _parse(raw: str) -> list[dict] | None:
 
 
 def rule_based(report: dict) -> list[dict]:
-    """LLM 不可用时的规则化提案（与瓶颈识别同源，保证自动进化链路可用）。"""
+    """LLM 不可用时的规则化提案（与瓶颈识别同源，保证自动进化链路可用）。
+
+    修复 BUG-011 的第二半：原实现只认 high_rework/slow_gate/timeout 三种 type，
+    且用 `finding["gate"]` 直取键——遇到别的瓶颈形态（如 `gate_wait`）会**一条都不产出**，
+    让"回退规则化"形同虚设。现在：
+      - 全部用 `.get()` 取值，避免异构 finding 触发 KeyError；
+      - 覆盖更多类型，并对未知类型给一条引用原始建议的通用提案（保证有信号就有提案）。
+    """
     proposals: list[dict] = []
-    for finding in report.get("bottlenecks", []):
-        if finding["type"] == "high_rework":
-            proposals.append(
-                {
-                    "title": f"降低 {finding['gate']} 退回率：前置预检",
-                    "rationale": "退回率高说明上游产出未达审查要点，增加提交前自检可减少往返",
-                    "evidence": finding["evidence"],
-                    "action": {"type": "advice", "target": finding["gate"], "value": "precheck"},
-                    "risk": "L2",
-                }
-            )
-        elif finding["type"] == "slow_gate":
-            proposals.append(
-                {
-                    "title": f"缩短 {finding['gate']} SLA 或提高抽样",
-                    "rationale": "决策等待过长；对低风险项采用信任抽样可显著降低等待",
-                    "evidence": finding["evidence"],
-                    "action": {"type": "trust_threshold", "target": "sample_ratio", "value": 0.3},
-                    "risk": "L2",
-                }
-            )
-        elif finding["type"] == "timeout":
-            proposals.append(
-                {
-                    "title": f"放宽 {finding['gate']} SLA",
-                    "rationale": "超时自动处置率偏高，SLA 可能过紧",
-                    "evidence": finding["evidence"],
-                    "action": {"type": "gate_sla", "target": finding["gate"], "value": 48},
-                    "risk": "L3",
-                }
-            )
+    for finding in report.get("bottlenecks", []) or []:
+        if not isinstance(finding, dict):
+            continue
+        kind = str(finding.get("type") or "")
+        gate = str(finding.get("gate") or finding.get("target") or "")
+        evidence = str(finding.get("evidence") or finding.get("detail") or kind)
+        detail = str(finding.get("detail") or finding.get("suggestion") or "")
+
+        if kind == "high_rework":
+            proposals.append({
+                "title": f"降低 {gate or '高返工 Gate'} 退回率：前置预检",
+                "rationale": "退回率高说明上游产出未达审查要点，增加提交前自检可减少往返",
+                "evidence": evidence,
+                "action": {"type": "advice", "target": gate, "value": "precheck"},
+                "risk": "L2",
+            })
+        elif kind in ("slow_gate", "gate_wait"):
+            proposals.append({
+                "title": f"缩短 {gate or '等待热点'} 等待：提高信任抽样",
+                "rationale": "决策等待过长；对低风险项采用信任抽样可显著降低等待",
+                "evidence": evidence or detail,
+                "action": {"type": "trust_threshold", "target": "sample_ratio", "value": 0.3},
+                "risk": "L2",
+            })
+        elif kind == "timeout":
+            proposals.append({
+                "title": f"放宽 {gate or '超时 Gate'} 的 SLA",
+                "rationale": "超时自动处置率偏高，SLA 可能过紧",
+                "evidence": evidence,
+                "action": {"type": "gate_sla", "target": gate, "value": 48},
+                "risk": "L3",
+            })
+        else:
+            # 未知类型：保留挖掘结论作为建议（有信号就产出提案，而不是静默丢弃）
+            proposals.append({
+                "title": f"关注挖掘发现的瓶颈：{kind or '未分类'}",
+                "rationale": detail or "挖掘算法报告了该瓶颈，建议人工复核后决定优化动作",
+                "evidence": evidence,
+                "action": {"type": "advice", "target": gate, "value": detail or kind},
+                "risk": "L2",
+            })
     return proposals[:3]
 
 
@@ -130,8 +147,12 @@ def generate(report: dict, chat: Callable[[str], str] | None = None) -> list[dic
         try:
             raw = chat(json.dumps(summary, ensure_ascii=False))
             proposals = _parse(raw) or []
-        except httpx.HTTPError as exc:
-            logger.warning("LLM 提案生成失败，回退规则化: %s", exc)
+        except Exception as exc:
+            # 修复 BUG-011：原先只捕获 httpx.HTTPError，而"200 但非 JSON"或"缺 choices"
+            # 会以 ValueError/KeyError 逃逸出去，把整条自进化链路打断——与文档承诺的
+            # "LLM 不可用时回退规则化"不符。这里改为捕获全部异常并回退，同时保留告警。
+            logger.warning("LLM 提案生成失败（%s: %s），回退规则化提案",
+                           type(exc).__name__, str(exc)[:200])
     if not proposals:
         proposals = rule_based(report)
     import re

@@ -65,12 +65,39 @@ class TestSweeper:
         client.post("/admin/sweep")
         assert client.get(f"/approvals/{apv['id']}").json()["status"] == "rejected"
 
-    def test_l1_auto_approve_honored(self, client):
+    def test_l1_auto_approve_requires_server_side_trust(self, client):
+        """BUG-004 修复后的语义：超时自动放行只认**服务端信任等级**，不认单据自述等级。
+
+        未积累信任（服务端 L3）时，即使单据自述 level=L1 且策略声明 auto_approve_l1_only，
+        也必须拒绝——否则提交方自封 L1 就能换取自动放行。
+        """
         p = _payload(
             deadline=(utcnow() - timedelta(minutes=5)).isoformat(),
             escalation_policy={"remind_after_hours": 1, "escalate_to": "x", "timeout_action": "auto_approve_l1_only"},
         )
         p["context_snapshot"]["risk"]["level"] = "L1"
+        apv = client.post("/approvals", json=p).json()
+        client.post("/admin/sweep")
+        assert client.get(f"/approvals/{apv['id']}").json()["status"] == "rejected"
+        detail = client.get(f"/approvals/{apv['id']}").json()["decisions"][-1]["comment"]
+        assert "服务端信任等级" in detail and "不作为依据" in detail
+
+    def test_l1_auto_approve_honored_when_trust_is_l1(self, client):
+        """真正达到服务端 L1 信任时，策略声明的自动放行仍然生效（安全不等于永远拒绝）。"""
+        gate = "GATE_RELEASE_DECISION"
+        base = _payload()
+        for _ in range(12):                       # 积累信任：连续 12 次人工批准 → L1
+            created = client.post("/approvals", json={**base, "type": gate}).json()
+            client.post(f"/approvals/{created['id']}/decision",
+                        json={"decision": "approve", "decided_by": "信任积累"})
+        assert client.get(f"/trust/{gate}").json()["level"] == "L1"
+
+        p = _payload(
+            type=gate,
+            deadline=(utcnow() - timedelta(minutes=5)).isoformat(),
+            escalation_policy={"remind_after_hours": 1, "escalate_to": "x",
+                               "timeout_action": "auto_approve_l1_only"},
+        )
         apv = client.post("/approvals", json=p).json()
         client.post("/admin/sweep")
         assert client.get(f"/approvals/{apv['id']}").json()["status"] == "approved"

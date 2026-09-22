@@ -10,6 +10,8 @@
 """
 from __future__ import annotations
 
+import json
+
 import os
 import tempfile
 from datetime import timedelta
@@ -222,10 +224,18 @@ class TestApi:
         assert set(gap_ids) == {"change_targets", "impact_scope", "rollback_plan"}
 
     def test_mode_override_warn(self, client):
+        """客户端传 mode 现在被**忽略**（BUG-003 修复后的正确语义）。
+
+        灰度仍可用，但只能由服务端决定：环境变量 `ENG_GATES_MODE` 或规则文件自身的 mode。
+        内部判定函数仍保留 mode_override 供 CLI/单测使用。
+        """
         body = client.post("/eng-gates/E1/check", json={"task_ref": "wp2-c", "context": {}, "mode": "warn"}).json()
-        assert body["mode"] == "warn" and body["blocked"] is False
+        assert body["mode"] == "block" and body["blocked"] is True      # 调用方无法自免门禁
         hist = client.get("/eng-gates/checks", params={"task_ref": "wp2-c"}).json()
-        assert hist[0]["mode"] == "warn" and hist[0]["passed"] is False
+        assert hist[0]["mode"] == "block" and hist[0]["passed"] is False
+        # 服务端灰度仍然有效（规则 + mode_override 在内部路径上工作）
+        rule = gate_rules.load_rule("E1")
+        assert gate_rules.evaluate(rule, {}, mode_override="warn")["mode"] == "warn"
 
     def test_unknown_gate_404(self, client):
         assert client.post("/eng-gates/E9/check", json={"context": {}}).status_code == 404
@@ -464,3 +474,104 @@ class TestFeedbackReliability:
             monkeypatch.delenv("GATE_MIN_JUDGED", raising=False)
             monkeypatch.delenv("GATE_MIN_COVERAGE", raising=False)
             importlib.reload(eg)
+
+
+class TestCampaignRegressions:
+    """camp-pst-20260922 缺陷回归（防复发）：BUG-001/002/003/004/013/014。"""
+
+    def test_im_callback_requires_signature(self, client, monkeypatch):
+        """BUG-001：无签名回调不得批准审批。"""
+        monkeypatch.delenv("IM_CALLBACK_SIGNING_KEY", raising=False)
+        monkeypatch.delenv("FEISHU_VERIFY_TOKEN", raising=False)
+        monkeypatch.delenv("IM_CALLBACK_ALLOW_UNSIGNED", raising=False)
+        apv = client.post("/approvals", json={
+            "type": "GATE_REQUIREMENT_REVIEW", "stage": "s", "requester": "r", "task_ref": "reg-im",
+            "context_snapshot": {"artifact_ref": "a", "diff_summary": "d", "evidence": ["e"],
+                                 "risk": {"score": 10, "level": "L2", "factors": []}},
+            "deadline": (utcnow() + timedelta(hours=1)).isoformat(),
+            "escalation_policy": {"remind_after_hours": 1, "escalate_to": "lead", "timeout_action": "reject"},
+        }).json()
+        r = client.post("/callbacks/im/card", json={"approval_id": apv["id"], "action": "approve",
+                                                    "operator": "attacker", "comment": "x"})
+        assert r.status_code in (401, 503), r.text
+        assert client.get(f"/approvals/{apv['id']}").json()["status"] == "pending"
+
+    def test_im_callback_accepts_valid_signature(self, client, monkeypatch):
+        """有正确签名则放行（证明不是"一刀切拒绝"）。"""
+        import time as _time
+
+        from app import im_auth
+
+        monkeypatch.setenv("IM_CALLBACK_SIGNING_KEY", "test-key")
+        apv = client.post("/approvals", json={
+            "type": "GATE_REQUIREMENT_REVIEW", "stage": "s", "requester": "r", "task_ref": "reg-im-ok",
+            "context_snapshot": {"artifact_ref": "a", "diff_summary": "d", "evidence": ["e"],
+                                 "risk": {"score": 10, "level": "L2", "factors": []}},
+            "deadline": (utcnow() + timedelta(hours=1)).isoformat(),
+            "escalation_policy": {"remind_after_hours": 1, "escalate_to": "lead", "timeout_action": "reject"},
+        }).json()
+        body = json.dumps({"approval_id": apv["id"], "action": "approve",
+                           "operator": "ops-lead", "comment": "ok"}).encode()
+        ts, nonce = str(int(_time.time())), "n1"
+        headers = {"X-Lark-Request-Timestamp": ts, "X-Lark-Request-Nonce": nonce,
+                   "X-Lark-Signature": im_auth.compute_signature(ts, nonce, "test-key", body),
+                   "Content-Type": "application/json"}
+        r = client.post("/callbacks/im/card", content=body, headers=headers)
+        assert r.status_code == 200, r.text
+        assert client.get(f"/approvals/{apv['id']}").json()["status"] == "approved"
+
+    def test_im_callback_rejects_stale_timestamp(self, client, monkeypatch):
+        from app import im_auth
+
+        monkeypatch.setenv("IM_CALLBACK_SIGNING_KEY", "test-key")
+        body = json.dumps({"approval_id": "apv_x", "action": "approve", "operator": "o", "comment": ""}).encode()
+        ts, nonce = "1000000000", "n1"     # 远古时间戳
+        headers = {"X-Lark-Request-Timestamp": ts, "X-Lark-Request-Nonce": nonce,
+                   "X-Lark-Signature": im_auth.compute_signature(ts, nonce, "test-key", body)}
+        assert client.post("/callbacks/im/card", content=body, headers=headers).status_code == 401
+
+    def test_resubmit_is_tenant_scoped(self, client):
+        """BUG-002：跨租户 resubmit 必须 404。"""
+        payload = {
+            "type": "GATE_REQUIREMENT_REVIEW", "stage": "s", "requester": "r", "task_ref": "reg-resub",
+            "context_snapshot": {"artifact_ref": "a", "diff_summary": "d", "evidence": ["e"],
+                                 "risk": {"score": 10, "level": "L2", "factors": []}},
+            "deadline": (utcnow() + timedelta(hours=1)).isoformat(),
+            "escalation_policy": {"remind_after_hours": 1, "escalate_to": "lead", "timeout_action": "reject"},
+        }
+        apv = client.post("/approvals", json=payload, headers={"X-Tenant": "line-a"}).json()
+        client.post(f"/approvals/{apv['id']}/decision",
+                    json={"decision": "revise", "comment": "改", "decided_by": "评审员"},
+                    headers={"X-Tenant": "line-a"})
+        r = client.post(f"/approvals/{apv['id']}/resubmit", json=payload, headers={"X-Tenant": "line-b"})
+        assert r.status_code == 404
+        assert client.get(f"/approvals/{apv['id']}", headers={"X-Tenant": "line-a"}).json()["status"] == "revised"
+
+    def test_caller_cannot_override_gate_mode_or_disable_persist(self, client):
+        """BUG-003/014：客户端传 mode/persist 一律忽略（服务端权威 + 审计强制）。"""
+        ctx = {"prd_ref": "PRD", "sources": [{"kind": "chat", "ref": "x", "quote": "q", "confirmed_by": "李"}],
+               "change_targets": ["a.py"], "rollback_plan": "切回"}
+        r = client.post("/eng-gates/E1/check", json={"task_ref": "reg-mode", "context": ctx,
+                                                    "mode": "off", "persist": False})
+        assert r.status_code == 200
+        body = r.json()
+        assert body["blocked"] is True and body["mode"] == "block"     # 未被 off 降级
+        assert body["check_id"], "被要求不持久化，但检查必须留痕"
+        hist = client.get("/eng-gates/checks", params={"task_ref": "reg-mode"}).json()
+        assert len(hist) == 1
+
+    def test_options_are_enforced(self, client):
+        """BUG-013：不在 options 内的决策被拒。"""
+        apv = client.post("/approvals", json={
+            "type": "GATE_REQUIREMENT_REVIEW", "stage": "s", "requester": "r", "task_ref": "reg-opt",
+            "context_snapshot": {"artifact_ref": "a", "diff_summary": "d", "evidence": ["e"],
+                                 "risk": {"score": 10, "level": "L2", "factors": []}},
+            "options": ["approve", "reject"],
+            "deadline": (utcnow() + timedelta(hours=1)).isoformat(),
+            "escalation_policy": {"remind_after_hours": 1, "escalate_to": "lead", "timeout_action": "reject"},
+        }).json()
+        r = client.post(f"/approvals/{apv['id']}/decision",
+                        json={"decision": "revise", "comment": "改", "decided_by": "评审员"})
+        assert r.status_code == 422
+        detail = r.json()["detail"]
+        assert "只允许" in (detail if isinstance(detail, str) else json.dumps(detail, ensure_ascii=False))

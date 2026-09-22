@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class TaskCreate(BaseModel):
-    external_ref: str = ""
+    external_ref: Optional[str] = Field(default=None, description="外部引用；留空表示无（存 NULL）")
     sop: str = ""
     params: dict[str, Any] = Field(default_factory=dict)
 
@@ -54,7 +54,9 @@ class EventOut(BaseModel):
 class TaskOut(BaseModel):
     id: str
     tenant: str = "default"
-    external_ref: str
+    # 修复 BUG-015 的连带项：无外部引用现在是 NULL，输出类型必须可空，
+    # 否则 pydantic 响应校验会抛 ResponseValidationError（同样是 HTTP 500）。
+    external_ref: Optional[str] = None
     sop: str
     params: dict[str, Any]
     status: str

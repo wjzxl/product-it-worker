@@ -13,13 +13,15 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .db import get_db
 from .events import new_event, publisher_from_env
 from .models import EventInbox, Task, TaskEvent
 from .schemas import EventEnvelope, PrometheusAlertsIn, TaskCreate, TaskOut, TimelineIn, TransitionIn
-from .state import TERMINAL, validate_transition
+from .state import (DECISION_EXITS_FROM, DECISION_REQUIRED_TARGETS, TERMINAL,
+                    validate_transition)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -42,11 +44,32 @@ def current_tenant(x_tenant: str = Header(default="")) -> str:
     return x_tenant or os.getenv("DEFAULT_TENANT", "default")
 
 
-def _get_or_404(db: Session, task_id: str) -> Task:
+def _get_or_404(db: Session, task_id: str, tenant: Optional[str] = None) -> Task:
+    """按 id 取任务；给定 tenant 时做隔离（修复 BUG-006：此前只过滤 list）。"""
     task = db.get(Task, task_id)
-    if task is None:
+    if task is None or (tenant is not None and (task.tenant or "default") != tenant):
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"task {task_id} 不存在")
     return task
+
+
+def _ensure_decision_present(db: Session, task: Task, target: str, detail: dict) -> None:
+    """修复 BUG-005：进入 approved 必须能指明是哪次审批决策带来的。
+
+    判定依据（任一即可，均要求非空）：
+      - `detail.approval_id`（审批单号）
+      - `detail.decided_by`（决策人）
+    这样"审批通过"在任务时间线上是可追溯的事实，而不是一个自我声明的状态跳变。
+    """
+    if task.status != DECISION_EXITS_FROM or target not in DECISION_REQUIRED_TARGETS:
+        return
+    approval_id = str(detail.get("approval_id") or "").strip()
+    decided_by = str(detail.get("decided_by") or "").strip()
+    if not (approval_id or decided_by):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"任务处于 {DECISION_EXITS_FROM}，流转到 {target} 必须提供审批决策依据"
+            f"（detail.approval_id 或 detail.decided_by）——没有决策不得恢复执行",
+        )
 
 
 def _record(db: Session, task: Task, event_type: str, by: str = "", detail: dict | None = None) -> TaskEvent:
@@ -134,19 +157,29 @@ def _maybe_auto_start_dev_sop(task: Task, payload: dict) -> None:
 
 @router.post("/tasks", response_model=TaskOut, status_code=status.HTTP_201_CREATED)
 def create_task(payload: TaskCreate, db: Session = Depends(get_db), tenant: str = Depends(current_tenant)) -> Task:
-    if payload.external_ref:
-        existing = db.scalar(select(Task).where(Task.external_ref == payload.external_ref))
+    # 修复 BUG-015：空 external_ref 原样存 "" 会撞唯一索引，第二次建单直接 500。
+    # 语义澄清：**没有外部引用就是 NULL**（唯一索引允许多个 NULL），而不是空字符串。
+    ref = (payload.external_ref or "").strip() or None
+    if ref:
+        # 幂等查询必须**限定本租户**：否则 B 产品线用同一外部引用建单会拿回 A 产品线的任务
+        # （跨租户读取，与 BUG-006 同源，由回归测试发现）。
+        existing = db.scalar(select(Task).where(Task.external_ref == ref, Task.tenant == tenant))
         if existing:
-            return existing  # 幂等：同一外部引用只建一个任务
+            return existing  # 幂等：同一租户内同一外部引用只建一个任务
     task = Task(
         tenant=tenant,
-        external_ref=payload.external_ref,
+        external_ref=ref,
         sop=payload.sop,
         params=payload.params,
         status="pending",
     )
     db.add(task)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError as exc:          # 并发下同一 external_ref 撞唯一索引
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            f"external_ref 冲突：{ref}") from exc
     _record(db, task, "task.created", by="task-center", detail={"sop": task.sop})
     db.commit()
     db.refresh(task)
@@ -173,18 +206,20 @@ def list_tasks(
 
 
 @router.get("/tasks/{task_id}", response_model=TaskOut)
-def get_task(task_id: str, db: Session = Depends(get_db)) -> Task:
-    return _get_or_404(db, task_id)
+def get_task(task_id: str, db: Session = Depends(get_db), tenant: str = Depends(current_tenant)) -> Task:
+    return _get_or_404(db, task_id, tenant=tenant)
 
 
 @router.post("/tasks/{task_id}/transition", response_model=TaskOut)
-def transition(task_id: str, payload: TransitionIn, db: Session = Depends(get_db)) -> Task:
-    task = _get_or_404(db, task_id)
+def transition(task_id: str, payload: TransitionIn, db: Session = Depends(get_db),
+               tenant: str = Depends(current_tenant)) -> Task:
+    task = _get_or_404(db, task_id, tenant=tenant)
     if not validate_transition(task.status, payload.to):
         raise HTTPException(
             status.HTTP_409_CONFLICT,
             f"非法状态流转 {task.status} -> {payload.to}（见 contracts/任务状态机）",
         )
+    _ensure_decision_present(db, task, payload.to, payload.detail or {})   # 修复 BUG-005
     old_status = task.status
     task.status = payload.to
     task.current_step = payload.detail.get("step", task.current_step)
@@ -203,8 +238,9 @@ def transition(task_id: str, payload: TransitionIn, db: Session = Depends(get_db
 
 
 @router.post("/tasks/{task_id}/events", response_model=TaskOut)
-def append_timeline(task_id: str, payload: TimelineIn, db: Session = Depends(get_db)) -> Task:
-    task = _get_or_404(db, task_id)
+def append_timeline(task_id: str, payload: TimelineIn, db: Session = Depends(get_db),
+                    tenant: str = Depends(current_tenant)) -> Task:
+    task = _get_or_404(db, task_id, tenant=tenant)
     _record(db, task, payload.event_type, by=payload.by, detail=payload.detail)
     db.commit()
     db.refresh(task)
@@ -239,8 +275,14 @@ def prometheus_alerts(payload: PrometheusAlertsIn, db: Session = Depends(get_db)
 
 
 @router.post("/events", status_code=status.HTTP_200_OK)
-def ingest_event(envelope: EventEnvelope, db: Session = Depends(get_db)) -> dict:
-    """平台事件接入（幂等：信封 event_id 去重，重复投递直接跳过）。"""
+def ingest_event(envelope: EventEnvelope, db: Session = Depends(get_db),
+                 tenant: Optional[str] = Header(default=None, alias="X-Tenant")) -> dict:
+    """平台事件接入（幂等：信封 event_id 去重，重复投递直接跳过）。
+
+    **租户约束（修复 BUG-006）**：事件关联任务时，若带 `X-Tenant` 则限定该租户；
+    未带时要求 external_ref **唯一命中**，命中多条（跨租户重名）则拒绝并记录，
+    绝不"随便挑一条"改状态。
+    """
     if db.get(EventInbox, envelope.event_id):
         return {"status": "duplicate_skipped", "event_id": envelope.event_id}
     db.add(EventInbox(event_id=envelope.event_id))
@@ -251,6 +293,11 @@ def ingest_event(envelope: EventEnvelope, db: Session = Depends(get_db)) -> dict
 
     if etype == "gitlab.issue.opened":
         ref = f"{payload.get('project_id')}#{payload.get('iid')}"
+        # 修复 BUG-015：空 external_ref 会被唯一索引拦成 HTTP 500；
+        # 这里显式判定并返回 422/409，让调用方拿到可处理的客户端错误。
+        if not payload.get("project_id") or payload.get("iid") in (None, ""):
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                                "external_ref 不能为空（需要 project_id 与 iid）")
         existing = db.scalar(select(Task).where(Task.external_ref == ref))
         if existing:
             logger.info("task 已存在 external_ref=%s，跳过", ref)
@@ -268,7 +315,11 @@ def ingest_event(envelope: EventEnvelope, db: Session = Depends(get_db)) -> dict
             status="pending",
         )
         db.add(task)
-        db.flush()
+        try:
+            db.flush()
+        except IntegrityError as exc:      # 并发下重复 external_ref
+            db.rollback()
+            raise HTTPException(status.HTTP_409_CONFLICT, f"external_ref 冲突：{ref}") from exc
         _record(db, task, "task.created", by=envelope.source, detail={"trigger": etype})
         db.commit()
         db.refresh(task)
@@ -279,7 +330,17 @@ def ingest_event(envelope: EventEnvelope, db: Session = Depends(get_db)) -> dict
         return {"status": "created", "task_id": task.id}
 
     task_ref = payload.get("task_ref", "")
-    task = db.scalar(select(Task).where(Task.external_ref == task_ref)) if task_ref else None
+    task = None
+    if task_ref:
+        stmt = select(Task).where(Task.external_ref == task_ref)
+        if tenant:
+            stmt = stmt.where(Task.tenant == tenant)
+        matches = list(db.scalars(stmt))
+        if len(matches) > 1:
+            logger.warning("事件关联歧义：external_ref=%s 命中 %d 个任务（跨租户重名），"
+                           "拒绝自动改状态，请带 X-Tenant 重投", task_ref, len(matches))
+            return {"status": "ambiguous_ref", "matches": [t.id for t in matches]}
+        task = matches[0] if matches else None
 
     if etype == "approval.requested" and task:
         if task.status == "running":

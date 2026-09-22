@@ -1,0 +1,9 @@
+$ bash /Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/probes.sh task-dup-ref
+exit: 1
+duration_ms: 150.5
+--- stdout ---
+second create with empty external_ref http=500
+FINDING: duplicate empty external_ref surfaces as HTTP 500 instead of a client error
+
+--- stderr ---
+

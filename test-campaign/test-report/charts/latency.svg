@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="182" viewBox="0 0 640 182" role="img" aria-label="Latency percentiles by scenario (ms)">
+<text x="12" y="24" font-family="system-ui,sans-serif" font-size="15" font-weight="600" fill="#1f2328">Latency percentiles by scenario (ms)</text>
+<text x="160" y="65.0" text-anchor="end" font-family="system-ui,sans-serif" font-size="13" fill="#1f2328">load p50</text>
+<rect x="170" y="50" width="126.1" height="18" rx="3" fill="#0969da"/>
+<text x="304.1" y="65.0" font-family="system-ui,sans-serif" font-size="12" fill="#57606a">121.401ms</text>
+<text x="160" y="93.0" text-anchor="end" font-family="system-ui,sans-serif" font-size="13" fill="#1f2328">load p90</text>
+<rect x="170" y="78" width="258.3" height="18" rx="3" fill="#1a7f37"/>
+<text x="436.3" y="93.0" font-family="system-ui,sans-serif" font-size="12" fill="#57606a">248.626ms</text>
+<text x="160" y="121.0" text-anchor="end" font-family="system-ui,sans-serif" font-size="13" fill="#1f2328">load p95</text>
+<rect x="170" y="106" width="288.9" height="18" rx="3" fill="#bf8700"/>
+<text x="466.9" y="121.0" font-family="system-ui,sans-serif" font-size="12" fill="#57606a">278.03ms</text>
+<text x="160" y="149.0" text-anchor="end" font-family="system-ui,sans-serif" font-size="13" fill="#1f2328">load p99</text>
+<rect x="170" y="134" width="380.0" height="18" rx="3" fill="#cf222e"/>
+<text x="558.0" y="149.0" font-family="system-ui,sans-serif" font-size="12" fill="#57606a">365.71ms</text>
+</svg>

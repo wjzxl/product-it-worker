@@ -1,0 +1,237 @@
+{
+  "generated_at": "2026-09-22 14:54:48+0800",
+  "advisory": "BLOCKED",
+  "advisory_reasons": [
+    "G1 failed: 全部 P0 测试卡通过 (actual 26.67% >= threshold 100.00%)",
+    "G2 failed: 无未关闭的 BLOCKER/CRITICAL 缺陷 (actual 7 <= threshold 0)",
+    "G3 failed: 总体通过率不低于 90% (actual 37.50% >= threshold 90.00%)"
+  ],
+  "metrics": {
+    "total_cards": 24,
+    "executed_cards": 24,
+    "gap_cards": 0,
+    "passed": 9,
+    "failed": 15,
+    "verdict_counts": {
+      "PASS": 9,
+      "FAIL": 15
+    },
+    "priority_counts": {
+      "P0": {
+        "total": 15,
+        "pass": 4,
+        "fail": 11,
+        "gap": 0
+      },
+      "P1": {
+        "total": 9,
+        "pass": 5,
+        "fail": 4,
+        "gap": 0
+      }
+    },
+    "layer_counts": {
+      "api": {
+        "total": 12,
+        "pass": 7,
+        "fail": 5,
+        "gap": 0
+      },
+      "security": {
+        "total": 7,
+        "pass": 1,
+        "fail": 6,
+        "gap": 0
+      },
+      "data": {
+        "total": 4,
+        "pass": 0,
+        "fail": 4,
+        "gap": 0
+      },
+      "performance": {
+        "total": 1,
+        "pass": 1,
+        "fail": 0,
+        "gap": 0
+      }
+    },
+    "execution_rate": 1.0,
+    "overall_pass_rate": 0.375,
+    "p0_pass_rate": 0.26666666666666666,
+    "p1_pass_rate": 0.5555555555555556,
+    "defect_count": 15,
+    "severity_counts": {
+      "CRITICAL": 7,
+      "MAJOR": 7,
+      "MINOR": 1
+    },
+    "open_by_severity": {
+      "CRITICAL": 7,
+      "MAJOR": 7,
+      "MINOR": 1
+    },
+    "open_blocker_count": 0,
+    "open_critical_count": 7,
+    "open_major_count": 7,
+    "open_blocker_critical_count": 7,
+    "requirement_count": 20,
+    "requirements_covered": 20,
+    "requirements_verified": 8,
+    "coverage_rate": 1.0,
+    "uncovered_requirements": [
+      {
+        "id": "REQ-004",
+        "title": "闸门决策必须经鉴权，调用方不能自免门禁",
+        "priority": "P0",
+        "reason": "mapped cards did not pass",
+        "card_ids": [
+          "SEC-001",
+          "SEC-004"
+        ]
+      },
+      {
+        "id": "REQ-006",
+        "title": "每次闸门检查都留审计记录",
+        "priority": "P0",
+        "reason": "mapped cards did not pass",
+        "card_ids": [
+          "GATE-001"
+        ]
+      },
+      {
+        "id": "REQ-007",
+        "title": "超时策略不得由单据自述风险等级驱动自动放行",
+        "priority": "P0",
+        "reason": "mapped cards did not pass",
+        "card_ids": [
+          "GATE-002"
+        ]
+      },
+      {
+        "id": "REQ-008",
+        "title": "单据声明的可选决策被强制执行",
+        "priority": "P1",
+        "reason": "mapped cards did not pass",
+        "card_ids": [
+          "GATE-003"
+        ]
+      },
+      {
+        "id": "REQ-009",
+        "title": "等待审批的任务不能无决策恢复执行",
+        "priority": "P0",
+        "reason": "mapped cards did not pass",
+        "card_ids": [
+          "FSM-001"
+        ]
+      },
+      {
+        "id": "REQ-011",
+        "title": "重复或空的 external_ref 被优雅处理",
+        "priority": "P1",
+        "reason": "mapped cards did not pass",
+        "card_ids": [
+          "FSM-004"
+        ]
+      },
+      {
+        "id": "REQ-012",
+        "title": "运行归档状态如实反映被否决的结果",
+        "priority": "P0",
+        "reason": "mapped cards did not pass",
+        "card_ids": [
+          "RT-001"
+        ]
+      },
+      {
+        "id": "REQ-013",
+        "title": "数据唤醒不得改变等待审批运行的结果",
+        "priority": "P0",
+        "reason": "mapped cards did not pass",
+        "card_ids": [
+          "RT-002"
+        ]
+      },
+      {
+        "id": "REQ-015",
+        "title": "Heuristic Miner 输出正确依赖方向且能接受自身日志",
+        "priority": "P0",
+        "reason": "mapped cards did not pass",
+        "card_ids": [
+          "ALG-001"
+        ]
+      },
+      {
+        "id": "REQ-016",
+        "title": "α-Miner 能回放自身挖掘所用日志",
+        "priority": "P0",
+        "reason": "mapped cards did not pass",
+        "card_ids": [
+          "ALG-002"
+        ]
+      },
+      {
+        "id": "REQ-017",
+        "title": "默认一致性检查能识别唯一异常路径",
+        "priority": "P1",
+        "reason": "mapped cards did not pass",
+        "card_ids": [
+          "ALG-003"
+        ]
+      },
+      {
+        "id": "REQ-018",
+        "title": "LLM 不可用或响应畸形时回退规则化",
+        "priority": "P1",
+        "reason": "mapped cards did not pass",
+        "card_ids": [
+          "ALG-004"
+        ]
+      }
+    ],
+    "performance_runs": 1,
+    "performance_failures": 0,
+    "worst_p95_ms": 278.03,
+    "p95_latency_ms": 278.03,
+    "max_error_rate": 0.0,
+    "error_rate": 0.0,
+    "experiment_count": 0,
+    "significant_experiments": 0,
+    "srm_suspect_experiments": 0,
+    "flaky_cards": 0,
+    "blocked_cards": 0
+  },
+  "gates": [
+    {
+      "id": "G1",
+      "description": "全部 P0 测试卡通过",
+      "metric": "p0_pass_rate",
+      "comparator": "gte",
+      "threshold": 1.0,
+      "actual": 0.26666666666666666,
+      "status": "FAIL",
+      "detail": "actual 26.67% >= threshold 100.00%"
+    },
+    {
+      "id": "G2",
+      "description": "无未关闭的 BLOCKER/CRITICAL 缺陷",
+      "metric": "open_blocker_critical_count",
+      "comparator": "lte",
+      "threshold": 0,
+      "actual": 7,
+      "status": "FAIL",
+      "detail": "actual 7 <= threshold 0"
+    },
+    {
+      "id": "G3",
+      "description": "总体通过率不低于 90%",
+      "metric": "overall_pass_rate",
+      "comparator": "gte",
+      "threshold": 0.9,
+      "actual": 0.375,
+      "status": "FAIL",
+      "detail": "actual 37.50% >= threshold 90.00%"
+    }
+  ]
+}

@@ -1,0 +1,987 @@
+{
+  "schema_version": "1.0",
+  "campaign": {
+    "id": "camp-pst-20260922",
+    "name": "产品研发智能化平台 全系统测试",
+    "target": "http://127.0.0.1:18001",
+    "commit": "c4757a9",
+    "environment": "隔离实例：approval-gateway:18001 / agent-runtime:18002 / task-center:18004，一次性 sqlite，ENG_GATES_MODE=block",
+    "run_marker": "RUN-PST-20260922",
+    "objective": "评估该 AI 研发流水线平台能否安全上线：人审闸门是否真拦得住、多租户是否真隔离、状态机与挖掘算法是否自洽。",
+    "out_of_scope": [
+      "真实 LLM 输出质量（无 API Key，走 TemplateLLM 模板桩）",
+      "Qdrant 语义检索质量（无 Qdrant，知识库走 HashEmbedder 哈希桩）",
+      "GitLab / 飞书真实外呼",
+      "Postgres 专项（隔离实例使用一次性 sqlite）",
+      "公网 Caddy / SSO 入口（未在本机部署）",
+      "前端控制台浏览器交互"
+    ],
+    "executed_by": "full-system-testing skill",
+    "variables": {
+      "gw": "http://127.0.0.1:18001",
+      "tc": "http://127.0.0.1:18004",
+      "rt": "http://127.0.0.1:18002"
+    },
+    "defaults": {
+      "timeout_ms": 300000,
+      "headers": {
+        "Accept": "application/json"
+      }
+    }
+  },
+  "features": [
+    {
+      "id": "F-approval",
+      "name": "人审审批闸门（创建/决策/状态机）",
+      "priority": "P0",
+      "source": "route table",
+      "risk": "平台核心治理控制，失效等同无审批"
+    },
+    {
+      "id": "F-gate",
+      "name": "工程闸门 E1–E3 机器检查",
+      "priority": "P0",
+      "source": "route table",
+      "risk": "自动质量门禁，可自免则形同虚设"
+    },
+    {
+      "id": "F-trust",
+      "name": "信任分级 L1/L2/L3 与超时策略",
+      "priority": "P0",
+      "source": "code",
+      "risk": "决定哪些审批无需人看"
+    },
+    {
+      "id": "F-tenant",
+      "name": "多租户隔离",
+      "priority": "P0",
+      "source": "code",
+      "risk": "跨租户读改即数据泄露"
+    },
+    {
+      "id": "F-taskfsm",
+      "name": "任务状态机与时间线",
+      "priority": "P0",
+      "source": "route table",
+      "risk": "SOP 推进的事实源"
+    },
+    {
+      "id": "F-runtime",
+      "name": "Agent 运行时 SOP 图与归档",
+      "priority": "P0",
+      "source": "route table",
+      "risk": "承载全部 AI 执行与成本统计"
+    },
+    {
+      "id": "F-mining",
+      "name": "流程挖掘与一致性检查",
+      "priority": "P1",
+      "source": "code",
+      "risk": "SOP 自进化输入，算法错误会放大"
+    },
+    {
+      "id": "F-evidence",
+      "name": "证据链存证与校验",
+      "priority": "P1",
+      "source": "route table",
+      "risk": "来源链可追溯性的载体"
+    }
+  ],
+  "flows": [
+    {
+      "id": "FLOW-G1",
+      "name": "需求评审闸门：创建→人工批准→生效",
+      "priority": "P0",
+      "actors": [
+        "agent",
+        "reviewer"
+      ],
+      "steps": [
+        "创建审批单",
+        "人工批准",
+        "查询状态"
+      ],
+      "invariant": "只有带合法决策的批准才能让单据进入 approved，且决策人可追溯",
+      "failure_modes": [
+        "无鉴权回调可批准",
+        "跨租户可操作",
+        "自述风险换取自动放行"
+      ]
+    },
+    {
+      "id": "FLOW-TASK",
+      "name": "任务推进：pending→running→waiting_approval→(决策)→running→done",
+      "priority": "P0",
+      "actors": [
+        "task-center",
+        "reviewer"
+      ],
+      "steps": [
+        "建任务",
+        "推进到运行",
+        "进入等待审批",
+        "凭决策恢复"
+      ],
+      "invariant": "没有审批决策就不能从 waiting_approval 回到 running",
+      "failure_modes": [
+        "无决策直接恢复",
+        "跨租户推进"
+      ]
+    },
+    {
+      "id": "FLOW-DEV",
+      "name": "研发域：需求→设计→G2→编码→MR→G3→合入",
+      "priority": "P0",
+      "actors": [
+        "agent",
+        "reviewer"
+      ],
+      "steps": [
+        "启动 dev SOP",
+        "G2 评审",
+        "编码",
+        "G3 评审"
+      ],
+      "invariant": "每次闸门否决都被如实归档并可统计",
+      "failure_modes": [
+        "否决被归档为非否决状态"
+      ]
+    },
+    {
+      "id": "FLOW-EVD",
+      "name": "证据链：执行产出→存证→校验→放行",
+      "priority": "P1",
+      "actors": [
+        "agent",
+        "reviewer"
+      ],
+      "steps": [
+        "产出证据",
+        "上传存证",
+        "读取时校验哈希"
+      ],
+      "invariant": "证据一旦存证即不可被静默替换",
+      "failure_modes": [
+        "哈希校验被绕过"
+      ]
+    }
+  ],
+  "requirements": [
+    {
+      "id": "REQ-001",
+      "title": "审批闸门可正常创建与查询",
+      "priority": "P0",
+      "source": "spec",
+      "card_ids": [
+        "BASE-001",
+        "BASE-002"
+      ]
+    },
+    {
+      "id": "REQ-002",
+      "title": "人工批准能生效并留痕决策人",
+      "priority": "P0",
+      "source": "spec",
+      "card_ids": [
+        "BASE-003"
+      ]
+    },
+    {
+      "id": "REQ-003",
+      "title": "拒绝/退回必须附原因",
+      "priority": "P1",
+      "source": "spec",
+      "card_ids": [
+        "BASE-004"
+      ]
+    },
+    {
+      "id": "REQ-004",
+      "title": "闸门决策必须经鉴权，调用方不能自免门禁",
+      "priority": "P0",
+      "source": "inferred",
+      "card_ids": [
+        "SEC-001",
+        "SEC-004"
+      ]
+    },
+    {
+      "id": "REQ-005",
+      "title": "租户之间完全隔离，不得跨租户读写",
+      "priority": "P0",
+      "source": "spec",
+      "card_ids": [
+        "SEC-002",
+        "SEC-003",
+        "FSM-003"
+      ]
+    },
+    {
+      "id": "REQ-006",
+      "title": "每次闸门检查都留审计记录",
+      "priority": "P0",
+      "source": "spec",
+      "card_ids": [
+        "GATE-001"
+      ]
+    },
+    {
+      "id": "REQ-007",
+      "title": "超时策略不得由单据自述风险等级驱动自动放行",
+      "priority": "P0",
+      "source": "inferred",
+      "card_ids": [
+        "GATE-002"
+      ]
+    },
+    {
+      "id": "REQ-008",
+      "title": "单据声明的可选决策被强制执行",
+      "priority": "P1",
+      "source": "spec",
+      "card_ids": [
+        "GATE-003"
+      ]
+    },
+    {
+      "id": "REQ-009",
+      "title": "等待审批的任务不能无决策恢复执行",
+      "priority": "P0",
+      "source": "spec",
+      "card_ids": [
+        "FSM-001"
+      ]
+    },
+    {
+      "id": "REQ-010",
+      "title": "非法状态转换被拒绝",
+      "priority": "P1",
+      "source": "spec",
+      "card_ids": [
+        "FSM-002"
+      ]
+    },
+    {
+      "id": "REQ-011",
+      "title": "重复或空的 external_ref 被优雅处理",
+      "priority": "P1",
+      "source": "inferred",
+      "card_ids": [
+        "FSM-004"
+      ]
+    },
+    {
+      "id": "REQ-012",
+      "title": "运行归档状态如实反映被否决的结果",
+      "priority": "P0",
+      "source": "inferred",
+      "card_ids": [
+        "RT-001"
+      ]
+    },
+    {
+      "id": "REQ-013",
+      "title": "数据唤醒不得改变等待审批运行的结果",
+      "priority": "P0",
+      "source": "spec",
+      "card_ids": [
+        "RT-002"
+      ]
+    },
+    {
+      "id": "REQ-014",
+      "title": "健康检查如实报告持久化后端",
+      "priority": "P1",
+      "source": "spec",
+      "card_ids": [
+        "RT-003"
+      ]
+    },
+    {
+      "id": "REQ-015",
+      "title": "Heuristic Miner 输出正确依赖方向且能接受自身日志",
+      "priority": "P0",
+      "source": "inferred",
+      "card_ids": [
+        "ALG-001"
+      ]
+    },
+    {
+      "id": "REQ-016",
+      "title": "α-Miner 能回放自身挖掘所用日志",
+      "priority": "P0",
+      "source": "inferred",
+      "card_ids": [
+        "ALG-002"
+      ]
+    },
+    {
+      "id": "REQ-017",
+      "title": "默认一致性检查能识别唯一异常路径",
+      "priority": "P1",
+      "source": "inferred",
+      "card_ids": [
+        "ALG-003"
+      ]
+    },
+    {
+      "id": "REQ-018",
+      "title": "LLM 不可用或响应畸形时回退规则化",
+      "priority": "P1",
+      "source": "spec",
+      "card_ids": [
+        "ALG-004"
+      ]
+    },
+    {
+      "id": "REQ-019",
+      "title": "审批网关稳态负载满足延迟与错误率预算",
+      "priority": "P1",
+      "source": "inferred",
+      "card_ids": [
+        "PT-001"
+      ]
+    },
+    {
+      "id": "REQ-020",
+      "title": "证据存证可上传、可校验、篡改可发现",
+      "priority": "P1",
+      "source": "spec",
+      "card_ids": [
+        "EVD-001"
+      ]
+    }
+  ],
+  "quality_gates": [
+    {
+      "id": "G1",
+      "description": "全部 P0 测试卡通过",
+      "metric": "p0_pass_rate",
+      "comparator": "gte",
+      "threshold": 1.0
+    },
+    {
+      "id": "G2",
+      "description": "无未关闭的 BLOCKER/CRITICAL 缺陷",
+      "metric": "open_blocker_critical_count",
+      "comparator": "lte",
+      "threshold": 0
+    },
+    {
+      "id": "G3",
+      "description": "每条需求都有已执行用例覆盖",
+      "metric": "coverage_rate",
+      "comparator": "gte",
+      "threshold": 1.0
+    }
+  ],
+  "cards": [
+    {
+      "id": "BASE-001",
+      "title": "审批网关健康检查",
+      "layer": "api",
+      "priority": "P0",
+      "risk": "战役前提：若基线不成立，后续所有发现都不可信。",
+      "expected": "200 且 status=ok",
+      "check": {
+        "type": "http",
+        "method": "GET",
+        "path": "/health",
+        "status_expect": 200,
+        "assert_json": {
+          "status": {
+            "equals": "ok"
+          }
+        }
+      },
+      "requirement_ids": [
+        "REQ-001"
+      ],
+      "feature_ids": [
+        "F-approval"
+      ]
+    },
+    {
+      "id": "BASE-002",
+      "title": "正常创建审批单成功（三要素+风险分）",
+      "layer": "api",
+      "priority": "P0",
+      "risk": "基线：创建通路必须可用。RiskSnapshot 要求 score/level/factors。",
+      "expected": "201 且返回 pending",
+      "check": {
+        "type": "http",
+        "method": "POST",
+        "path": "/approvals",
+        "body": {
+          "type": "GATE_REQUIREMENT_REVIEW",
+          "stage": "draft",
+          "requester": "tester",
+          "task_ref": "BASE-002",
+          "context_snapshot": {
+            "artifact_ref": "BASE-002",
+            "diff_summary": "实现功能X",
+            "evidence": [
+              "http://e/1"
+            ],
+            "risk": {
+              "score": 10,
+              "level": "L2",
+              "factors": [
+                "自测"
+              ]
+            },
+            "self_review": "已自测"
+          },
+          "deadline": "2026-12-31T00:00:00+00:00"
+        },
+        "status_expect": 201,
+        "assert_json": {
+          "status": {
+            "equals": "pending"
+          }
+        },
+        "extract": {
+          "apv_baseline": "id"
+        }
+      },
+      "requirement_ids": [
+        "REQ-001"
+      ],
+      "feature_ids": [
+        "F-approval"
+      ]
+    },
+    {
+      "id": "BASE-003",
+      "title": "正常人工批准生效（对照组）",
+      "layer": "api",
+      "priority": "P0",
+      "risk": "对照组：合法决策路径必须有效，否则无法证明非法路径的问题。",
+      "expected": "200 且 decision=approve",
+      "check": {
+        "type": "http",
+        "method": "POST",
+        "path": "/approvals/{apv_baseline}/decision",
+        "body": {
+          "decision": "approve",
+          "decided_by": "human.reviewer",
+          "comment": "ok"
+        },
+        "status_expect": 200,
+        "assert_json": {
+          "decision": {
+            "equals": "approve"
+          }
+        }
+      },
+      "requirement_ids": [
+        "REQ-002"
+      ],
+      "feature_ids": [
+        "F-approval"
+      ]
+    },
+    {
+      "id": "BASE-004",
+      "title": "拒绝/退回必须附原因",
+      "layer": "api",
+      "priority": "P1",
+      "risk": "反馈闭环的输入必须有原因，schema 层强制。",
+      "expected": "无原因拒绝返回 422",
+      "check": {
+        "type": "command",
+        "command": "ID=$(curl -s -X POST http://127.0.0.1:18001/approvals -H 'Content-Type: application/json' -d '{\"type\":\"GATE_REQUIREMENT_REVIEW\",\"stage\":\"s\",\"requester\":\"r\",\"task_ref\":\"BASE-004\",\"context_snapshot\":{\"artifact_ref\":\"a\",\"diff_summary\":\"d\",\"evidence\":[\"e\"],\"risk\":{\"score\":10,\"level\":\"L2\",\"factors\":[]},\"self_review\":\"\"},\"deadline\":\"2026-12-31T00:00:00+00:00\"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)[\"id\"])'); C=$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:18001/approvals/$ID/decision -H 'Content-Type: application/json' -d '{\"decision\":\"reject\",\"decided_by\":\"x\",\"comment\":\"\"}'); echo \"reject without reason http=$C\"; if [ \"$C\" != \"422\" ]; then echo 'FINDING: reject without a reason was accepted'; exit 1; fi; echo 'RESULT: PASS reject without a reason is rejected'",
+        "assert_stdout": {
+          "matches": "RESULT: PASS"
+        }
+      },
+      "requirement_ids": [
+        "REQ-003"
+      ],
+      "feature_ids": [
+        "F-approval"
+      ]
+    },
+    {
+      "id": "SEC-001",
+      "title": "[发现] IM 卡片回调无签名无鉴权即可批准审批单",
+      "layer": "security",
+      "priority": "P0",
+      "risk": "未鉴权回调可直接批准审批，绕过全部人审控制。现有 129 个测试只验证了合法调用。",
+      "expected": "需签名或鉴权；未授权批准即为人审绕过",
+      "check": {
+        "type": "command",
+        "command": "bash /Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/probes.sh im-callback",
+        "assert_stdout": {
+          "matches": "RESULT: PASS"
+        }
+      },
+      "requirement_ids": [
+        "REQ-004"
+      ],
+      "severity_on_fail": "CRITICAL",
+      "feature_ids": [
+        "F-approval"
+      ],
+      "flow_ids": [
+        "FLOW-G1"
+      ]
+    },
+    {
+      "id": "SEC-002",
+      "title": "跨租户读取审批单被拒绝",
+      "layer": "security",
+      "priority": "P0",
+      "risk": "核实租户隔离在读取路径上是否成立。",
+      "expected": "跨租户读 404",
+      "check": {
+        "type": "command",
+        "command": "bash /Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/probes.sh cross-tenant-read",
+        "assert_stdout": {
+          "matches": "RESULT: PASS"
+        }
+      },
+      "requirement_ids": [
+        "REQ-005"
+      ],
+      "severity_on_fail": "CRITICAL",
+      "feature_ids": [
+        "F-tenant"
+      ],
+      "flow_ids": [
+        "FLOW-G1"
+      ]
+    },
+    {
+      "id": "SEC-003",
+      "title": "[发现] resubmit 丢失租户过滤，可跨租户改状态",
+      "layer": "security",
+      "priority": "P0",
+      "risk": "router.py:295 的 _get_or_404 未传 tenant，兄弟路由都传了；可跨租户把他人单据改回 pending。",
+      "expected": "跨租户 resubmit 应 404/409",
+      "check": {
+        "type": "command",
+        "command": "bash /Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/probes.sh resubmit-tenant",
+        "assert_stdout": {
+          "matches": "RESULT: PASS"
+        }
+      },
+      "requirement_ids": [
+        "REQ-005"
+      ],
+      "severity_on_fail": "CRITICAL",
+      "feature_ids": [
+        "F-tenant"
+      ],
+      "flow_ids": [
+        "FLOW-G1"
+      ]
+    },
+    {
+      "id": "SEC-004",
+      "title": "[发现] 调用方可自行关闭工程闸门（mode=off 自免门禁）",
+      "layer": "security",
+      "priority": "P0",
+      "risk": "请求体可覆盖规则自身的 mode。若 mode=off 能让本该 block 的检查放行，闸门形同虚设。",
+      "expected": "规则 mode 不可被调用方覆盖",
+      "check": {
+        "type": "command",
+        "command": "bash /Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/probes.sh gate-mode",
+        "assert_stdout": {
+          "matches": "RESULT: PASS"
+        }
+      },
+      "requirement_ids": [
+        "REQ-004"
+      ],
+      "severity_on_fail": "CRITICAL",
+      "feature_ids": [
+        "F-gate"
+      ],
+      "flow_ids": [
+        "FLOW-G1"
+      ]
+    },
+    {
+      "id": "GATE-001",
+      "title": "[发现] persist=false 使闸门检查不留审计记录",
+      "layer": "security",
+      "priority": "P0",
+      "risk": "若检查可不留痕，E3 的 prior_gates_passed 与误拦率统计全部失真，且可规避审计。",
+      "expected": "每次检查必留痕",
+      "check": {
+        "type": "command",
+        "command": "bash /Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/probes.sh gate-persist",
+        "assert_stdout": {
+          "matches": "RESULT: PASS"
+        }
+      },
+      "requirement_ids": [
+        "REQ-006"
+      ],
+      "severity_on_fail": "MAJOR",
+      "feature_ids": [
+        "F-gate"
+      ],
+      "flow_ids": [
+        "FLOW-G1"
+      ]
+    },
+    {
+      "id": "GATE-002",
+      "title": "[发现] 超时自动放行由单据自述风险等级决定",
+      "layer": "security",
+      "priority": "P0",
+      "risk": "sweeper 从客户端提交的 risk.level 读取等级，提交方自封 L1 即可换取超时自动放行。",
+      "expected": "超时不得因自述等级自动放行",
+      "check": {
+        "type": "command",
+        "command": "bash /Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/probes.sh timeout-auto",
+        "assert_stdout": {
+          "matches": "RESULT: PASS"
+        }
+      },
+      "requirement_ids": [
+        "REQ-007"
+      ],
+      "severity_on_fail": "CRITICAL",
+      "feature_ids": [
+        "F-trust"
+      ],
+      "flow_ids": [
+        "FLOW-G1"
+      ]
+    },
+    {
+      "id": "GATE-003",
+      "title": "单据声明的 options 未被强制执行",
+      "layer": "api",
+      "priority": "P1",
+      "risk": "options 被存储但从未校验，属契约漂移。",
+      "expected": "不在 options 内的决策被拒",
+      "check": {
+        "type": "command",
+        "command": "ID=$(curl -s -X POST http://127.0.0.1:18001/approvals -H 'Content-Type: application/json' -d '{\"type\":\"GATE_REQUIREMENT_REVIEW\",\"stage\":\"s\",\"requester\":\"r\",\"task_ref\":\"GATE-003\",\"context_snapshot\":{\"artifact_ref\":\"a\",\"diff_summary\":\"d\",\"evidence\":[\"e\"],\"risk\":{\"score\":10,\"level\":\"L2\",\"factors\":[]},\"self_review\":\"\"},\"options\":[\"approve\",\"reject\"],\"deadline\":\"2026-12-31T00:00:00+00:00\"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)[\"id\"])'); C=$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:18001/approvals/$ID/decision -H 'Content-Type: application/json' -d '{\"decision\":\"revise\",\"decided_by\":\"x\",\"comment\":\"越权选项\"}'); echo \"options=[approve,reject] but revise submitted -> http=$C\"; if [ \"$C\" = \"200\" ]; then echo 'FINDING: declared gate options were not enforced'; exit 1; fi; echo 'RESULT: PASS declared gate options are enforced'",
+        "assert_stdout": {
+          "matches": "RESULT: PASS"
+        }
+      },
+      "requirement_ids": [
+        "REQ-008"
+      ],
+      "severity_on_fail": "MAJOR",
+      "feature_ids": [
+        "F-gate"
+      ],
+      "flow_ids": [
+        "FLOW-G1"
+      ]
+    },
+    {
+      "id": "FSM-001",
+      "title": "[发现] waiting_approval 可直接回到 running，绕过审批决策",
+      "layer": "api",
+      "priority": "P0",
+      "risk": "state.py 把该边列为合法且 transition 不校验决策存在，人审闸门在任务层被绕过。",
+      "expected": "无决策时不允许恢复执行",
+      "check": {
+        "type": "command",
+        "command": "bash /Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/probes.sh task-fsm",
+        "assert_stdout": {
+          "matches": "RESULT: PASS"
+        }
+      },
+      "requirement_ids": [
+        "REQ-009"
+      ],
+      "severity_on_fail": "CRITICAL",
+      "feature_ids": [
+        "F-taskfsm"
+      ],
+      "flow_ids": [
+        "FLOW-TASK"
+      ]
+    },
+    {
+      "id": "FSM-002",
+      "title": "非法状态转换被拒绝（对照组）",
+      "layer": "api",
+      "priority": "P1",
+      "risk": "对照组：真正非法的转换必须 409。",
+      "expected": "pending→done 返回 409",
+      "check": {
+        "type": "command",
+        "command": "bash /Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/probes.sh task-fsm-illegal",
+        "assert_stdout": {
+          "matches": "RESULT: PASS"
+        }
+      },
+      "requirement_ids": [
+        "REQ-010"
+      ],
+      "feature_ids": [
+        "F-taskfsm"
+      ],
+      "flow_ids": [
+        "FLOW-TASK"
+      ]
+    },
+    {
+      "id": "FSM-003",
+      "title": "[发现] task-center 详情与转换接口缺少租户过滤",
+      "layer": "security",
+      "priority": "P0",
+      "risk": "只有 list 做了租户过滤，get/transition 未过滤，跨租户可读改他人任务。",
+      "expected": "跨租户读写任务被拒",
+      "check": {
+        "type": "command",
+        "command": "bash /Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/probes.sh task-tenant",
+        "assert_stdout": {
+          "matches": "RESULT: PASS"
+        }
+      },
+      "requirement_ids": [
+        "REQ-005"
+      ],
+      "severity_on_fail": "CRITICAL",
+      "feature_ids": [
+        "F-tenant"
+      ],
+      "flow_ids": [
+        "FLOW-TASK"
+      ]
+    },
+    {
+      "id": "FSM-004",
+      "title": "[发现] 重复空 external_ref 返回 500 而非客户端错误",
+      "layer": "api",
+      "priority": "P1",
+      "risk": "唯一索引 + 空值未保护，第二次提交返回 500。",
+      "expected": "返回 4xx",
+      "check": {
+        "type": "command",
+        "command": "bash /Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/probes.sh task-dup-ref",
+        "assert_stdout": {
+          "matches": "RESULT: PASS"
+        }
+      },
+      "requirement_ids": [
+        "REQ-011"
+      ],
+      "severity_on_fail": "MAJOR",
+      "feature_ids": [
+        "F-taskfsm"
+      ],
+      "flow_ids": [
+        "FLOW-TASK"
+      ]
+    },
+    {
+      "id": "RT-001",
+      "title": "被否决的运行归档状态应如实反映否决",
+      "layer": "data",
+      "priority": "P0",
+      "risk": "归档是 /runs 与 stats.success_rate 的数据源，写错会污染成功率与成本统计。",
+      "expected": "归档状态为 rejected",
+      "check": {
+        "type": "command",
+        "command": "bash /Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/probes.sh reject-archive",
+        "assert_stdout": {
+          "matches": "RESULT: PASS"
+        }
+      },
+      "requirement_ids": [
+        "REQ-012"
+      ],
+      "severity_on_fail": "MAJOR",
+      "feature_ids": [
+        "F-runtime"
+      ],
+      "flow_ids": [
+        "FLOW-DEV"
+      ]
+    },
+    {
+      "id": "RT-002",
+      "title": "[发现] /wake 无状态守卫，会吞掉闸门中断",
+      "layer": "api",
+      "priority": "P0",
+      "risk": "resume 对非闸门线程 409，wake 无校验；对等待审批的运行调用 wake 会消费闸门中断并静默否决。",
+      "expected": "wake 不得改变等待审批运行的结果",
+      "check": {
+        "type": "command",
+        "command": "bash /Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/probes.sh wake-guard",
+        "assert_stdout": {
+          "matches": "RESULT: PASS"
+        }
+      },
+      "requirement_ids": [
+        "REQ-013"
+      ],
+      "severity_on_fail": "CRITICAL",
+      "feature_ids": [
+        "F-runtime"
+      ],
+      "flow_ids": [
+        "FLOW-DEV"
+      ]
+    },
+    {
+      "id": "RT-003",
+      "title": "健康检查如实报告检查点后端",
+      "layer": "api",
+      "priority": "P1",
+      "risk": "避免健康接口谎报持久化能力。",
+      "expected": "configured 与实例设置一致",
+      "check": {
+        "type": "command",
+        "command": "bash /Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/probes.sh health-checkpointer",
+        "assert_stdout": {
+          "matches": "RESULT: PASS"
+        }
+      },
+      "requirement_ids": [
+        "REQ-014"
+      ],
+      "feature_ids": [
+        "F-runtime"
+      ],
+      "flow_ids": [
+        "FLOW-DEV"
+      ]
+    },
+    {
+      "id": "ALG-001",
+      "title": "[发现] Heuristic Miner 反向依赖输出错误方向，自评适应度 0",
+      "layer": "data",
+      "priority": "P0",
+      "risk": "只输出 from=a,to=b，反向占优时方向反了且真边缺失；用该日志挖出的模型自评 0.0。",
+      "expected": "依赖方向正确且模型能接受自身日志",
+      "check": {
+        "type": "command",
+        "command": "bash /Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/probes.sh heuristic",
+        "assert_stdout": {
+          "matches": "RESULT: PASS"
+        }
+      },
+      "requirement_ids": [
+        "REQ-015"
+      ],
+      "severity_on_fail": "MAJOR",
+      "feature_ids": [
+        "F-mining"
+      ]
+    },
+    {
+      "id": "ALG-002",
+      "title": "[发现] α-Miner 对三路分支与循环建模错误，自评适应度 <1",
+      "layer": "data",
+      "priority": "P0",
+      "risk": "候选集上限为 2 且回放非标准触发规则，三路 XOR 得 0.722、循环 0.6。",
+      "expected": "模型能回放自身挖掘所用日志",
+      "check": {
+        "type": "command",
+        "command": "bash /Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/probes.sh alpha",
+        "assert_stdout": {
+          "matches": "RESULT: PASS"
+        }
+      },
+      "requirement_ids": [
+        "REQ-016"
+      ],
+      "severity_on_fail": "MAJOR",
+      "feature_ids": [
+        "F-mining"
+      ]
+    },
+    {
+      "id": "ALG-003",
+      "title": "[发现] 默认 DFG 一致性检查差一，唯一异常路径不报",
+      "layer": "data",
+      "priority": "P1",
+      "risk": "min_support=1 时唯一异常路径仍得 fitness 1.0，默认一致性分数可能恒为 1。",
+      "expected": "识别出唯一异常路径",
+      "check": {
+        "type": "command",
+        "command": "bash /Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/probes.sh dfg-conformance",
+        "assert_stdout": {
+          "matches": "RESULT: PASS"
+        }
+      },
+      "requirement_ids": [
+        "REQ-017"
+      ],
+      "severity_on_fail": "MAJOR",
+      "feature_ids": [
+        "F-mining"
+      ]
+    },
+    {
+      "id": "ALG-004",
+      "title": "[发现] LLM 返回畸形响应时不再回退，异常直接逃逸",
+      "layer": "api",
+      "priority": "P1",
+      "risk": "只捕获 httpx.HTTPError，200 非 JSON 或缺 choices 会抛出 ValueError/KeyError，与文档承诺不符。",
+      "expected": "畸形响应回退规则化",
+      "check": {
+        "type": "command",
+        "command": "bash /Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/probes.sh llm-fallback",
+        "assert_stdout": {
+          "matches": "RESULT: PASS"
+        }
+      },
+      "requirement_ids": [
+        "REQ-018"
+      ],
+      "severity_on_fail": "MAJOR",
+      "feature_ids": [
+        "F-mining"
+      ]
+    },
+    {
+      "id": "EVD-001",
+      "title": "证据上传与哈希校验闭环",
+      "layer": "api",
+      "priority": "P1",
+      "risk": "来源链可追溯性依赖存证与读取时校验；校验失效则证据可被替换。",
+      "expected": "上传后校验通过",
+      "check": {
+        "type": "command",
+        "command": "curl -s -X POST http://127.0.0.1:18001/evidence -H 'X-Tenant: default' -F 'file=@/tmp/pst-sut/evd.txt' -F 'task_ref=EVD-001' -F 'acceptance_item=A1' -F 'kind=log' >/dev/null; V=$(curl -s -H 'X-Tenant: default' \"http://127.0.0.1:18001/evidence/verify?task_ref=EVD-001\"); echo \"verify=$V\"; OK=$(printf '%s' \"$V\" | python3 -c 'import sys,json;d=json.load(sys.stdin);print(d.get(\"verified\",0)==d.get(\"total\",-1) and not d.get(\"broken\"))'); if [ \"$OK\" != \"True\" ]; then echo 'FINDING: evidence verification did not confirm every artifact'; exit 1; fi; echo 'RESULT: PASS evidence upload and hash verification round-trip'",
+        "assert_stdout": {
+          "matches": "RESULT: PASS"
+        }
+      },
+      "requirement_ids": [
+        "REQ-020"
+      ],
+      "severity_on_fail": "MAJOR",
+      "feature_ids": [
+        "F-evidence"
+      ],
+      "flow_ids": [
+        "FLOW-EVD"
+      ]
+    },
+    {
+      "id": "PT-001",
+      "title": "审批网关稳态负载延迟预算",
+      "layer": "performance",
+      "priority": "P1",
+      "risk": "闸门是流水线必经路径，延迟直接影响产线吞吐。",
+      "expected": "p95<300ms 且错误率<1%",
+      "check": {
+        "type": "command",
+        "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/loadtest.py --url http://127.0.0.1:18001 --endpoint 'GET /health:5' --endpoint 'GET /approvals?status=pending:5' --vus 20 --duration 20 --slo-p95 300 --slo-error-rate 0.01 --quiet --out /Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/artifacts/perf-approval.json",
+        "expect_exit": 0
+      },
+      "requirement_ids": [
+        "REQ-019"
+      ],
+      "severity_on_fail": "MAJOR",
+      "feature_ids": [
+        "F-approval"
+      ]
+    }
+  ]
+}

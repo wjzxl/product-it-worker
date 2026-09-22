@@ -200,7 +200,12 @@ class TestTenantApiIsolation:
         apv_a = self._make(client, LINE_A, GATE)
         apv_b = self._make(client, LINE_B, GATE)
         listed_a = client.get("/approvals", headers={"X-Tenant": LINE_A}).json()
-        assert [x["id"] for x in listed_a] == [apv_a["id"]]
+        # 验证隔离**属性**（而不是"列表恰好一项"——同租户的其它用例也会建单）：
+        # 本租户能列出自己刚建的单，且列表里绝不出现其它租户的单。
+        ids_a = [x["id"] for x in listed_a]
+        assert apv_a["id"] in ids_a
+        assert apv_b["id"] not in ids_a
+        assert all(x["tenant"] == LINE_A for x in listed_a)
         # 跨产品线直读必须 404（隔离而非仅列表过滤）
         assert client.get(f"/approvals/{apv_a['id']}", headers={"X-Tenant": LINE_B}).status_code == 404
         # 决策接口同样隔离

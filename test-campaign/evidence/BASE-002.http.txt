@@ -1,0 +1,16 @@
+POST http://127.0.0.1:18001/approvals
+status: 201
+duration_ms: 59.3
+--- request headers ---
+Accept: application/json
+Content-Type: application/json
+--- request body ---
+{"type": "GATE_REQUIREMENT_REVIEW", "stage": "draft", "requester": "tester", "task_ref": "BASE-002", "context_snapshot": {"artifact_ref": "BASE-002", "diff_summary": "\u5b9e\u73b0\u529f\u80fdX", "evidence": ["http://e/1"], "risk": {"score": 10, "level": "L2", "factors": ["\u81ea\u6d4b"]}, "self_review": "\u5df2\u81ea\u6d4b"}, "deadline": "2026-12-31T00:00:00+00:00"}
+--- response headers ---
+date: Tue, 22 Sep 2026 06:53:18 GMT
+server: uvicorn
+content-length: 688
+content-type: application/json
+connection: close
+--- response body ---
+{"id":"apv_05ebeb50f4b1","tenant":"default","type":"GATE_REQUIREMENT_REVIEW","stage":"draft","requester":"tester","task_ref":"BASE-002","context_snapshot":{"artifact_ref":"BASE-002","diff_summary":"实现功能X","evidence":["http://e/1"],"risk":{"score":10,"level":"L2","factors":["自测"]},"self_review":"已自测","sources":[]},"options":["approve","reject","revise"],"deadline":"2026-12-31T00:00:00","escalation_policy":{"remind_after_hours":24,"escalate_to":"team_lead","timeout_action":"reject"},"status":"pending","version":1,"created_at":"2026-09-22T06:53:18.211219","decisions":[],"trust_level":"L3","trust_reason":"通过率 0%（0/0）低于阈值","auto_decision":"pending"}

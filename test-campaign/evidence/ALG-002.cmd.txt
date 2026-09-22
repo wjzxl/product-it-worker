@@ -1,0 +1,11 @@
+$ bash /Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/probes.sh alpha
+exit: 1
+duration_ms: 129.0
+--- stdout ---
+xor3: places=14 fitness=0.722
+par3: places=6 fitness=1.0
+loop: places=3 fitness=0.6
+FINDING: alpha net cannot replay its own log: [('xor3', 0.722), ('loop', 0.6)]
+
+--- stderr ---
+

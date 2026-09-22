@@ -65,7 +65,13 @@ class EscalationPolicy(BaseModel):
 
     @model_validator(mode="after")
     def _l3_must_reject_on_timeout(self) -> "EscalationPolicy":
-        # 安全底线：默认拒绝；只有显式声明的 L1 才允许超时自动放行（Phase 0 不启用）
+        """安全底线校验（修复 BUG-004 的"空校验"）：超时动作只能是默认拒绝或 L1 自动放行。
+
+        真正的等级判断在 sweeper 里用**服务端信任等级**完成（见 app/policies.py）；
+        这里保证契约层不会出现第三种取值，也不会出现"未声明却自动放行"。
+        """
+        if self.timeout_action not in ("reject", "auto_approve_l1_only"):
+            raise ValueError("timeout_action 只允许 reject 或 auto_approve_l1_only")
         return self
 
 
@@ -127,13 +133,22 @@ class ApprovalRequestOut(BaseModel):
 
 
 class GateCheckIn(BaseModel):
-    """工程闸门检查请求（WP2）。上下文交由判定器按规则取用，故为自由结构。"""
+    """工程闸门检查请求（WP2）。上下文交由判定器按规则取用，故为自由结构。
+
+    **安全约束（修复 BUG-003/014）**：`mode` 与 `persist` **不接受客户端覆盖**——
+    闸门宽严由服务端规则文件 + `ENG_GATES_MODE` 决定，留痕一律强制。
+    否则调用方可用 `mode=off` 自免门禁、用 `persist=false` 规避审计。
+    这两个字段若被传入会被忽略（并记录告警），保留字段定义只为兼容旧客户端。
+    """
 
     task_ref: str = ""
     context: dict[str, Any] = Field(default_factory=dict)
-    mode: Optional[Literal["off", "warn", "block"]] = None  # 覆盖灰度（不传则用规则/全局配置）
     checked_by: str = ""
-    persist: bool = True
+    # 以下两个字段：**已废弃，传入即被忽略**（见上方安全约束）
+    mode: Optional[Literal["off", "warn", "block"]] = Field(
+        default=None, deprecated=True, description="已废弃：不接受客户端覆盖，忽略")
+    persist: Optional[bool] = Field(
+        default=None, deprecated=True, description="已废弃：闸门检查一律留痕，忽略")
 
 
 class GateFeedbackIn(BaseModel):

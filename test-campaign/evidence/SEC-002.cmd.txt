@@ -1,0 +1,9 @@
+$ bash /Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/probes.sh cross-tenant-read
+exit: 0
+duration_ms: 183.2
+--- stdout ---
+created=apv_3b5ef36fa9f2 as tenantA; read as tenantB http=404
+RESULT: PASS cross-tenant read rejected
+
+--- stderr ---
+

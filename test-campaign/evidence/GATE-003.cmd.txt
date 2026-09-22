@@ -1,0 +1,9 @@
+$ ID=$(curl -s -X POST http://127.0.0.1:18001/approvals -H 'Content-Type: application/json' -d '{"type":"GATE_REQUIREMENT_REVIEW","stage":"s","requester":"r","task_ref":"GATE-003","context_snapshot":{"artifact_ref":"a","diff_summary":"d","evidence":["e"],"risk":{"score":10,"level":"L2","factors":[]},"self_review":""},"options":["approve","reject"],"deadline":"2026-12-31T00:00:00+00:00"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])'); C=$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:18001/approvals/$ID/decision -H 'Content-Type: application/json' -d '{"decision":"revise","decided_by":"x","comment":"越权选项"}'); echo "options=[approve,reject] but revise submitted -> http=$C"; if [ "$C" = "200" ]; then echo 'FINDING: declared gate options were not enforced'; exit 1; fi; echo 'RESULT: PASS declared gate options are enforced'
+exit: 1
+duration_ms: 165.3
+--- stdout ---
+options=[approve,reject] but revise submitted -> http=200
+FINDING: declared gate options were not enforced
+
+--- stderr ---
+

@@ -1,0 +1,7 @@
+$ python3 /Users/edy/.dsh/skills/full-system-testing/scripts/loadtest.py --url http://127.0.0.1:18001 --endpoint 'GET /health:5' --endpoint 'GET /approvals?status=pending:5' --vus 20 --duration 20 --slo-p95 300 --slo-error-rate 0.01 --quiet --out /Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/artifacts/perf-approval.json
+exit: 0
+duration_ms: 20387.2
+--- stdout ---
+
+--- stderr ---
+

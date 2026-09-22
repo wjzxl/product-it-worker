@@ -1,0 +1,9 @@
+$ curl -s -X POST http://127.0.0.1:18001/evidence -H 'X-Tenant: default' -F 'file=@/tmp/pst-sut/evd.txt' -F 'task_ref=EVD-001' -F 'acceptance_item=A1' -F 'kind=log' >/dev/null; V=$(curl -s -H 'X-Tenant: default' "http://127.0.0.1:18001/evidence/verify?task_ref=EVD-001"); echo "verify=$V"; OK=$(printf '%s' "$V" | python3 -c 'import sys,json;d=json.load(sys.stdin);print(d.get("verified",0)==d.get("total",-1) and not d.get("broken"))'); if [ "$OK" != "True" ]; then echo 'FINDING: evidence verification did not confirm every artifact'; exit 1; fi; echo 'RESULT: PASS evidence upload and hash verification round-trip'
+exit: 0
+duration_ms: 188.6
+--- stdout ---
+verify={"task_ref":"EVD-001","total":1,"verified":1,"broken":[]}
+RESULT: PASS evidence upload and hash verification round-trip
+
+--- stderr ---
+

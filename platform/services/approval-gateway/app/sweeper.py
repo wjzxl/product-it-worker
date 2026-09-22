@@ -17,6 +17,7 @@ from .db import SessionLocal
 from .events import new_event, publisher_from_env
 from .models import ApprovalRequest, Decision, utcnow
 from .policies import apply_timeout_action, is_overdue
+from .trust import compute_trust
 
 logger = logging.getLogger(__name__)
 
@@ -37,17 +38,24 @@ def sweep(db: Session) -> list[dict]:
     for req in pending:
         if not is_overdue(req.deadline, now):
             continue
-        risk_level = (req.context_snapshot or {}).get("risk", {}).get("level", "L3")
-        action = apply_timeout_action(req.escalation_policy or {}, risk_level)
+        # 修复 BUG-004：等级取自**服务端信任计算**，不读单据自述的 risk.level
+        trust = compute_trust(db, req.type, tenant=req.tenant, now=now)
+        trusted_level = trust["level"]
+        action = apply_timeout_action(req.escalation_policy or {}, trusted_level)
+        declared = (req.context_snapshot or {}).get("risk", {}).get("level", "?")
         decision = Decision(
             request_id=req.id,
             decision=action,
             decided_by="system:timeout",
-            comment=f"超时未处理，按策略自动{action}（风险等级 {risk_level}）",
+            comment=(
+                f"超时未处理，按策略自动{action}"
+                f"（服务端信任等级 {trusted_level}；单据自述等级 {declared} 不作为依据）"
+            ),
         )
         db.add(decision)
         req.status = "approved" if action == "approve" else "rejected"
-        handled.append({"approval_id": req.id, "action": action, "risk_level": risk_level})
+        handled.append({"approval_id": req.id, "action": action,
+                        "trusted_level": trusted_level, "declared_level": declared})
         _publisher.publish(
             new_event(
                 "approval.decided",
@@ -63,7 +71,8 @@ def sweep(db: Session) -> list[dict]:
                 "approval-gateway",
             )
         )
-        logger.warning("审批超时自动处置: %s -> %s（%s）", req.id, action, risk_level)
+        logger.warning("审批超时自动处置: %s -> %s（服务端信任=%s，单据自述=%s）",
+                       req.id, action, trusted_level, declared)
     if handled:
         db.commit()
     return handled

@@ -179,7 +179,8 @@ def stats(tenant: str = "") -> dict:
             cost += row["cost_usd"] or 0.0
         else:
             unmetered += 1
-    finished = by_status.get("done", 0) + by_status.get("failed", 0)
+    # 已结束 = 完成 + 失败 + 被否决（否决是终态，遗漏它会让成功率虚高/为空）
+    finished = by_status.get("done", 0) + by_status.get("failed", 0) + by_status.get("rejected", 0)
     return {
         "runs": total,
         "by_status": by_status,

@@ -1,8 +1,9 @@
 """任务中心领域模型：Task（任务）+ TaskEvent（时间线）+ EventInbox（幂等收件箱）。"""
 import uuid
+from typing import Optional
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, DateTime, ForeignKey, String
+from sqlalchemy import JSON, DateTime, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -23,7 +24,11 @@ class Task(Base):
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: new_id("tsk"))
     tenant: Mapped[str] = mapped_column(String(64), default="default", index=True)  # 多租户隔离键
-    external_ref: Mapped[str] = mapped_column(String(128), unique=True, index=True, default="")
+    # NULL = 无外部引用（唯一索引允许多个 NULL）；空串会被索引视为同一个值，故不再用 ""（修复 BUG-015）
+    # 唯一性范围是 **(tenant, external_ref)** 而不是全局：不同产品线完全可以引用各自系统的同名单号，
+    # 全局唯一会让第二个租户建单直接 409（多租户语义错误）。
+    external_ref: Mapped[Optional[str]] = mapped_column(String(128), index=True,
+                                                        nullable=True, default=None)
     sop: Mapped[str] = mapped_column(String(128), default="")          # 如 product-domain/prd-flow
     params: Mapped[dict] = mapped_column(JSON, default=dict)           # 流程入参（需求文本等）
     status: Mapped[str] = mapped_column(String(24), default="pending", index=True)
@@ -34,6 +39,11 @@ class Task(Base):
 
     events: Mapped[list["TaskEvent"]] = relationship(
         back_populates="task", order_by="TaskEvent.occurred_at", cascade="all, delete-orphan"
+    )
+
+
+    __table_args__ = (
+        UniqueConstraint("tenant", "external_ref", name="uq_tasks_tenant_external_ref"),
     )
 
 

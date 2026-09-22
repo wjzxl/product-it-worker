@@ -13,7 +13,7 @@ from fastapi import (APIRouter, Depends, File, Form, Header, HTTPException, Requ
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import eng_gates, evidence, gate_rules
+from . import eng_gates, evidence, gate_rules, im_auth
 from .db import get_db
 from .events import new_event, publisher_from_env
 from .models import ApprovalRequest, Decision, utcnow
@@ -53,6 +53,20 @@ def current_tenant(x_tenant: str = Header(default="")) -> str:
     import os
 
     return x_tenant or os.getenv("DEFAULT_TENANT", "default")
+
+
+def _check_decision_allowed(req: ApprovalRequest, decision: str) -> None:
+    """修复 BUG-013：`options` 声明了什么就只允许什么（契约必须被执行）。
+
+    此前 options 被存储但从不校验：声明 `["approve","reject"]` 的单据仍可被 revise，
+    属契约漂移——闸门声明了可用动作，就应该真的只允许这些动作。
+    """
+    options = list(req.options or [])
+    if options and decision not in options:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            f"该审批单只允许 {options}，收到 {decision!r}",
+        )
 
 
 def _get_or_404(db: Session, approval_id: str, tenant: Optional[str] = None) -> ApprovalRequest:
@@ -241,6 +255,7 @@ def decide(
     """人做决策（Web 审批台入口）。AUTH_MODE=oidc/static 时要求登录（主体写入审计）。"""
     req = _get_or_404(db, approval_id, tenant=tenant)
     _check_pending(req)
+    _check_decision_allowed(req, payload.decision)    # 修复 BUG-013
 
     decided_by = payload.decided_by or principal.sub
     decision = Decision(
@@ -290,9 +305,14 @@ def resubmit(
     payload: ApprovalRequestCreate,
     db: Session = Depends(get_db),
     principal=Depends(current_principal),
+    tenant: str = Depends(current_tenant),
 ) -> ApprovalRequest:
-    """revise 后修订重新提交：新上下文（version+1），重新进入 pending。"""
-    req = _get_or_404(db, approval_id)
+    """revise 后修订重新提交：新上下文（version+1），重新进入 pending。
+
+    **租户过滤（修复 BUG-002）**：此前 `_get_or_404` 未传 tenant，其它租户可把
+    他人单据改回 pending（跨租户写）。现在与兄弟路由一致做隔离。
+    """
+    req = _get_or_404(db, approval_id, tenant=tenant)
     if req.status != "revised":
         raise HTTPException(status.HTTP_409_CONFLICT, "仅 revised 状态的审批可重新提交")
 
@@ -323,11 +343,27 @@ def resubmit(
 
 
 @router.post("/callbacks/im/card", response_model=DecisionOut)
-async def im_card_callback(payload: ImCardCallback, request: Request, db: Session = Depends(get_db)) -> Decision:
-    """IM 交互卡片回调：卡片按钮 → 决策。"""
-    # TODO(T0.4): 飞书签名校验（timestamp+sign），防伪造回调
-    req = _get_or_404(db, payload.approval_id)
+async def im_card_callback(
+    payload: ImCardCallback,
+    request: Request,
+    db: Session = Depends(get_db),
+    tenant: str = Depends(current_tenant),
+) -> Decision:
+    """IM 交互卡片回调：卡片按钮 → 决策。
+
+    **鉴权（修复 BUG-001）**：飞书签名校验（`app/im_auth.py`）+ 租户隔离。
+    未配置签名密钥时**拒绝**（503），不再允许任何匿名回调直接批准审批。
+    """
+    raw_body = await request.body()
+    try:
+        im_auth.verify(dict(request.headers), raw_body)
+    except im_auth.ImAuthError as exc:
+        logger.warning("IM 回调被拒：%s（%s）", exc, exc.reason)
+        raise HTTPException(exc.status_code, f"IM 回调鉴权失败：{exc}") from exc
+
+    req = _get_or_404(db, payload.approval_id, tenant=tenant)
     _check_pending(req)
+    _check_decision_allowed(req, payload.action)      # 修复 BUG-013
 
     decision = Decision(
         request_id=req.id,
@@ -427,6 +463,13 @@ def eng_gate_check(
     code = code.upper()
     if code not in eng_gates.KNOWN_CODES:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"未知工程闸门 {code}（可用：{', '.join(eng_gates.KNOWN_CODES)}）")
+    # 修复 BUG-003/014：显式忽略客户端传入的 mode/persist——宽严以服务端规则与
+    # ENGINEERING_GATES_MODE 为准，留痕一律强制；客户端试图覆盖时记录告警。
+    if payload.mode is not None or payload.persist is not None:
+        logger.warning(
+            "忽略客户端试图覆盖闸门控制项 task=%s mode=%s persist=%s（服务端权威）",
+            payload.task_ref or "-", payload.mode, payload.persist,
+        )
     try:
         return eng_gates.run_check(
             db,
@@ -434,9 +477,9 @@ def eng_gate_check(
             task_ref=payload.task_ref,
             tenant=tenant,
             context=payload.context,
-            mode=payload.mode,
+            mode=None,          # 服务端权威：不接受调用方覆盖
             checked_by=payload.checked_by or principal.sub,
-            persist=payload.persist,
+            persist=True,       # 审计强制
         )
     except gate_rules.GateRuleError as exc:
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, f"规则加载失败：{exc}") from exc

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="126" viewBox="0 0 640 126" role="img" aria-label="Test card verdicts">
+<text x="12" y="24" font-family="system-ui,sans-serif" font-size="15" font-weight="600" fill="#1f2328">Test card verdicts</text>
+<text x="160" y="65.0" text-anchor="end" font-family="system-ui,sans-serif" font-size="13" fill="#1f2328">PASS</text>
+<rect x="170" y="50" width="228.0" height="18" rx="3" fill="#1a7f37"/>
+<text x="406.0" y="65.0" font-family="system-ui,sans-serif" font-size="12" fill="#57606a">9</text>
+<text x="160" y="93.0" text-anchor="end" font-family="system-ui,sans-serif" font-size="13" fill="#1f2328">FAIL</text>
+<rect x="170" y="78" width="380.0" height="18" rx="3" fill="#cf222e"/>
+<text x="558.0" y="93.0" font-family="system-ui,sans-serif" font-size="12" fill="#57606a">15</text>
+</svg>

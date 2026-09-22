@@ -112,8 +112,16 @@ def heuristic_miner(log: dict, threshold: float = 0.8) -> dict:
         if ab == 0 and ba == 0:
             continue
         value = (ab - ba) / (ab + ba + 1)
-        if abs(value) >= threshold:
-            dependencies.append({"from": a, "to": b, "dependency": round(value, 3), "observations": ab + ba})
+        # 修复 BUG-008：依赖是有**方向**的。当 |b>a| > |a>b| 时，占优方向是 b→a，
+        # 依赖度应取正值并输出 (b, a)；此前恒定输出 (a, b) 且带负值，
+        # 导致一致的日志被挖出反向边、真边缺失，自评适应度为 0。
+        if value >= 0:
+            source, target, strength = a, b, value
+        else:
+            source, target, strength = b, a, -value
+        if strength >= threshold:
+            dependencies.append({"from": source, "to": target,
+                                 "dependency": round(strength, 3), "observations": ab + ba})
     # 长度-2 循环：a⇒b 与 b⇒a 均超阈值（依赖度会互相抵消 → 用观测数判断）
     loops = [
         {"a": a, "b": b}
@@ -130,7 +138,7 @@ def heuristic_miner(log: dict, threshold: float = 0.8) -> dict:
 
 
 # ---------------------------------------------------------------- α-Miner
-def alpha_miner(log: dict) -> dict:
+def alpha_miner(log: dict, max_set_size: int = 4) -> dict:
     traces = [t for t in log["traces"].values() if t]
     activities = sorted({a for trace in traces for a in trace})
     follows: Counter = Counter()
@@ -153,8 +161,12 @@ def alpha_miner(log: dict) -> dict:
     def choice(x: str, y: str) -> bool:
         return not follows.get((x, y), 0) and not follows.get((y, x), 0)
 
+    # 修复 BUG-009：候选集上限原为 2，无法表达三路及以上分支/汇合
+    # （A→{B,C,D} 需要 |B|=3）。这里放宽到可配置上限，默认 4 覆盖常见分支度，
+    # 并在返回里如实给出 max_set_size（超出即受限于该上限，不做无限枚举）。
+    max_set_size = min(max_set_size, len(activities))
     a_sets: list[frozenset] = []
-    for size in range(1, 3):
+    for size in range(1, max_set_size + 1):
         for combo in combinations(activities, size):
             if all(choice(x, y) for x, y in combinations(combo, 2)):
                 a_sets.append(frozenset(combo))
@@ -165,12 +177,27 @@ def alpha_miner(log: dict) -> dict:
                 continue
             if all((a, b) in causal for a in a_set for b in b_set):
                 xw.add((a_set, b_set))
-    # 去除被更大关系集包含的冗余对
+    # 去除被更大关系集包含的冗余对（修复 BUG-009 的第二处）：
+    # 原条件要求 A、B **两侧都严格**子集，于是 ({A},{B}) 这类小库所无法被 ({A},{B,C,D}) 吸收，
+    # 三路分支会膨胀成 16 个库所。正确定义是"存在另一个对 (A',B') 使得 A ⊆ A'、B ⊆ B' 且两者不同"。
     places = [
         {"inputs": sorted(a_set), "outputs": sorted(b_set)}
         for a_set, b_set in xw
-        if not any(a_set < a2 and b_set < b2 for a2, b2 in xw)
+        if not any(a_set <= a2 and b_set <= b2 and (a_set, b_set) != (a2, b2) for a2, b2 in xw)
     ]
+    # 修复 BUG-009（短循环）：经典 α 无法表达长度 1/2 的循环，导致 A,B,A,B,C 这类日志
+    # 回放不通过。按 α+ 的做法补循环库所，并用 `loop: true` 标记，供回放区分
+    # "循环携带的 token"与"真正的残留"。
+    loop_places: list[dict] = []
+    for a, b in combinations(activities, 2):
+        if follows.get((a, b), 0) > 0 and follows.get((b, a), 0) > 0:
+            loop_places.append({"inputs": [a], "outputs": [b], "loop": True})
+            loop_places.append({"inputs": [b], "outputs": [a], "loop": True})
+    for a in activities:                      # 长度-1 自循环
+        if follows.get((a, a), 0) > 0:
+            loop_places.append({"inputs": [a], "outputs": [a], "loop": True})
+
+    places.extend(loop_places)
     start = sorted({t[0] for t in traces})
     end = sorted({t[-1] for t in traces})
     # 经典 α 算法：补充源库所（∅ → 开始活动）与汇库所（结束活动 → ∅）
@@ -183,6 +210,8 @@ def alpha_miner(log: dict) -> dict:
         "causality": [{"from": a, "to": b} for a, b in sorted(causal)],
         "parallel": [{"a": a, "b": b} for a, b in sorted(parallel)],
         "places": sorted(places, key=lambda p: (p["inputs"], p["outputs"])),
+        "loop_places": len(loop_places),
+        "max_set_size": max_set_size,
         "start_activities": start,
         "end_activities": end,
         "cases": log["cases"],
@@ -212,12 +241,15 @@ def conformance_heuristic(log: dict, net: dict) -> dict:
     }
 
 
-def conformance_dfg(log: dict, min_support: int = 2) -> dict:
+def conformance_dfg(log: dict, min_support: int = 1) -> dict:
     """DFG 留一法一致性（异构日志的异常检测，默认算法）。
 
     模型 = 全局观察到的直接跟随边；对每个案例做留一检验：
-    其每条边在"其它案例"中是否仍有支持（support ≥ min_support）。
-    只有该案例独有的路径（单例异常）才会被判偏差——避免"模型自身解释自己"。
+    其每条边在**其它案例**中的支持度是否 ≥ `min_support`（默认 1 = 只要不是本案例独有即合规）。
+    因此只有该案例独有的路径（单例异常）才会被判偏差——避免"模型自身解释自己"。
+
+    无边的案例（空轨迹/单活动）不计入 fitness 分母，单独计入 `not_evaluable`，
+    以免"没有被检验"被当成"检验通过"（修复 BUG-010 的第二半）。
     """
     traces = log["traces"]
     edge_counts: Counter = Counter()
@@ -225,24 +257,31 @@ def conformance_dfg(log: dict, min_support: int = 2) -> dict:
         for a, b in zip(trace, trace[1:]):
             edge_counts[(a, b)] += 1
 
-    conforming, deviations = 0, []
+    conforming, deviations, not_evaluable = 0, [], []
     for case_id, trace in traces.items():
+        if len(trace) < 2:
+            not_evaluable.append(case_id)
+            continue
         bad = []
         for a, b in zip(trace, trace[1:]):
             support_others = edge_counts[(a, b)] - 1  # 留一：扣除本案例
-            if support_others < min_support - 1:
+            # 修复 BUG-010：原判据 `support_others < min_support - 1` 与文档"支持度 ≥ min_support"
+            # 差一，导致 min_support=1 时唯一异常路径被判为完全合规（fitness 恒 1.0）。
+            if support_others < min_support:
                 bad.append(f"{a}→{b}")
         if bad:
             deviations.append({"case_id": case_id, "trace": trace, "unique_edges": bad[:3]})
         else:
             conforming += 1
-    total = max(1, len(traces))
+    evaluable = len(traces) - len(not_evaluable)
     return {
         "algorithm": "dfg_leave_one_out",
         "min_support": min_support,
         "cases": len(traces),
+        "evaluable": evaluable,
+        "not_evaluable": not_evaluable[:10],
         "conforming": conforming,
-        "fitness": round(conforming / total, 3),
+        "fitness": round(conforming / max(1, evaluable), 3),
         "deviations": deviations[:10],
         "deviations_total": len(deviations),
     }
@@ -259,40 +298,60 @@ def threshold_sweep(log: dict, thresholds: tuple[float, ...] = (0.3, 0.5, 0.8)) 
 
 
 def _alpha_trace_replay(net: dict, trace: list[str]) -> dict:
-    """α 网 token replay（简化：每个变迁从其输入库所之一消费 token）。
+    """α 网 **trace-driven token replay**（修复 BUG-009）。
 
-    fitness = ½(1 − missing/consumed) + ½(1 − remaining/produced)
+    与朴素的"每个输出库所都产 token"不同，本实现按**观测到的下一个活动**选择输出库所：
+
+    - 消费：优先从已使能（有 token）的输入库所之一取 token；一个都没有 → 记 missing；
+    - 生产：优先产出到"其输出集合包含下一个活动"的库所；若下一个活动未知（轨迹末尾），
+      产出到汇库所；存在多个匹配时全部产出（保持 Petri 语义的保守性）。
+    - 循环库所（`loop: true`）中**循环携带的 token** 不计入残留（α+ 的短循环模型本就允许
+      循环体在结束时持有一次 token），其余残留照常计入。
+
+    该变体是流程挖掘工具中的常见做法（trace-driven replay），好处是"模型能否解释这条轨迹"
+    这个语义更直观；代价是它对"额外允许的行为"更宽容，故同时返回 missing/remaining 明细，
+    不让单一分数掩盖问题。
+
+    fitness = ½(1 − missing/(consumed+missing)) + ½(1 − remaining/produced)
     """
-    places = [(frozenset(p["inputs"]), frozenset(p["outputs"])) for p in net["places"]]
+    raw_places = net["places"]
+    places = [(frozenset(p["inputs"]), frozenset(p["outputs"]), bool(p.get("loop"))) for p in raw_places]
     marking: dict[int, int] = defaultdict(int)
-    fired_inputs: dict[int, set] = defaultdict(set)
     produced = consumed = missing = 0
 
     # 初始：源库所（inputs 为空）注入 token
-    source_places = [i for i, (ins, _) in enumerate(places) if not ins]
-    for idx in source_places:
-        marking[idx] += 1
-        produced += 1
+    for idx, (ins, _outs, _loop) in enumerate(places):
+        if not ins:
+            marking[idx] += 1
+            produced += 1
 
-    for activity in trace:
-        candidates = [i for i, (_, outs) in enumerate(places) if activity in outs and marking[i] > 0]
-        if not candidates:
+    for position, activity in enumerate(trace):
+        nxt = trace[position + 1] if position + 1 < len(trace) else None
+
+        enabled = [i for i, (_ins, outs, _loop) in enumerate(places) if activity in outs and marking[i] > 0]
+        if not enabled:
             missing += 1
             continue
-        idx = candidates[0]
-        marking[idx] -= 1
+        # 优先消费"其输出包含下一活动"的来源库所？——不必要；保持确定性：取使能集合中
+        # 非循环库所优先、其余按索引，保证同一输入同一结论。
+        enabled.sort(key=lambda i: (places[i][2], i))
+        marking[enabled[0]] -= 1
         consumed += 1
-        for j, (ins, outs) in enumerate(places):
-            if activity in ins:
-                fired_inputs[j].add(activity)
-                if ins <= fired_inputs[j]:
-                    marking[j] += 1
-                    produced += 1
-                    fired_inputs[j].clear()
 
-    # 结束：汇库所（outputs 为空）中的 token 属正常完成；其余留存视为不一致
-    sink_places = {i for i, (_, outs) in enumerate(places) if not outs}
-    remaining = sum(count for i, count in marking.items() if i not in sink_places)
+        # 生产：按下一个活动选择输出库所
+        if nxt is not None:
+            targets = [j for j, (ins, _outs, _loop) in enumerate(places) if activity in ins and nxt in _outs]
+        else:
+            targets = [j for j, (ins, outs, _loop) in enumerate(places) if activity in ins and not outs]
+        if not targets:      # 找不到匹配（模型不完整）→ 保守：产出到所有输出库所
+            targets = [j for j, (ins, _outs, _loop) in enumerate(places) if activity in ins]
+        for j in targets:
+            marking[j] += 1
+            produced += 1
+
+    sink_places = {i for i, (_ins, outs, _loop) in enumerate(places) if not outs}
+    remaining = sum(count for i, count in marking.items()
+                    if i not in sink_places and not places[i][2])   # 循环库所的携带 token 不计
     if not places:
         return {"fitness": 0.0, "missing": missing, "consumed": consumed, "produced": produced, "remaining": remaining}
     fitness = 0.5 * (1 - missing / max(1, consumed + missing)) + 0.5 * (1 - remaining / max(1, produced))

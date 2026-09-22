@@ -107,16 +107,26 @@ def _usage_of(ctx) -> dict:
     return {"cost_metered": False, "unmetered_note": f"{type(ctx.llm).__name__} 未提供用量计量"}
 
 
-def _archive_progress(thread_id: str, status_body: dict, ctx) -> None:
-    """按运行状态归档：等待（人审/数据）、完成、失败。"""
+def _archive_progress(thread_id: str, status_body: dict, ctx, extra: Optional[dict] = None) -> None:
+    """按运行状态归档：等待（人审/数据）、完成、被否决、失败。
+
+    修复 BUG-012：此前只特判 waiting_approval/waiting_data/done，
+    `rejected` 落入 else 被记成 running/waiting，导致 /runs 与 stats.success_rate 看不到否决。
+    """
     status = status_body.get("status", "")
     usage = _usage_of(ctx)
+    extra = extra or {}
     if status == "waiting_approval":
-        runs.finish_run(thread_id, "waiting", usage, {"gate": status_body.get("gate", "")})
+        # 被"退回修订"后流程回到 PRD 并再次挂起 G1，状态仍是 waiting_approval，
+        # 因此"这轮是退回"只能从决策侧带进来（extra），否则归档看不出被退回过。
+        runs.finish_run(thread_id, "waiting", usage, {"gate": status_body.get("gate", ""), **extra})
     elif status == "waiting_data":
         runs.mark_waiting(thread_id, status_body.get("waiting_reason", "数据未就绪"), _usage_of(ctx))
     elif status == "done":
         runs.finish_run(thread_id, "done", usage, {"issue": status_body.get("issue", {})})
+    elif status == "rejected":
+        runs.finish_run(thread_id, "rejected", usage,
+                        {"gate": status_body.get("gate", ""), "comment": status_body.get("comment", "")})
     else:
         runs.finish_run(thread_id, "running", usage)
 
@@ -398,12 +408,20 @@ def create_app(
         snap = graph.get_state(config)
         if snap.next and not any(g in list(snap.next) for g in ("gate_g1", "gate_g2", "gate_g3", "gate_g4", "gate_g5", "gate_g6")):
             raise HTTPException(status_code=409, detail="当前流程不在人审挂起状态")
+        # 修复 BUG-012（真正的根因）：/resume 此前**从不写运行归档**，
+        # 于是被否决的运行在归档里永远停留在 waiting —— /runs 与 stats.success_rate 看不到否决。
+        if hasattr(ctx.llm, "reset_usage"):
+            ctx.llm.reset_usage()
         try:
             graph.invoke(Command(resume={"decision": body.decision, "comment": body.comment}), config)
         except Exception as exc:
             if "GraphInterrupt" not in type(exc).__name__:
+                runs.finish_run(thread_id, "failed", _usage_of(ctx), {"error": f"{type(exc).__name__}: {exc}"})
                 raise
-        return _status(graph, thread_id, sop)
+        out = _status(graph, thread_id, sop)
+        _archive_progress(thread_id, out, ctx,
+                          extra={"revised": True, "decision": body.decision} if body.decision == "revise" else None)
+        return out
 
     @app.get("/runs/{thread_id}/state")
     def run_state(thread_id: str) -> dict:
@@ -434,6 +452,23 @@ def create_app(
         if graph is None:
             raise HTTPException(status_code=404, detail=f"线程 {thread_id} 不存在")
         config = _config(thread_id, sop)
+        # 修复 BUG-007（CRITICAL）：/wake 是"数据到齐"的唤醒，只能用于数据等待。
+        # 此前它无状态守卫，对**等待人审**的运行调用会把 gate 中断当作 data_ready 消费掉，
+        # 而闸门路由把未知决策映射为否决 —— 等于用一次 HTTP 调用静默否决人审。
+        snap = graph.get_state(config)
+        pending = list(snap.next or [])
+        gate_nodes = {"gate_g1", "gate_g2", "gate_g3", "gate_g4", "gate_g5", "gate_g6"}
+        if any(node in gate_nodes for node in pending):
+            raise HTTPException(
+                status_code=409,
+                detail=(f"线程正等待人审（next={pending}），不能用 /wake 唤醒；"
+                        f"请调用 /runs/{thread_id}/resume 提交决策"),
+            )
+        if "await_data" not in pending:
+            raise HTTPException(
+                status_code=409,
+                detail=f"线程当前不在数据等待状态（next={pending}），/wake 不适用",
+            )
         if hasattr(ctx.llm, "reset_usage"):
             ctx.llm.reset_usage()
         try:

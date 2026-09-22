@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="154" viewBox="0 0 640 154" role="img" aria-label="Defects by severity">
+<text x="12" y="24" font-family="system-ui,sans-serif" font-size="15" font-weight="600" fill="#1f2328">Defects by severity</text>
+<text x="160" y="65.0" text-anchor="end" font-family="system-ui,sans-serif" font-size="13" fill="#1f2328">CRITICAL</text>
+<rect x="170" y="50" width="380.0" height="18" rx="3" fill="#e16f24"/>
+<text x="558.0" y="65.0" font-family="system-ui,sans-serif" font-size="12" fill="#57606a">7</text>
+<text x="160" y="93.0" text-anchor="end" font-family="system-ui,sans-serif" font-size="13" fill="#1f2328">MAJOR</text>
+<rect x="170" y="78" width="380.0" height="18" rx="3" fill="#bf8700"/>
+<text x="558.0" y="93.0" font-family="system-ui,sans-serif" font-size="12" fill="#57606a">7</text>
+<text x="160" y="121.0" text-anchor="end" font-family="system-ui,sans-serif" font-size="13" fill="#1f2328">MINOR</text>
+<rect x="170" y="106" width="54.3" height="18" rx="3" fill="#0969da"/>
+<text x="232.3" y="121.0" font-family="system-ui,sans-serif" font-size="12" fill="#57606a">1</text>
+</svg>

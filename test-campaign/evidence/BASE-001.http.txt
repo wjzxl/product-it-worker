@@ -1,0 +1,13 @@
+GET http://127.0.0.1:18001/health
+status: 200
+duration_ms: 26.6
+--- request headers ---
+Accept: application/json
+--- response headers ---
+date: Tue, 22 Sep 2026 06:53:18 GMT
+server: uvicorn
+content-length: 62
+content-type: application/json
+connection: close
+--- response body ---
+{"status":"ok","service":"approval-gateway","version":"0.1.0"}

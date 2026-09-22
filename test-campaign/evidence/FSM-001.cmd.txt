@@ -1,0 +1,9 @@
+$ bash /Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/probes.sh task-fsm
+exit: 1
+duration_ms: 618.4
+--- stdout ---
+before=waiting_approval transition_http=200 after=running
+FINDING: waiting_approval -> running allowed with no approval decision present
+
+--- stderr ---
+
