@@ -3,6 +3,14 @@ import os
 import tempfile
 
 os.environ["DATABASE_URL"] = f"sqlite:///{tempfile.mkdtemp(prefix='taskcenter-test-')}/test.db"
+# 鉴权专项：告警 webhook 现在要求共享密钥（未配置时 fail-closed 503）。
+# 密钥值在**调用时**从环境读取——同一次 pytest 会话里可能有别的测试文件改过它。
+os.environ.setdefault("ALERT_WEBHOOK_SECRET", "test-alert-secret")
+
+
+def _alert_headers() -> dict:
+    return {"X-Webhook-Token": os.environ.get("ALERT_WEBHOOK_SECRET")
+            or os.environ.get("WEBHOOK_SECRET", "")}
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -186,6 +194,7 @@ class TestPrometheusAlerts:
 
         r = client.post(
             "/alerts/prometheus",
+            headers=_alert_headers(),
             json={
                 "status": "firing",
                 "alerts": [
@@ -213,6 +222,7 @@ class TestPrometheusAlerts:
         monkeypatch.setenv("AGENT_RUNTIME_URL", "http://localhost:8003")
         r = client.post(
             "/alerts/prometheus",
+            headers=_alert_headers(),
             json={"status": "resolved", "alerts": [{"status": "resolved", "labels": {"alertname": "X"}}]},
         )
         assert r.json()["tasks"] == []

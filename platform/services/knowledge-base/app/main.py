@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from .embedder import EmbeddingDimError, embedder_from_env
 from .ingest import chunk_markdown
 from .store import MemoryStore, QdrantStore, VectorDimMismatch
+from .service_auth import install_service_auth
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
@@ -58,6 +59,7 @@ def create_app(store=None, embedder=None) -> FastAPI:
         description="知识库 v0：文档分块 → 向量化 → Qdrant 入库 → 带来源检索（设计文档 01 §4 能力层）",
         version="0.1.0",
     )
+    install_service_auth(app, "knowledge-base")
     app.state.store = store
     app.state.embedder = embedder
 

@@ -25,7 +25,7 @@ from dataclasses import dataclass, field
 
 import httpx
 import jwt
-from fastapi import Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 
 logger = logging.getLogger(__name__)
 
@@ -140,6 +140,34 @@ def current_principal(authorization: str = Header(default="")) -> Principal:
     return verify_bearer(token)
 
 
+def approver_roles() -> list[str]:
+    """有资格做/触发人审决策的角色（`APPROVER_ROLES`，默认 approver,admin）。"""
+    raw = os.getenv("APPROVER_ROLES", "approver,admin")
+    return [r.strip() for r in raw.split(",") if r.strip()]
+
+
+def require_role(*roles: str):
+    """角色校验依赖（鉴权专项）。
+
+    修复的问题：`AUTH_MODE=oidc` 只校验"登录了没有"，不校验"是谁"——
+    任何登录用户（含只读账号）都能批准审批、触发全局超时扫描。
+    `AUTH_MODE=off`（本机开发）与 `static`（共享令牌，主体即 admin）不受影响。
+    """
+    wanted = list(roles)
+
+    def _dep(principal: Principal = Depends(current_principal)) -> Principal:
+        if _config.mode == "off":
+            return principal
+        if wanted and not (set(wanted) & set(principal.roles)):
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                f"该操作需要角色之一 {wanted}，当前主体 {principal.sub!r} 的角色为 {principal.roles or '（空）'}",
+            )
+        return principal
+
+    return _dep
+
+
 def auth_summary() -> dict:
     return {
         "mode": _config.mode,
@@ -148,4 +176,5 @@ def auth_summary() -> dict:
         "role_claim": _config.role_claim,
         "required_role": _config.required_role or None,
         "protect_reads": _config.protect_reads,
+        "approver_roles": approver_roles(),
     }

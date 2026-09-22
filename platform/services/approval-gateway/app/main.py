@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from .db import Base, SessionLocal, engine
 from .router import router
 from .sweeper import sweep
+from .service_auth import install_service_auth
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -107,17 +108,56 @@ def _ensure_gate_feedback_columns() -> None:
         logger.exception("gate_checks 反馈列迁移失败")
 
 
+def _ensure_decision_version_column() -> None:
+    """并发专项修复的轻量迁移：`approval_decisions.version` 列 + (request_id, version) 唯一键。
+
+    没有它，并发决策会往同一单据写多条决策（实测 30 并发 8 轮中 6 轮 2–5 条）。
+    存量库可能已经存在重复行（正是本缺陷造成的），因此先把重复行的 version 顺次编号
+    （保留全部审计记录、不改写谁批的），再建唯一索引；任何失败只记日志、不阻断启动。
+    """
+    from sqlalchemy import inspect, text
+
+    try:
+        insp = inspect(engine)
+        if "approval_decisions" not in insp.get_table_names():
+            return
+        cols = [c["name"] for c in insp.get_columns("approval_decisions")]
+        with engine.begin() as conn:
+            if "version" not in cols:
+                conn.execute(text("ALTER TABLE approval_decisions ADD COLUMN version INTEGER DEFAULT 1"))
+                logger.info("已为 approval_decisions 补充 version 列（并发防重复决策迁移）")
+            # 存量重复行顺次编号，避免建唯一索引失败（历史审计数据一条不删）
+            if engine.dialect.name == "postgresql":
+                conn.execute(text(
+                    "UPDATE approval_decisions d SET version = s.rn FROM ("
+                    "  SELECT id, row_number() OVER (PARTITION BY request_id ORDER BY decided_at, id) AS rn"
+                    "  FROM approval_decisions"
+                    ") s WHERE d.id = s.id AND d.version IS DISTINCT FROM s.rn"
+                ))
+        with engine.begin() as conn:
+            conn.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_decision_request_version "
+                "ON approval_decisions (request_id, version)"
+            ))
+        logger.info("approval_decisions 唯一键 uq_decision_request_version 就绪")
+    except Exception:  # 迁移失败不阻断服务（表可能尚不存在 / 非 PG 方言）
+        logger.exception("approval_decisions version/唯一键迁移失败")
+
+
 _ensure_tenant_column()
 _ensure_sources_column()
 _ensure_gate_check_table()
 _ensure_gate_feedback_columns()
 _ensure_evidence_table()
+_ensure_decision_version_column()
 
 app = FastAPI(
     title="平台人审网关 approval-gateway",
     description="统一审批状态机 + Web/IM 双通道 + 超时升级（设计文档 03 §3）",
     version="0.1.0",
 )
+# IM 卡片回调自带飞书签名校验、Web 审批台是纯静态页，故豁免这两类路径
+install_service_auth(app, "approval-gateway", extra_exempt=("/callbacks/im", "/index.html", "/"))
 
 app.include_router(router)
 

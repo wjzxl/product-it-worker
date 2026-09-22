@@ -65,6 +65,7 @@ def start_services(gateway: bool, pg: bool) -> None:
     env = dict(os.environ)
     env["DATABASE_URL"] = db or f"sqlite:///{TMP}/taskcenter.db"
     env["AGENT_RUNTIME_URL"] = f"http://127.0.0.1:{PORTS['agent-runtime']}"
+    env["ALERT_WEBHOOK_SECRET"] = os.getenv("WEBHOOK_SECRET", "alert-secret")
     env["OPS_PROJECT_ID"] = DEMO_PROJECT_ID
     procs.append(subprocess.Popen(
         [service_python("task-center"), "-m", "uvicorn", "app.main:app", "--port", str(PORTS["task-center"])],
@@ -174,6 +175,8 @@ def main(gateway: bool, pg: bool) -> int:
     # 3. 真实 Alertmanager webhook → 任务 + 自动触发运维域 SOP
     r = httpx.post(
         f"http://127.0.0.1:{PORTS['task-center']}/alerts/prometheus",
+        # 鉴权专项：告警 webhook 现在要求共享密钥（此前无鉴权，任何人可凭空拉运维 SOP）
+        headers={"X-Webhook-Token": os.getenv("WEBHOOK_SECRET", "alert-secret")},
         json={
             "status": "firing",
             "alerts": [

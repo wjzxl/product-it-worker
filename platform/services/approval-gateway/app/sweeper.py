@@ -11,6 +11,7 @@ import logging
 import os
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .db import SessionLocal
@@ -31,11 +32,22 @@ _publisher = publisher_from_env(_publish_targets() or None)
 
 
 def sweep(db: Session) -> list[dict]:
-    """扫描 pending 且已过 deadline 的审批，按策略处置并留痕。"""
+    """扫描 pending 且已过 deadline 的审批，按策略处置并留痕。
+
+    **并发（专项 CONC-001 同根因）**：`SELECT … FOR UPDATE SKIP LOCKED` 保证扫描器与人工决策
+    不会同时处置同一单据——被人工决策锁住的行直接跳过，留到下一轮，而不是阻塞或重复决策。
+    SQLite 无行锁（单写者），其方言静默忽略该子句，单元测试行为不变。
+    """
     now = utcnow()
-    pending = db.scalars(select(ApprovalRequest).where(ApprovalRequest.status == "pending")).all()
+    pending = db.scalars(
+        select(ApprovalRequest)
+        .where(ApprovalRequest.status == "pending")
+        .with_for_update(skip_locked=True)
+    ).all()
     handled: list[dict] = []
     for req in pending:
+        if req.status != "pending":   # 加锁重读后可能已被并发决策处理
+            continue
         if not is_overdue(req.deadline, now):
             continue
         # 修复 BUG-004：等级取自**服务端信任计算**，不读单据自述的 risk.level
@@ -45,6 +57,7 @@ def sweep(db: Session) -> list[dict]:
         declared = (req.context_snapshot or {}).get("risk", {}).get("level", "?")
         decision = Decision(
             request_id=req.id,
+            version=req.version,
             decision=action,
             decided_by="system:timeout",
             comment=(
@@ -74,7 +87,12 @@ def sweep(db: Session) -> list[dict]:
         logger.warning("审批超时自动处置: %s -> %s（服务端信任=%s，单据自述=%s）",
                        req.id, action, trusted_level, declared)
     if handled:
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            logger.warning("超时处置与并发决策撞车（唯一键），本轮回滚，下一轮重扫")
+            return []
     return handled
 
 

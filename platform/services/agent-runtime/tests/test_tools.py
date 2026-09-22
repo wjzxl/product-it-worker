@@ -178,8 +178,22 @@ class TestApi:
         assert r.status_code == 200
         assert len(r.json()["result"]["findings"]) >= 2
 
-    def test_real_handler_bypassing_approval_is_denied(self, client):
-        """即便有实现，危险工具仍先过鉴权。"""
+    def test_real_handler_bypassing_approval_is_denied(self, client, monkeypatch):
+        """即便有实现，危险工具仍先过鉴权。
+
+        鉴权专项后语义更强了：`allow_ungated` 由请求体自带 ⇒ 默认**根本不采信**
+        （`ungated_not_allowed`），比"采信后靠岗位列表挡住"更靠前。
+        下面同时保留原意图的用例：显式允许 ungated 时，岗位边界依然生效。
+        """
+        monkeypatch.delenv("TOOLS_ALLOW_UNGATED", raising=False)
+        r = client.post("/tools/invoke", json={"tool": "ops.execute",
+                                               "params": {"action": "restart", "target": "order-api"},
+                                               "role": "ops-duty", "allow_ungated": True})
+        assert r.status_code == 403 and r.json()["detail"]["reason"] == "ungated_not_allowed"
+
+    def test_role_boundary_still_applies_when_ungated_is_allowed(self, client, monkeypatch):
+        """`TOOLS_ALLOW_UNGATED=1`（演练/内网）下，岗位边界仍然是第一道闸。"""
+        monkeypatch.setenv("TOOLS_ALLOW_UNGATED", "1")
         r = client.post("/tools/invoke", json={"tool": "ops.execute",
                                                "params": {"action": "restart", "target": "order-api"},
                                                "role": "ops-duty", "allow_ungated": True})

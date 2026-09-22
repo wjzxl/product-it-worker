@@ -38,12 +38,16 @@ from .algorithms import (
 from .apply import apply_action, config_path, record_improvement
 from .mining import mine
 from .proposals import generate
+from .service_auth import install_service_auth
+
+from .service_auth import outbound_headers
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger(__name__)
 
 REPORTS_DIR = Path(os.getenv("REPORTS_DIR", str(Path(__file__).resolve().parents[3] / "reports")))
-APPROVAL_GATEWAY_URL = os.getenv("APPROVAL_GATEWAY_URL", "http://localhost:8000")
+# 默认端口对齐 platform/scripts/run_local_stack.py（本机一键起栈的端口表）：审批网关 8001
+APPROVAL_GATEWAY_URL = os.getenv("APPROVAL_GATEWAY_URL", "http://127.0.0.1:8001")
 GATE_TYPE = "GATE_PROCESS_IMPROVEMENT"
 
 
@@ -63,6 +67,7 @@ app = FastAPI(
     description="流程挖掘与 SOP 自进化：瓶颈 → 提案 → G7 人审 → 配置应用（设计文档 05 Phase 3）",
     version="0.1.0",
 )
+install_service_auth(app, "process-mining")
 
 
 @app.get("/mining/event-log")

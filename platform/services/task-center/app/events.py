@@ -14,6 +14,8 @@ from typing import Any
 
 import httpx
 
+from .service_auth import outbound_headers
+
 logger = logging.getLogger(__name__)
 
 
@@ -56,7 +58,9 @@ class FanoutPublisher(Publisher):
 
     def __init__(self, targets: list[str], timeout: float = 5.0):
         self.targets = targets
-        self._client = httpx.Client(timeout=timeout)
+        # 鉴权专项：事件投递也是服务间调用，token 模式下带上服务令牌，
+        # 否则任务中心的 /events 会 401，整条"事件驱动状态联动"链路静默失效。
+        self._client = httpx.Client(timeout=timeout, headers=outbound_headers())
 
     def publish(self, event: dict) -> None:
         for target in self.targets:

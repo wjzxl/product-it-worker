@@ -41,9 +41,10 @@ class TestKnowledgeIngest:
     def test_ingest_posts_document(self, monkeypatch):
         captured = {}
 
-        def fake_post(url, json=None, timeout=None):
+        def fake_post(url, json=None, timeout=None, headers=None):
             captured["url"] = url
             captured["json"] = json
+            captured["headers"] = headers or {}
             return httpx.Response(200, json={"source": json["source"], "chunks": 3},
                                   request=httpx.Request("POST", url, json=json))
 

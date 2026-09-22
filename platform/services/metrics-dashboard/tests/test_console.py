@@ -84,7 +84,7 @@ class TestActions:
     def test_decide_proxies_to_approval_gateway(self, client, monkeypatch):
         captured = {}
 
-        def fake_post(url, json=None, timeout=20):
+        def fake_post(url, json=None, headers=None, timeout=20):
             captured.update({"url": url, "json": json})
             class R:
                 status_code = 200
@@ -105,7 +105,7 @@ class TestActions:
     def test_feedback_proxies_and_validates(self, client, monkeypatch):
         captured = {}
 
-        def fake_post(url, json=None, timeout=20):
+        def fake_post(url, json=None, headers=None, timeout=20):
             captured.update({"url": url, "json": json})
             class R:
                 status_code = 200
@@ -121,7 +121,7 @@ class TestActions:
         assert client.post("/console/feedback", json={"check_id": "x", "verdict": "乱写"}).status_code == 422
 
     def test_upstream_error_becomes_502(self, client, monkeypatch):
-        def boom(url, json=None, timeout=20):
+        def boom(url, json=None, headers=None, timeout=20):
             raise RuntimeError("网关挂了")
         monkeypatch.setattr(console.httpx, "post", boom)
         r = client.post("/console/decide", json={"approval_id": "apv_1", "decision": "approve"})

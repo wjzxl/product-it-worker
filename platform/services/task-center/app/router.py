@@ -11,11 +11,13 @@ import logging
 import time
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from . import alert_auth
+from .service_auth import outbound_headers
 from .db import get_db
 from .events import new_event, publisher_from_env
 from .models import EventInbox, Task, TaskEvent
@@ -44,9 +46,18 @@ def current_tenant(x_tenant: str = Header(default="")) -> str:
     return x_tenant or os.getenv("DEFAULT_TENANT", "default")
 
 
-def _get_or_404(db: Session, task_id: str, tenant: Optional[str] = None) -> Task:
-    """按 id 取任务；给定 tenant 时做隔离（修复 BUG-006：此前只过滤 list）。"""
-    task = db.get(Task, task_id)
+def _get_or_404(db: Session, task_id: str, tenant: Optional[str] = None,
+                for_update: bool = False) -> Task:
+    """按 id 取任务；给定 tenant 时做隔离（修复 BUG-006：此前只过滤 list）。
+
+    `for_update=True` 对行加排他锁，用于状态流转这类"读状态 → 判合法性 → 写新状态"的路径。
+    没有它，并发流转会各自读到旧状态、各自判合法、各自写成功（实测 30 并发 6 轮里 3 轮
+    成功 2–15 次、时间线多出 1–14 条 status_changed）。SQLite 单写者，其方言忽略该子句。
+    """
+    stmt = select(Task).where(Task.id == task_id)
+    if for_update:
+        stmt = stmt.with_for_update()
+    task = db.scalars(stmt).first()
     if task is None or (tenant is not None and (task.tenant or "default") != tenant):
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"task {task_id} 不存在")
     return task
@@ -213,7 +224,7 @@ def get_task(task_id: str, db: Session = Depends(get_db), tenant: str = Depends(
 @router.post("/tasks/{task_id}/transition", response_model=TaskOut)
 def transition(task_id: str, payload: TransitionIn, db: Session = Depends(get_db),
                tenant: str = Depends(current_tenant)) -> Task:
-    task = _get_or_404(db, task_id, tenant=tenant)
+    task = _get_or_404(db, task_id, tenant=tenant, for_update=True)
     if not validate_transition(task.status, payload.to):
         raise HTTPException(
             status.HTTP_409_CONFLICT,
@@ -248,8 +259,22 @@ def append_timeline(task_id: str, payload: TimelineIn, db: Session = Depends(get
 
 
 @router.post("/alerts/prometheus", status_code=status.HTTP_200_OK)
-def prometheus_alerts(payload: PrometheusAlertsIn, db: Session = Depends(get_db)) -> dict:
-    """Prometheus Alertmanager webhook：firing 告警 → 建任务 + 自动触发运维域 SOP。"""
+async def prometheus_alerts(request: Request, payload: PrometheusAlertsIn,
+                            db: Session = Depends(get_db)) -> dict:
+    """Prometheus Alertmanager webhook：firing 告警 → 建任务 + 自动触发运维域 SOP。
+
+    **鉴权（鉴权专项）**：此前该入口无任何鉴权，任何人都能凭空造告警拉起运维 SOP。
+    现在要求 `X-Webhook-Token` 或 `X-Webhook-Signature: sha256=<hmac>`（见 `app/alert_auth.py`），
+    未配置密钥时 fail-closed（503），不再"没配就是全开"。
+    """
+    raw = await request.body()
+    try:
+        channel = alert_auth.verify(dict(request.headers), raw)
+    except alert_auth.AlertAuthError as exc:
+        logger.warning("告警 webhook 被拒：%s（%s）", exc, exc.reason)
+        raise HTTPException(exc.status_code, f"告警 webhook 鉴权失败：{exc}") from exc
+    logger.info("告警 webhook 通过（%s）", channel)
+
     created: list[str] = []
     for alert in payload.alerts:
         if alert.get("status") not in (None, "firing"):

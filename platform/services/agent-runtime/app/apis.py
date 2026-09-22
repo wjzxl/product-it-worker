@@ -8,6 +8,8 @@ import os
 
 import httpx
 
+from .service_auth import outbound_headers
+
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +19,8 @@ class ApprovalAPI:
 
     def __init__(self, base_url: str, transport: httpx.BaseTransport | None = None):
         self.base_url = base_url.rstrip("/")
-        self._client = httpx.Client(timeout=30, transport=transport)
+        self._client = httpx.Client(timeout=30, transport=transport,
+                                    headers=outbound_headers())
 
     def create_approval(self, payload: dict) -> dict:
         resp = self._client.post(f"{self.base_url}/approvals", json=payload)
@@ -39,7 +42,8 @@ class GateAPI:
 
     def __init__(self, base_url: str, transport: httpx.BaseTransport | None = None, required: bool | None = None):
         self.base_url = base_url.rstrip("/")
-        self._client = httpx.Client(timeout=30, transport=transport)
+        self._client = httpx.Client(timeout=30, transport=transport,
+                                    headers=outbound_headers())
         self.required = (
             required if required is not None
             else os.getenv("ENG_GATES_REQUIRED", "0") == "1"
@@ -83,7 +87,8 @@ class GitLabAPI:
 
     def __init__(self, base_url: str, transport: httpx.BaseTransport | None = None):
         self.base_url = base_url.rstrip("/")
-        self._client = httpx.Client(timeout=30, transport=transport)
+        self._client = httpx.Client(timeout=30, transport=transport,
+                                    headers=outbound_headers())
 
     def create_issue(self, project_id: Any, title: str, description: str, labels: list[str], retries: int = 2) -> dict:
         """建单带 5xx/网络重试（代理抖动环境）。"""
@@ -192,7 +197,8 @@ class KnowledgeAPI:
 
     def __init__(self, base_url: str, transport: httpx.BaseTransport | None = None):
         self.base_url = base_url.rstrip("/")
-        self._client = httpx.Client(timeout=30, transport=transport)
+        self._client = httpx.Client(timeout=30, transport=transport,
+                                    headers=outbound_headers())
 
     def search(self, query: str, limit: int = 3) -> list[dict]:
         resp = self._client.post(f"{self.base_url}/search", json={"query": query, "limit": limit})

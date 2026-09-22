@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import JSON, DateTime, ForeignKey, String, Text
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -73,12 +73,22 @@ class TrustState(Base):
 
 
 class Decision(Base):
-    """人审决策留痕（审计要求：谁、何时、批了什么、理由）。"""
+    """人审决策留痕（审计要求：谁、何时、批了什么、理由）。
+
+    **一个提交版本只能有一条决策**（唯一键 `uq_decision_request_version`）：并发决策是实测到的
+    真实缺陷（专项 CONC-001：30 并发 8 轮中 6 轮插入 2–5 条决策、返回 2–5 个 200），
+    仅靠"先查后写"挡不住。数据库唯一约束是最后一道防线，`SELECT … FOR UPDATE` 是第一道。
+    同一单据 revise 后 version+1 重新提交，故唯一键取 (request_id, version) 而非 request_id。
+    """
 
     __tablename__ = "approval_decisions"
+    __table_args__ = (
+        UniqueConstraint("request_id", "version", name="uq_decision_request_version"),
+    )
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: new_id("dec"))
     request_id: Mapped[str] = mapped_column(ForeignKey("approval_requests.id"), index=True)
+    version: Mapped[int] = mapped_column(Integer, default=1)           # 对应 approval_requests.version
     decision: Mapped[str] = mapped_column(String(16))                  # approve / reject / revise
     decided_by: Mapped[str] = mapped_column(String(128))
     comment: Mapped[str] = mapped_column(Text, default="")             # 拒绝原因结构化入库（反馈闭环输入）

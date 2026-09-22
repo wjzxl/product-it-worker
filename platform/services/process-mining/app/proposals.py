@@ -19,6 +19,8 @@ from typing import Any, Callable
 
 import httpx
 
+from .service_auth import outbound_headers
+
 logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = (

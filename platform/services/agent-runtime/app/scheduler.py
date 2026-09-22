@@ -27,6 +27,8 @@ from pathlib import Path
 import httpx
 import yaml
 
+from .service_auth import outbound_headers
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_SCHEDULES = Path(__file__).resolve().parents[3] / "schedules.yaml"
@@ -77,7 +79,9 @@ def trigger(base_url: str, job: dict, timeout: float = 120.0) -> dict:
     }
     if job.get("project_id"):
         payload["project_id"] = job["project_id"]
-    resp = httpx.post(f"{base_url.rstrip('/')}/runs", json=payload, timeout=timeout)
+    # 鉴权专项：调度器也是"服务间调用"，token 模式下必须带服务令牌
+    resp = httpx.post(f"{base_url.rstrip('/')}/runs", json=payload, timeout=timeout,
+                      headers=outbound_headers())
     resp.raise_for_status()
     return resp.json()
 

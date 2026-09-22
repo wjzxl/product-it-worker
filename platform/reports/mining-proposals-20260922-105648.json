@@ -1,0 +1,265 @@
+{
+  "report_summary": {
+    "gates": [
+      {
+        "gate": "G2 方案评审",
+        "domain": "研发域",
+        "requests": 24,
+        "decisions": 24,
+        "revises": 3,
+        "rejects": 0,
+        "timeouts": 0,
+        "wait_p50_s": 1.75,
+        "wait_p95_s": 5.55,
+        "timeout_rate": 0.0,
+        "rework_rate": 0.125,
+        "reasons": [
+          {
+            "gate": "G2 方案评审",
+            "decision": "revise",
+            "reason": "批量试点自动审批"
+          },
+          {
+            "gate": "G2 方案评审",
+            "decision": "revise",
+            "reason": "批量试点自动审批"
+          },
+          {
+            "gate": "G2 方案评审",
+            "decision": "revise",
+            "reason": "批量试点自动审批"
+          }
+        ]
+      },
+      {
+        "gate": "G5 变更审批",
+        "domain": "运维域",
+        "requests": 4,
+        "decisions": 4,
+        "revises": 0,
+        "rejects": 0,
+        "timeouts": 0,
+        "wait_p50_s": 0.8,
+        "wait_p95_s": 5.46,
+        "timeout_rate": 0.0,
+        "rework_rate": 0.0,
+        "reasons": []
+      },
+      {
+        "gate": "G1 需求评审",
+        "domain": "产品域",
+        "requests": 6,
+        "decisions": 6,
+        "revises": 0,
+        "rejects": 2,
+        "timeouts": 0,
+        "wait_p50_s": 0.11,
+        "wait_p95_s": 1.7,
+        "timeout_rate": 0.0,
+        "rework_rate": 0.333,
+        "reasons": [
+          {
+            "gate": "G1 需求评审",
+            "decision": "reject",
+            "reason": "多租户验证清理"
+          },
+          {
+            "gate": "G1 需求评审",
+            "decision": "reject",
+            "reason": "多租户验证清理"
+          }
+        ]
+      },
+      {
+        "gate": "G3 代码审查",
+        "domain": "研发域",
+        "requests": 16,
+        "decisions": 16,
+        "revises": 0,
+        "rejects": 0,
+        "timeouts": 0,
+        "wait_p50_s": 0.64,
+        "wait_p95_s": 1.36,
+        "timeout_rate": 0.0,
+        "rework_rate": 0.0,
+        "reasons": []
+      },
+      {
+        "gate": "G4 放行决策",
+        "domain": "测试域",
+        "requests": 18,
+        "decisions": 18,
+        "revises": 0,
+        "rejects": 0,
+        "timeouts": 0,
+        "wait_p50_s": 0.75,
+        "wait_p95_s": 1.18,
+        "timeout_rate": 0.0,
+        "rework_rate": 0.0,
+        "reasons": []
+      },
+      {
+        "gate": "G6 复盘审查",
+        "domain": "运维域",
+        "requests": 2,
+        "decisions": 2,
+        "revises": 0,
+        "rejects": 0,
+        "timeouts": 0,
+        "wait_p50_s": 0.57,
+        "wait_p95_s": 0.72,
+        "timeout_rate": 0.0,
+        "rework_rate": 0.0,
+        "reasons": []
+      },
+      {
+        "gate": "G7 流程改进",
+        "domain": "平台域",
+        "requests": 12,
+        "decisions": 12,
+        "revises": 0,
+        "rejects": 0,
+        "timeouts": 0,
+        "wait_p50_s": 0.07,
+        "wait_p95_s": 0.11,
+        "timeout_rate": 0.0,
+        "rework_rate": 0.0,
+        "reasons": []
+      }
+    ],
+    "bottlenecks": [
+      {
+        "type": "high_rework",
+        "gate": "G1 需求评审",
+        "evidence": "退回/否决率 33%（0 退回 / 2 否决 / 6 决策）",
+        "hint": "提高上游产出质量（模板/预检）或调整该 Gate 的审查要点"
+      },
+      {
+        "type": "variant_deviation",
+        "variant": "product-domain/prd-flow｜task.created",
+        "evidence": "变体出现 6 次（平均 0.0s），缺少完整审批留痕",
+        "hint": "检查该路径是否绕过了 Gate"
+      }
+    ],
+    "variants": [
+      {
+        "variant": "product-domain/prd-flow｜task.created → approval.requested → approval.decided → approval.requested → approval.decided",
+        "count": 9,
+        "avg_duration_s": 0.0
+      },
+      {
+        "variant": "product-domain/prd-flow｜task.created → status_changed → approval.requested → approval.decided",
+        "count": 6,
+        "avg_duration_s": 20.4
+      },
+      {
+        "variant": "product-domain/prd-flow｜task.created",
+        "count": 6,
+        "avg_duration_s": 0.0
+      },
+      {
+        "variant": "product-domain/prd-flow｜task.created → approval.requested → approval.decided",
+        "count": 4,
+        "avg_duration_s": 0.0
+      },
+      {
+        "variant": "product-domain/prd-flow｜task.created → status_changed → approval.requested → approval.decided → approval.requested → approval.decided",
+        "count": 3,
+        "avg_duration_s": 58.8
+      },
+      {
+        "variant": "product-domain/prd-flow｜task.created → approval.requested → approval.decided → approval.requested → approval.decided → approval.requested → approval.decided",
+        "count": 3,
+        "avg_duration_s": 0.0
+      },
+      {
+        "variant": "product-domain/prd-flow｜task.created → status_changed",
+        "count": 1,
+        "avg_duration_s": 1.1
+      },
+      {
+        "variant": "ops-domain/alert-to-postmortem｜task.created → approval.requested → approval.decided → approval.requested → approval.decided",
+        "count": 1,
+        "avg_duration_s": 0.0
+      }
+    ],
+    "cost_by_model": [
+      {
+        "model": "deepseek/deepseek-chat",
+        "calls": 212,
+        "spend_usd": 0.5447122959999996,
+        "tokens": 571112
+      },
+      {
+        "model": "openai/qwen-max",
+        "calls": 71,
+        "spend_usd": 0.0291696,
+        "tokens": 82189
+      },
+      {
+        "model": "openai/qwen-plus",
+        "calls": 39,
+        "spend_usd": 0.0080748,
+        "tokens": 28954
+      },
+      {
+        "model": "openai/text-embedding-v3",
+        "calls": 30,
+        "spend_usd": 1.365e-05,
+        "tokens": 3181
+      },
+      {
+        "model": "deepseek-chat",
+        "calls": 1,
+        "spend_usd": 0.0,
+        "tokens": 0
+      },
+      {
+        "model": "qwen-embed",
+        "calls": 1,
+        "spend_usd": 0.0,
+        "tokens": 0
+      },
+      {
+        "model": "qwen-plus",
+        "calls": 1,
+        "spend_usd": 0.0,
+        "tokens": 0
+      },
+      {
+        "model": "openai/mock-gpt",
+        "calls": 2,
+        "spend_usd": 0.0,
+        "tokens": 101
+      }
+    ]
+  },
+  "proposals": [
+    {
+      "title": "降低 G1 需求评审 退回率：前置预检",
+      "rationale": "退回率高说明上游产出未达审查要点，增加提交前自检可减少往返",
+      "evidence": "退回/否决率 33%（0 退回 / 2 否决 / 6 决策）",
+      "action": {
+        "type": "advice",
+        "target": "G1 需求评审",
+        "value": "precheck"
+      },
+      "risk": "L2",
+      "id": "prop-1",
+      "appliable": false
+    },
+    {
+      "title": "关注挖掘发现的瓶颈：variant_deviation",
+      "rationale": "挖掘算法报告了该瓶颈，建议人工复核后决定优化动作",
+      "evidence": "变体出现 6 次（平均 0.0s），缺少完整审批留痕",
+      "action": {
+        "type": "advice",
+        "target": "",
+        "value": "variant_deviation"
+      },
+      "risk": "L2",
+      "id": "prop-2",
+      "appliable": false
+    }
+  ]
+}

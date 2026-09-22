@@ -132,7 +132,11 @@ class TestStaticMode:
 
 class TestApiWithAuth:
     def test_decision_requires_token(self, client):
-        """OIDC 模式：无令牌 → 401；有效令牌 → 200 且主体写入审计。"""
+        """OIDC 模式：无令牌 → 401；有效令牌 → 200，且**审计署名取自登录主体**。
+
+        鉴权专项后语义更严：身份真实时不再采信请求体里填的姓名
+        （否则登录用户可以冒名顶替写审计），`decided_by` 恒为 token 的 `sub`。
+        """
         apv = client.post("/approvals", json=_payload()).json()
         r = client.post(f"/approvals/{apv['id']}/decision",
                         json={"decision": "approve", "decided_by": "", "comment": "SSO 登录后批准"})
@@ -143,7 +147,7 @@ class TestApiWithAuth:
                         json={"decision": "approve", "decided_by": "reviewer-from-sso", "comment": "SSO"})
         assert r.status_code == 200
         detail = client.get(f"/approvals/{apv['id']}").json()
-        assert detail["decisions"][-1]["decided_by"] == "reviewer-from-sso"
+        assert detail["decisions"][-1]["decided_by"] == "user-123", "署名必须来自登录主体，而非客户端自述"
 
     def test_auth_info(self, client):
         info = client.get("/auth/info", headers={"Authorization": f"Bearer {_token()}"}).json()

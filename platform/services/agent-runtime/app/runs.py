@@ -122,7 +122,8 @@ def finish_run(thread_id: str, status: str, usage: dict | None = None, detail: d
         return _to_dict(row)
 
 
-def mark_waiting(thread_id: str, reason: str, usage: dict | None = None) -> dict:
+def mark_waiting(thread_id: str, reason: str, usage: dict | None = None,
+                 detail: dict | None = None) -> dict:
     """记录一次"等待"（对应课程图 48：数据没到就等，到齐再继续）。
 
     等待期间也可能已经产生 LLM 调用（如先做了一轮判断），故一并记录用量；
@@ -143,6 +144,9 @@ def mark_waiting(thread_id: str, reason: str, usage: dict | None = None) -> dict
             row.cost_usd = float(usage.get("cost_usd") or 0.0)
             row.cost_metered = bool(usage.get("cost_metered", False))
             row.llm_calls = int(usage.get("llm_calls") or 0)
+        # 审计信息（如"本次恢复依据哪条人审决策"）不能因为落到 waiting 分支就丢掉
+        if detail:
+            row.detail = {**(row.detail or {}), **detail}
         db.commit()
         return _to_dict(row)
 

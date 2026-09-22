@@ -106,6 +106,7 @@ class DecisionOut(BaseModel):
     decided_by: str
     comment: str
     decided_at: datetime
+    version: int = 1        # 决策对应的提交版本（revise 后 +1，审计可追溯"批的是哪一版"）
 
     model_config = {"from_attributes": True}
 

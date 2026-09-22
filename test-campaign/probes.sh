@@ -13,6 +13,11 @@ D=/tmp/pst-sut
 mkdir -p "$D"
 J() { python3 -c "import sys,json;d=json.load(sys.stdin);print(d$1)" 2>/dev/null; }
 
+# 鉴权专项后 SUT 默认以 SERVICE_AUTH_MODE=token 运行：所有请求统一带上服务令牌。
+# 用函数包装而不是逐个 curl 加参数——漏一处就会得到一个"看似 401 其实是探针写错"的假结论。
+SERVICE_TOKEN=${SERVICE_AUTH_TOKEN:-pst-sut-token}
+curl() { command curl -H "X-Service-Token: ${SERVICE_TOKEN}" "$@"; }
+
 # A valid approval body. RiskSnapshot requires score (0-100), level and factors.
 # Named arguments keep the call sites readable and prevent positional mistakes.
 approval_body() { # --ref --gate --level --options --policy  (all optional but --ref)
@@ -208,14 +213,22 @@ probe_task_dup_ref() {
 
 # RT-001: a rejected run must be archived with a status that reflects rejection.
 probe_reject_archive() {
-  local tid state archived
+  local tid state archived apv decision_code
   tid=$(curl -s -X POST "$RT/runs" -H 'Content-Type: application/json' \
     -d '{"sop":"product-domain/prd-flow","requirement_text":"probe requirement","task_ref":"RT-001"}' | J "['thread_id']")
   [ -z "$tid" ] && { echo "INVALID: could not start a run"; return 2; }
+  # 鉴权专项后 /resume 必须出示真实人审决策（GATE_DECISION_VERIFY=block），
+  # 所以这里先在审批台上真做一次 reject，再拿着 approval_id 恢复运行——
+  # 这比原来"直接自述 reject"更接近真实链路。
+  apv=$(curl -s "$RT/runs/$tid/state" | J "['interrupts'][0]['approval_id']")
+  [ -z "$apv" ] && { echo "INVALID: run did not expose an approval_id to decide on"; return 2; }
+  decision_code=$(curl -s -o "$D/ra.json" -w '%{http_code}' -X POST "$GW/approvals/$apv/decision" \
+    -H 'Content-Type: application/json' -d '{"decision":"reject","decided_by":"probe","comment":"not acceptable"}')
+  [ "$decision_code" != "200" ] && { echo "INVALID: could not record the human decision (HTTP $decision_code)"; return 2; }
   state=$(curl -s -X POST "$RT/runs/$tid/resume" -H 'Content-Type: application/json' \
-    -d '{"decision":"reject","comment":"not acceptable"}' | J "['status']")
+    -d "{\"decision\":\"reject\",\"approval_id\":\"$apv\",\"comment\":\"not acceptable\"}" | J "['status']")
   archived=$(curl -s "$RT/runs/$tid/archive" | J "['status']")
-  echo "run=$tid resume_status=$state archive_status=$archived"
+  echo "run=$tid approval=$apv resume_status=$state archive_status=$archived"
   if [ "$state" != "rejected" ]; then
     echo "INVALID: resume did not yield the rejected state (got $state)"; return 2
   fi

@@ -5,6 +5,7 @@ from fastapi import FastAPI
 
 from .db import Base, engine
 from .router import router
+from .service_auth import install_service_auth
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
@@ -34,6 +35,8 @@ app = FastAPI(
     description="平台任务中心：统一任务状态机 + 时间线 + 平台事件接入（设计文档 02 §0）",
     version="0.1.0",
 )
+# 告警 webhook 自带签名校验（见 /alerts/prometheus），故豁免服务令牌
+install_service_auth(app, "task-center", extra_exempt=("/alerts/prometheus",))
 
 app.include_router(router)
 

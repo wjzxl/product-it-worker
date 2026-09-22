@@ -11,6 +11,7 @@ from typing import Optional
 from fastapi import (APIRouter, Depends, File, Form, Header, HTTPException, Request,
                      Response, UploadFile, status)
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from . import eng_gates, evidence, gate_rules, im_auth
@@ -19,7 +20,7 @@ from .events import new_event, publisher_from_env
 from .models import ApprovalRequest, Decision, utcnow
 from .notifier import get_notifier
 from .policies import is_overdue
-from .auth import auth_summary, current_principal
+from .auth import approver_roles, auth_summary, current_principal, require_role
 from .trust import all_trust, apply_penalty, compute_trust, should_auto_approve, tenant_summary
 from .schemas import (
     ApprovalRequestCreate,
@@ -69,8 +70,24 @@ def _check_decision_allowed(req: ApprovalRequest, decision: str) -> None:
         )
 
 
-def _get_or_404(db: Session, approval_id: str, tenant: Optional[str] = None) -> ApprovalRequest:
-    req = db.get(ApprovalRequest, approval_id)
+def _get_or_404(
+    db: Session,
+    approval_id: str,
+    tenant: Optional[str] = None,
+    for_update: bool = False,
+) -> ApprovalRequest:
+    """取审批单（可选租户隔离）。`for_update=True` 时对行加排他锁，用于决策类写路径。
+
+    **为什么需要 `SELECT … FOR UPDATE`**（专项 CONC-001）：决策路径是"读状态 → 判 pending →
+    写决策"，PG 默认 READ COMMITTED 下两个并发请求会同时读到 pending，各自插入一条决策并
+    都返回 200（实测 30 并发 8 轮中 6 轮发生）。加锁后第二个事务会阻塞到第一个提交，重新读到
+    终态后由 `_check_pending` 返回 409。SQLite 单写者，`FOR UPDATE` 由其方言静默忽略，
+    单元测试行为不变。
+    """
+    stmt = select(ApprovalRequest).where(ApprovalRequest.id == approval_id)
+    if for_update:
+        stmt = stmt.with_for_update()
+    req = db.scalars(stmt).first()
     if req is None or (tenant is not None and req.tenant != tenant):
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"approval {approval_id} 不存在")
     return req
@@ -249,17 +266,29 @@ def decide(
     approval_id: str,
     payload: DecisionIn,
     db: Session = Depends(get_db),
-    principal=Depends(current_principal),
+    principal=Depends(require_role(*approver_roles())),
     tenant: str = Depends(current_tenant),
 ) -> Decision:
-    """人做决策（Web 审批台入口）。AUTH_MODE=oidc/static 时要求登录（主体写入审计）。"""
-    req = _get_or_404(db, approval_id, tenant=tenant)
+    """人做决策（Web 审批台入口）。
+
+    鉴权（鉴权专项）：`AUTH_MODE=oidc` 时不仅要登录，还必须具备 approver/admin 角色——
+    此前任何登录用户（含只读账号）都能批准审批。`AUTH_MODE=off/static` 行为不变。
+    """
+    req = _get_or_404(db, approval_id, tenant=tenant, for_update=True)
     _check_pending(req)
     _check_decision_allowed(req, payload.decision)    # 修复 BUG-013
 
-    decided_by = payload.decided_by or principal.sub
+    # 审计署名（鉴权专项）：OIDC 下身份是真实的，署名以 `sub` 为准——
+    # 否则登录用户可以在审计里署别人的名字（"谁批的"就成了自述）。
+    # static/off 模式没有真实身份（共享令牌/无认证），此时保留填写的姓名，并明确它是自述。
+    if principal.sub not in ("anonymous", "static-token") and payload.decided_by \
+            and payload.decided_by != principal.sub:
+        logger.warning("决策署名与登录主体不一致：填写=%r 主体=%r（以主体为准）",
+                       payload.decided_by, principal.sub)
+    decided_by = principal.sub if principal.sub not in ("anonymous", "static-token") else (payload.decided_by or principal.sub)
     decision = Decision(
         request_id=req.id,
+        version=req.version,
         decision=payload.decision,
         decided_by=decided_by,
         comment=payload.comment,
@@ -275,7 +304,14 @@ def decide(
         req.status = "revised"
         apply_penalty(db, req.type, f"退回：{payload.comment}", tenant=req.tenant)
 
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:  # 并发决策的第二道防线（唯一键 uq_decision_request_version）
+        db.rollback()
+        logger.warning("并发决策被唯一键拦下: approval=%s version=%s", approval_id, req.version)
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "该审批已被并发处理，请刷新后重试"
+        ) from exc
     db.refresh(decision)
     # 发布 approval.decided 事件（契约 contracts/events.md），驱动工作流恢复/回退
     _publisher.publish(
@@ -312,7 +348,7 @@ def resubmit(
     **租户过滤（修复 BUG-002）**：此前 `_get_or_404` 未传 tenant，其它租户可把
     他人单据改回 pending（跨租户写）。现在与兄弟路由一致做隔离。
     """
-    req = _get_or_404(db, approval_id, tenant=tenant)
+    req = _get_or_404(db, approval_id, tenant=tenant, for_update=True)
     if req.status != "revised":
         raise HTTPException(status.HTTP_409_CONFLICT, "仅 revised 状态的审批可重新提交")
 
@@ -361,12 +397,13 @@ async def im_card_callback(
         logger.warning("IM 回调被拒：%s（%s）", exc, exc.reason)
         raise HTTPException(exc.status_code, f"IM 回调鉴权失败：{exc}") from exc
 
-    req = _get_or_404(db, payload.approval_id, tenant=tenant)
+    req = _get_or_404(db, payload.approval_id, tenant=tenant, for_update=True)
     _check_pending(req)
     _check_decision_allowed(req, payload.action)      # 修复 BUG-013
 
     decision = Decision(
         request_id=req.id,
+        version=req.version,
         decision=payload.action,
         decided_by=payload.operator,
         comment=payload.comment,
@@ -380,7 +417,14 @@ async def im_card_callback(
     else:
         req.status = "revised"
         apply_penalty(db, req.type, f"退回(IM)：{payload.comment}", tenant=req.tenant)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:  # 并发决策（IM 与 Web 同时点）——唯一键兜底
+        db.rollback()
+        logger.warning("并发决策被唯一键拦下(IM): approval=%s version=%s", payload.approval_id, req.version)
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "该审批已被并发处理，请刷新后重试"
+        ) from exc
     db.refresh(decision)
     _publisher.publish(
         new_event(
@@ -430,8 +474,13 @@ def trust_one(gate_type: str, db: Session = Depends(get_db), tenant: str = Depen
 
 
 @router.post("/admin/sweep")
-def admin_sweep(db: Session = Depends(get_db), principal=Depends(current_principal)) -> dict:
-    """手动触发超时扫描（等价于 python -m app.sweep）。"""
+def admin_sweep(db: Session = Depends(get_db),
+                principal=Depends(require_role(*approver_roles()))) -> dict:
+    """手动触发超时扫描（等价于 python -m app.sweep）。
+
+    鉴权（鉴权专项）：这是**跨全部租户**的管理动作（会把所有到期未决审批按策略自动处置），
+    此前只要求"登录"。现在要求 approver/admin 角色。
+    """
     from .sweeper import sweep
 
     handled = sweep(db)

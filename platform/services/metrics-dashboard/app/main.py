@@ -9,12 +9,15 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import FastAPI, HTTPException
+import html as _html
+
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from . import console
 from .metrics import collect
+from .service_auth import install_service_auth
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
@@ -23,6 +26,7 @@ app = FastAPI(
     description="三域（研发/测试/运维）指标面板：Gate 决策、任务、LLM 成本（设计文档 05 度量体系）",
     version="0.1.0",
 )
+install_service_auth(app, "metrics-dashboard")
 
 
 @app.get("/metrics")
@@ -56,40 +60,53 @@ def decision_console(tenant: str = "default") -> dict:
 
 
 @app.post("/console/decide")
-def console_decide(body: DecideIn) -> dict:
-    """从驾驶舱提交人审决策（转调审批网关，保留三要素与审计）。"""
+def console_decide(body: DecideIn, request: Request) -> dict:
+    """从驾驶舱提交人审决策（转调审批网关，保留三要素与审计）。
+
+    鉴权专项：**透传调用方身份**——否则 oidc 模式下网关 401（驾驶舱永远点不动），
+    放行模式下网关也无从记录"是谁批的"。
+    """
     if body.decision not in ("approve", "reject", "revise"):
         raise HTTPException(status_code=422, detail="decision 必须为 approve/reject/revise")
     try:
-        return console.submit_decision(body.approval_id, body.decision, body.comment, body.decided_by)
+        return console.submit_decision(body.approval_id, body.decision, body.comment, body.decided_by,
+                                       headers=console.forward_headers(request.headers))
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"审批网关决策失败：{type(exc).__name__}: {exc}") from exc
 
 
 @app.post("/console/feedback")
-def console_feedback(body: FeedbackIn) -> dict:
-    """误拦反馈（M1 决策 D3）：标记"其实该放行"，用于计算误拦率。"""
+def console_feedback(body: FeedbackIn, request: Request) -> dict:
+    """误拦反馈（M1 决策 D3）：标记"其实该放行"，用于计算误拦率。（同样透传身份头）"""
     if body.verdict not in ("valid", "false_positive"):
         raise HTTPException(status_code=422, detail="verdict 必须为 valid/false_positive")
     try:
-        return console.submit_feedback(body.check_id, body.verdict, body.note, body.by)
+        return console.submit_feedback(body.check_id, body.verdict, body.note, body.by,
+                                       headers=console.forward_headers(request.headers))
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"反馈提交失败：{type(exc).__name__}: {exc}") from exc
+
+
+def esc(value) -> str:
+    """HTML 转义（安全专项）：驾驶舱里的标题/需求文本/阶段名来自用户与上游服务，
+    直接拼进 HTML 就是存储型 XSS。所有插值一律先过这里。"""
+    return _html.escape(str(value if value is not None else ""), quote=True)
 
 
 @app.get("/", response_class=HTMLResponse)
 def dashboard() -> str:
     d = collect()
     gate_rows = "".join(
-        f"<tr><td>{g['gate']}</td><td>{g['domain']}</td><td>{g['count']}</td>"
+        f"<tr><td>{esc(g['gate'])}</td><td>{esc(g['domain'])}</td><td>{g['count']}</td>"
         f"<td>{g['avg_decision_s'] if g['avg_decision_s'] is not None else '-'}</td></tr>"
         for g in d["gates"]
     )
     task_rows = "".join(
-        f"<tr><td>{t['domain']}</td><td>{t['count']}</td><td>{t['done']}</td></tr>" for t in d["tasks_by_sop"]
+        f"<tr><td>{esc(t['domain'])}</td><td>{t['count']}</td><td>{t['done']}</td></tr>"
+        for t in d["tasks_by_sop"]
     )
     cost_rows = "".join(
-        f"<tr><td>{m['model']}</td><td>{m['calls']}</td><td>{m['spend_usd']:.4f}</td><td>{m['tokens']}</td></tr>"
+        f"<tr><td>{esc(m['model'])}</td><td>{m['calls']}</td><td>{m['spend_usd']:.4f}</td><td>{m['tokens']}</td></tr>"
         for m in d.get("spend_by_model", [])
     )
     # WP10 待决策队列（课程图 67：驾驶舱要显示"卡在哪里、什么需要自己决定"）
@@ -101,21 +118,22 @@ def dashboard() -> str:
             if item["kind"] == "approval":
                 for act, label in (("approve", "批准"), ("reject", "否决"), ("revise", "退回")):
                     actions.append(
-                        f"<button onclick=\"decide('{item['id']}','{act}')\">{label}</button>"
+                        f"<button onclick=\"decide('{esc(item['id'])}','{act}')\">{label}</button>"
                     )
             elif item["kind"] == "gate_block":
-                actions.append(f"<button onclick=\"feedback('{item['id']}','valid')\">确实该拦</button>")
-                actions.append(f"<button onclick=\"feedback('{item['id']}','false_positive')\">其实可放行</button>")
+                actions.append(f"<button onclick=\"feedback('{esc(item['id'])}','valid')\">确实该拦</button>")
+                actions.append(f"<button onclick=\"feedback('{esc(item['id'])}','false_positive')\">其实可放行</button>")
             rows.append(
-                f"<tr><td>{item['kind']}</td><td>{item['title']}</td><td>{item['what'][:60]}</td>"
-                f"<td>{item['why_waiting'][:40]}</td><td>{item.get('task_ref', '')}</td>"
+                f"<tr><td>{esc(item['kind'])}</td><td>{esc(item['title'])}</td>"
+                f"<td>{esc(item['what'][:60])}</td>"
+                f"<td>{esc(item['why_waiting'][:40])}</td><td>{esc(item.get('task_ref', ''))}</td>"
                 f"<td>{' '.join(actions) or '-'}</td></tr>"
             )
         queue_rows = "".join(rows)
     else:
         queue_rows = "<tr><td colspan='6'>当前没有待决策事项</td></tr>"
     queue_note = (
-        f"上游不可用：{', '.join(queue['upstream_errors'])}" if queue["upstream_errors"] else "上游全部可用"
+        f"上游不可用：{esc(', '.join(queue['upstream_errors']))}" if queue["upstream_errors"] else "上游全部可用"
     )
     fb = queue.get("feedback_stats") or {}
     fb_note = (
@@ -124,8 +142,8 @@ def dashboard() -> str:
         else f"误拦率待反馈（阻断 {fb.get('blocked_total', 0)} 次，已反馈 {fb.get('judged', 0)} 次）"
     )
 
-    decisions = "，".join(f"{k}: {v}" for k, v in d.get("decision_dist", {}).items()) or "-"
-    statuses = "，".join(f"{k}: {v}" for k, v in d.get("status_dist", {}).items()) or "-"
+    decisions = esc("，".join(f"{k}: {v}" for k, v in d.get("decision_dist", {}).items()) or "-")
+    statuses = esc("，".join(f"{k}: {v}" for k, v in d.get("status_dist", {}).items()) or "-")
     spend = f"${d['spend_total_usd']:.4f}" if d.get("spend_total_usd") is not None else "-"
     avg = f"{d['decision_avg_s']:.1f}s" if d.get("decision_avg_s") else "-"
     return f"""<!DOCTYPE html>

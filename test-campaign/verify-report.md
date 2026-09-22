@@ -89,3 +89,122 @@
 - 本次修复引入一个新的**上线前置条件**：IM 回调现在必须配置签名密钥（`IM_CALLBACK_SIGNING_KEY` 或 `FEISHU_VERIFY_TOKEN`），未配置时会拒绝回调（503）——生产部署不要漏配。
 
 **建议**：重跑完整战役（24 卡 + 性能 + 覆盖率）重新判定 G1/G2/G3，并补做并发与鉴权专项。
+
+---
+
+# 专项复验（2026-09-22，第 2 轮）：并发/竞态 + 鉴权
+
+> 触发：第 7 节结论里"仍建议补做并发与鉴权专项"。本轮把这两个维度从"未覆盖"变成"有探针、有证据、有回归"。
+> 原报告与第 1 轮复验报告均**不改动**，本轮结论并列记录在此。
+> SUT：`bash test-campaign/start-sut.sh --backend postgres`（Postgres 后端 + `SERVICE_AUTH_MODE=token`）。
+
+## 8. 并发/竞态专项
+
+### 8.1 发现并修复的真实缺陷
+
+| # | 缺陷 | 实测证据（修复前） | 根因 | 修法 |
+|---|---|---|---|---|
+| CONC-001 | 同一审批单被并发决策 → 落多条决策、多个 200 | 30 并发 × 8 轮：**6 轮**插入 2–5 条 `approval_decisions`、2–5 个请求返回 200 | 决策路径是"读状态→判 pending→写决策"，PG READ COMMITTED 下无互斥；`approval_decisions` 也没有唯一键 | ① 决策/重提/超时四条写路径统一 `SELECT … FOR UPDATE`；② 新增 `version` 列 + 唯一键 `uq_decision_request_version`（按提交版本唯一，兼容 revise 后 version+1）；③ 唯一键冲突转 409 |
+| CONC-002 | 同一任务被并发流转 → 多次成功、时间线重复 | 30 并发 × 6 轮：**3 轮**有 2–15 个 200、时间线多出 1–14 条 `status_changed` | 与 CONC-001 同源：`transition` 无行锁 | `_get_or_404(..., for_update=True)` 用于流转路径；状态已变后重复流转仍 409 |
+
+修复前 5 个 2–8 并发的小探针**全部 PASS** —— 这说明"没撞上"不等于没有竞态；因此本轮把并发量做成可配置的压测（`race_stress.py`），并把"必须恰好成功一次 + 数据库行数对账"作为判据。
+
+### 8.2 复验结果
+
+| 探针 | 并发量 | 修复前 | 修复后 |
+|---|---|---|---|
+| `decide-race-stress`（决策） | 30 × 8 轮 | 6/8 轮重复写入 | **0/8 轮重复（每轮恰好 1 个 200、1 条决策）** |
+| `task-race-stress`（流转） | 30 × 6 轮 | 3/6 轮重复写入 | **0/6 轮重复** |
+| `decide-race`（CONC-001，2–8 并发） | 8 | PASS（侥幸） | PASS |
+| `decide-vs-sweep`（人工决策 vs 超时扫描） | 2 | PASS（侥幸） | PASS |
+| `im-vs-decide`（签名 IM 回调 vs Web 决策） | 2 | PASS（侥幸） | PASS |
+| `evidence-race`（并发上传证据） | 6 | PASS | PASS（6/6 落库） |
+| `task-transition-race` | 4 | PASS（侥幸） | PASS |
+
+### 8.3 新增回归用例（结构性断言 + 真实压测分工）
+
+SQLite 单写者，多线程测不出真实语义；因此单测断言**结构保证**（行锁确实发出 `FOR UPDATE`、四条写路径都带锁、唯一键在元数据里、唯一键兜底可复现），真实并发交给 `race_stress.py` 打 PG 后端：
+
+- `approval-gateway/tests/test_concurrency.py`（8 条）：含"预置同版本决策行 → 第二次决策 409 且库里只有 1 条"这类**确定性**兜底验证；
+- `task-center/tests/test_concurrency.py`（4 条）：流转路径带锁 + 状态变更后重复流转仍 409 且时间线恰好 3 条。
+
+## 9. 鉴权专项
+
+### 9.1 清点结果（工具化，可进 CI）
+
+新增 `platform/scripts/audit_endpoint_auth.py`（纯 AST，不启动服务）：
+
+```
+修复前：写接口 33 个，其中无鉴权 22 个（7 个服务里 6 个完全裸奔）
+修复后：写接口 33 个，其中无鉴权 0 个
+        （22 个由统一中间件接管；逐路由依赖口径仍是 22，正是中间件存在的意义）
+```
+
+无鉴权清单里包括：`POST /console/decide`（替人落决策）、`POST /tools/invoke`（调工具）、
+`POST /mining/proposals/apply`（改 SOP 配置）、`POST /runs/*/resume`（恢复人审挂起）、
+`POST /alerts/prometheus`（凭空拉运维 SOP）、`POST /gitlab/*`（用平台的 GitLab Token 改仓库）。
+
+### 9.2 发现并修复的真实缺陷
+
+| # | 缺陷 | 实测证据 | 修法 |
+|---|---|---|---|
+| AUTHZ-001 | 6 个服务的全部写接口无鉴权 | 清点 22/33 无鉴权；`X-Service-Token` 这个头**没有任何服务在读**（探针脚本里带着它，纯属自我安慰） | 新增统一中间件 `app/service_auth.py`（7 服务各一份，`scripts/sync_service_auth.py --check` 防漂移）：`SERVICE_AUTH_MODE=token` 时**默认拒绝、显式豁免**，新增路由自动受保护；`off` 模式启动即打 WARNING 明示"当前无服务间鉴权" |
+| AUTHZ-002 | 开了令牌模式后服务间调用全 401（把功能也关掉） | `POST /runs` 返回 500，日志显示 agent-runtime→网关 `/approvals` 401 | 中间件模块提供 `outbound_headers()`，所有出站客户端（审批/A 闸门/GitLab/知识库/事件发布/调度器）统一带上服务令牌 |
+| AUTHZ-003 | 人审闸门可被"自述决策"绕过 | `/resume` 只要挂在 Gate 上就接受任意调用方的 `decision=approve`（`/wake` 早已加守卫，`/resume` 没有） | 新增 `app/gate_decisions.py`：`GATE_DECISION_VERIFY=off\|warn\|block`（token 模式默认 block），核验审批单**存在 + 状态与决策一致 + task_ref 一致 + Gate 类型与挂起节点一致**；核验依据写进运行归档 |
+| AUTHZ-004 | 工具调用的岗位与"免人审"由请求体自述 | `{role:"ops-duty", allow_ungated:true}` 可自称任意岗位、自称免人审 | `allow_ungated` 默认不采信（需 `TOOLS_ALLOW_UNGATED=1`）；受管控部署下 `role` 也不采信（需 `TOOLS_ALLOW_CLIENT_ROLE=1`），并留审计 |
+| AUTHZ-005 | 告警 webhook 完全裸奔 | `demo_alert.py` 里的 `WEBHOOK_SECRET` 只给了 gitlab-bridge，task-center 从未读取 | 新增 `app/alert_auth.py`：`X-Webhook-Token` 或 `X-Webhook-Signature: sha256=<hmac>`，未配置密钥则 fail-closed(503)；更新 demo 与用例 |
+| AUTHZ-006 | OIDC 只校验"登录了没有"，不校验"是谁" | 任何登录用户（含只读账号）可批准审批、可触发**跨全部租户**的超时扫描 | 新增 `require_role()`（`APPROVER_ROLES` 默认 approver,admin）用于 `/approvals/{id}/decision` 与 `/admin/sweep`；`AUTH_MODE=off/static` 行为不变 |
+| AUTHZ-007 | 审计署名可冒名 | OIDC 下 `decided_by` 取自请求体，登录用户可署他人姓名 | 身份真实时署名以 token 的 `sub` 为准，不一致时告警 |
+| AUTHZ-008 | 驾驶舱转调网关不带身份 | `AUTH_MODE=oidc` 时驾驶舱"批准"按钮必然 502（网关 401）；放行模式下也无从记录是谁批的 | 透传 `Authorization`/`X-Tenant`/`X-Service-Token`/`X-Platform-User`/`Cookie` |
+| AUTHZ-009 | 驾驶舱 HTML 存储型 XSS | 上游可被用户左右的标题/需求文本/阶段名直接拼进 HTML | 新增 `esc()`，所有插值统一转义（含 `onclick` 参数） |
+| AUTHZ-010 | 默认配置指向错误端口 | `APPROVAL_GATEWAY_URL` 默认 `localhost:8000`，而本机一键起栈的网关是 **8001**（`run_local_stack.py` 端口表） | agent-runtime、process-mining 默认值对齐 8001；`GITLAB_BRIDGE_URL` 对齐 8006 |
+| AUTHZ-011 | 公网入口可被伪造可信头 | `Caddyfile` 未剥离 `X-Platform-User`/`X-Service-Token` | 入口统一 `header_up -X-...` 剥离，SSO 注入点显式标注；`.env.prod.example` 补全 8 个新变量与说明 |
+
+### 9.3 复验结果
+
+| 探针（`probes-authz.sh`） | 修复前 | 修复后 |
+|---|---|---|
+| `open-writes` | 22/33 写接口无鉴权 | **0/33**（22 个由中间件接管，豁免清单可审） |
+| `no-token`（6 个代表端点 + /health） | 全部 200（裸奔） | **无令牌 401、/health 200** |
+| `with-token` | — | 带令牌的建单→决策链路 **200**（鉴权没把功能关掉） |
+| `resume-bypass` | 自述 `approve` 直接恢复执行 | 无 `approval_id` / 伪造编号均 **409**，且闸门仍在原地 |
+| `tools-selfdeclared` | 自述岗位、自述免人审均被采信 | **403**（`ungated_not_allowed` / `role_not_trusted`） |
+| `alert-signature` | 无凭据也能拉运维 SOP | 无凭据/错密钥 **401**；正确令牌与 HMAC **200** |
+| `decide-race`（交叉验证） | — | PASS |
+
+### 9.4 对既有 18 个探针的影响（全部复验）
+
+打开令牌模式后，原 `probes.sh` 的请求不带服务令牌，会全部 401。处理方式与结果：
+
+- `probes.sh` 统一注入 `X-Service-Token`（用 shell 函数包装 `curl`，避免漏改一处就得出"假 401"结论）；
+- **加固后的 SUT 上 18/18 全部 PASS**（`verify-after/hardened-*.txt`）；
+- `reject-archive` 探针**按更严的新语义改写**：先在审批台上真做一次 `reject`，再拿 `approval_id` 恢复运行 —— 这比原来"直接自述 reject"更接近真实链路，属于**探针变强**而非放宽（其余 17 个探针的断言一字未改）。
+
+## 10. 本轮回归总量
+
+| 服务 | 测试数 | 本轮新增 |
+|---|---|---|
+| approval-gateway | 151 | +14（并发 8、鉴权 6） |
+| task-center | 38 | +15（并发 4、鉴权 11） |
+| agent-runtime | 190 | +15（鉴权 14、工具语义 1 改写） |
+| process-mining | 68 | +5（鉴权） |
+| metrics-dashboard | 22 | +9（身份透传、XSS、令牌） |
+| knowledge-base | 23 | +6（令牌） |
+| gitlab-bridge | 28 | +4（令牌 + webhook 豁免自查） |
+| **全平台** | **520** | **+66** |
+
+另：9 个演练（drills）复跑，`drill_eng_gate_e1` 因"客户端 mode 覆盖已被禁止"这一更严语义**同步更新为**：⑤ 客户端覆盖被忽略（服务端权威）+ ⑤b 服务端 `ENG_GATES_MODE=warn` 才灰度 → 11/11 通过；其余 8 个全绿。
+
+## 11. 本轮之后仍未验证的部分（诚实清单）
+
+- **公网部署形态**：Caddy 已补剥离头与 SSO 注入点，但**没有真跑过**公网入口 + oauth2-proxy 组合；`TRUST_PROXY_AUTH=1` 的正确性依赖入口剥离头，属于"配置正确才安全"，需要一次真实部署验证；
+- **真实 LLM 质量 / 提示注入、Qdrant 检索质量、GitLab MR 全生命周期、飞书真实推送、soak 稳定性**：仍未覆盖；
+- **多实例水平扩展**：行锁与唯一键在单库上成立；多副本 + 读写分离时的语义未验证；
+- **性能**：本轮压测只针对**正确性**（是否重复写入），没有测吞吐/尾延迟；原性能基线仍是修复前数据；
+- **前端**：驾驶舱 XSS 已修，但审批台单页（`approval-gateway/app/static/index.html`）未做同类审计。
+
+**结论**：并发/竞态与鉴权两个维度从"未覆盖"变为"有探针、有修复、有回归、有前后对照证据"。但门禁判定仍需重跑完整战役（24 卡 + 性能 + 覆盖率），本轮不改变 G1/G2/G3 的既有结论。
+
+**新增上线前置条件（务必配置，否则相应功能会 fail-closed）**：
+`SERVICE_AUTH_MODE=token` + `SERVICE_AUTH_TOKEN`、`ALERT_WEBHOOK_SECRET`、`IM_CALLBACK_SIGNING_KEY`（或 `FEISHU_VERIFY_TOKEN`）、
+`GATE_DECISION_VERIFY=block`、`TRUST_PROXY_AUTH=1`（且入口剥离同名头）；`TOOLS_ALLOW_UNGATED`/`TOOLS_ALLOW_CLIENT_ROLE` 保持 0。

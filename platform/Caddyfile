@@ -1,39 +1,81 @@
 # Caddy 反向代理（自动 HTTPS）。PLATFORM_DOMAIN 由环境变量注入。
+#
+# 鉴权专项（2026-09-22）后的入口约定：
+#
+# 1. **剥离** 客户端自带的 `X-Platform-User` / `X-Service-Token`（`header_up -X-...`）：
+#    这两个头是"可信入口签名"，若原样透传，任何人都能伪造身份直连服务。
+#    服务侧 `TRUST_PROXY_AUTH=1` 时才认 `X-Platform-User`——它必须只可能由本入口注入。
+#
+# 2. **SSO 层**：Caddy 本身不做 OIDC，推荐在前面放 oauth2-proxy（或企业已有网关），
+#    由它在登录成功后注入 `X-Platform-User: {user}`；本文件里的 `${...}` 占位给出注入点。
+#    没有 SSO 时，请把服务端口限制在内网，并只让审批台等 UI 走 `AUTH_MODE=static`。
+#
+# 3. 服务间的 `X-Service-Token` **不经过公网入口**：它只在内部网络（compose network）
+#    的服务之间使用；本入口一律剥掉，避免泄漏与伪造。
 {$PLATFORM_DOMAIN} {
 	encode zstd gzip
 
-	# GitLab / Prometheus webhook（公网入口，HMAC 签名校验在服务内完成）
+	# GitLab / Prometheus webhook（公网入口，签名校验在服务内完成：
+	# GitLab X-Gitlab-Token/HMAC、Alertmanager X-Webhook-Token/HMAC）
 	handle /webhooks/* {
-		reverse_proxy gitlab-bridge:8001
+		reverse_proxy gitlab-bridge:8001 {
+			header_up -X-Platform-User
+			header_up -X-Service-Token
+		}
 	}
 	handle /alerts/* {
-		reverse_proxy task-center:8002
+		reverse_proxy task-center:8002 {
+			header_up -X-Platform-User
+			header_up -X-Service-Token
+		}
 	}
 
 	# 审批台（人审 UI，SSO 保护）
 	handle /approvals* {
-		reverse_proxy approval-gateway:8000
+		reverse_proxy approval-gateway:8000 {
+			# SSO 网关注入的登录用户（示例：oauth2-proxy 的 X-Auth-Request-User）
+			header_up X-Platform-User {http.request.header.X-Auth-Request-User}
+			header_up -X-Service-Token
+		}
 	}
 	handle /callbacks/* {
-		reverse_proxy approval-gateway:8000
+		reverse_proxy approval-gateway:8000 {
+			header_up -X-Platform-User
+			header_up -X-Service-Token
+		}
 	}
 	handle /admin/* {
-		reverse_proxy approval-gateway:8000
+		reverse_proxy approval-gateway:8000 {
+			header_up X-Platform-User {http.request.header.X-Auth-Request-User}
+			header_up -X-Service-Token
+		}
 	}
 	handle /auth/* {
-		reverse_proxy approval-gateway:8000
+		reverse_proxy approval-gateway:8000 {
+			header_up -X-Platform-User
+			header_up -X-Service-Token
+		}
 	}
 
-	# 度量面板
+	# 度量面板（驾驶舱；点"批准"会转调审批网关并透传上面的身份头）
 	handle /metrics* {
-		reverse_proxy metrics-dashboard:8005
+		reverse_proxy metrics-dashboard:8005 {
+			header_up X-Platform-User {http.request.header.X-Auth-Request-User}
+			header_up -X-Service-Token
+		}
 	}
 	handle /dashboard* {
-		reverse_proxy metrics-dashboard:8005
+		reverse_proxy metrics-dashboard:8005 {
+			header_up X-Platform-User {http.request.header.X-Auth-Request-User}
+			header_up -X-Service-Token
+		}
 	}
 
 	handle {
-		reverse_proxy metrics-dashboard:8005
+		reverse_proxy metrics-dashboard:8005 {
+			header_up X-Platform-User {http.request.header.X-Auth-Request-User}
+			header_up -X-Service-Token
+		}
 	}
 
 	log {

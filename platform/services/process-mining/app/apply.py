@@ -8,6 +8,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
+
+from .service_auth import outbound_headers
 import yaml
 
 logger = logging.getLogger(__name__)
@@ -76,7 +78,7 @@ def _apply_knowledge_ingest(target: str, value: object) -> dict:
     url = os.getenv("KNOWLEDGE_BASE_URL", "http://localhost:8004").rstrip("/")
     source = f"{target}/auto-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}.md"
     try:
-        resp = httpx.post(f"{url}/documents", json={"source": source, "content": text}, timeout=120)
+        resp = httpx.post(f"{url}/documents", json={"source": source, "content": text}, timeout=120, headers=outbound_headers())
         resp.raise_for_status()
         body = resp.json()
     except httpx.HTTPError as exc:

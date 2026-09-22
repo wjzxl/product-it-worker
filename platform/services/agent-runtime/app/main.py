@@ -14,7 +14,7 @@ from fastapi import FastAPI, HTTPException
 from langgraph.types import Command
 from pydantic import BaseModel, Field
 
-from . import ambiguity
+from . import ambiguity, gate_decisions
 from . import roles as role_registry
 from . import runs
 from . import rules_pack
@@ -29,6 +29,7 @@ from .llm import llm_from_env
 from .prompts import active_versions, get_prompt
 from .sop import FlowContext, build_dev_graph, build_graph, build_ops_graph, build_test_graph
 from .tester import TestEngine
+from .service_auth import install_service_auth
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -76,6 +77,9 @@ class WakeIn(BaseModel):
 class ResumeIn(BaseModel):
     decision: str = Field(min_length=1)  # approve / reject / revise
     comment: str = ""
+    # 治理专项：审批台里的决策编号。GATE_DECISION_VERIFY=block（生产默认）时必填，
+    # 服务端据此向审批网关核验"这条决策真的存在且与本次动作一致"。
+    approval_id: str = ""
 
 
 _ROLE_BY_SOP = {
@@ -121,14 +125,16 @@ def _archive_progress(thread_id: str, status_body: dict, ctx, extra: Optional[di
         # 因此"这轮是退回"只能从决策侧带进来（extra），否则归档看不出被退回过。
         runs.finish_run(thread_id, "waiting", usage, {"gate": status_body.get("gate", ""), **extra})
     elif status == "waiting_data":
-        runs.mark_waiting(thread_id, status_body.get("waiting_reason", "数据未就绪"), _usage_of(ctx))
+        runs.mark_waiting(thread_id, status_body.get("waiting_reason", "数据未就绪"), _usage_of(ctx),
+                          {**extra} or None)
     elif status == "done":
-        runs.finish_run(thread_id, "done", usage, {"issue": status_body.get("issue", {})})
+        runs.finish_run(thread_id, "done", usage, {"issue": status_body.get("issue", {}), **extra})
     elif status == "rejected":
         runs.finish_run(thread_id, "rejected", usage,
-                        {"gate": status_body.get("gate", ""), "comment": status_body.get("comment", "")})
+                        {"gate": status_body.get("gate", ""), "comment": status_body.get("comment", ""),
+                         **extra})
     else:
-        runs.finish_run(thread_id, "running", usage)
+        runs.finish_run(thread_id, "running", usage, {**extra} or None)
 
 
 def _config(thread_id: str, sop: str = SOP_PRODUCT) -> dict:
@@ -246,9 +252,9 @@ def create_app(
     gate_api=None,
 ) -> FastAPI:
     llm = llm or llm_from_env()
-    gitlab_api = gitlab_api or GitLabAPI(os.getenv("GITLAB_BRIDGE_URL", "http://localhost:8001"))
+    gitlab_api = gitlab_api or GitLabAPI(os.getenv("GITLAB_BRIDGE_URL", "http://127.0.0.1:8006"))
     # WP2：工程闸门客户端（E1 在生成代码前拦截）
-    gate_api = gate_api if gate_api is not None else GateAPI(os.getenv("APPROVAL_GATEWAY_URL", "http://localhost:8000"))
+    gate_api = gate_api if gate_api is not None else GateAPI(os.getenv("APPROVAL_GATEWAY_URL", "http://127.0.0.1:8001"))
     # WP8：工具注册表（先建表，handler 在 ctx 就绪后绑定）
     tool_registry = ToolRegistry()
     coder = coder or Coder(
@@ -270,7 +276,7 @@ def create_app(
     executor = executor or executor_from_env()
     ctx = FlowContext(
         llm=llm,
-        approval_api=approval_api or ApprovalAPI(os.getenv("APPROVAL_GATEWAY_URL", "http://localhost:8000")),
+        approval_api=approval_api or ApprovalAPI(os.getenv("APPROVAL_GATEWAY_URL", "http://127.0.0.1:8001")),
         gitlab_api=gitlab_api,
         coder=coder,
         tester=tester,
@@ -341,6 +347,7 @@ def create_app(
         description="Agent 运行时：产品域 PRD+G1 / 研发域 方案+编码+MR+G3 / 测试域 独立用例+G4（设计文档 02）",
         version="0.3.0",
     )
+    install_service_auth(app, "agent-runtime")
     app.state.ctx = ctx
     app.state.graphs = graphs
     app.state.tools = tool_registry
@@ -408,6 +415,20 @@ def create_app(
         snap = graph.get_state(config)
         if snap.next and not any(g in list(snap.next) for g in ("gate_g1", "gate_g2", "gate_g3", "gate_g4", "gate_g5", "gate_g6")):
             raise HTTPException(status_code=409, detail="当前流程不在人审挂起状态")
+
+        # 治理专项：不接受调用方自述的决策——必须能对上审批网关里的一条真实决策
+        node = list(snap.next)[0] if snap.next else ""
+        run_task_ref = str((snap.values or {}).get("task_ref", "") or "")
+        try:
+            evidence = gate_decisions.resolve(
+                body.approval_id, body.decision, node, run_task_ref,
+                fetch=lambda aid: ctx.approval_api.get_approval(aid),
+            )
+        except gate_decisions.GateDecisionError as exc:
+            logger.warning("resume 被拒（%s）：thread=%s decision=%s approval=%s",
+                           exc.reason, thread_id, body.decision, body.approval_id)
+            raise HTTPException(exc.status_code, str(exc)) from exc
+
         # 修复 BUG-012（真正的根因）：/resume 此前**从不写运行归档**，
         # 于是被否决的运行在归档里永远停留在 waiting —— /runs 与 stats.success_rate 看不到否决。
         if hasattr(ctx.llm, "reset_usage"):
@@ -419,8 +440,12 @@ def create_app(
                 runs.finish_run(thread_id, "failed", _usage_of(ctx), {"error": f"{type(exc).__name__}: {exc}"})
                 raise
         out = _status(graph, thread_id, sop)
-        _archive_progress(thread_id, out, ctx,
-                          extra={"revised": True, "decision": body.decision} if body.decision == "revise" else None)
+        extra = {"decision": body.decision, "gate_decision_evidence": evidence}
+        if body.approval_id:
+            extra["approval_id"] = body.approval_id
+        if body.decision == "revise":
+            extra["revised"] = True
+        _archive_progress(thread_id, out, ctx, extra=extra)
         return out
 
     @app.get("/runs/{thread_id}/state")
@@ -513,16 +538,41 @@ def create_app(
 
     @app.post("/tools/invoke")
     def invoke_tool(body: "ToolInvokeIn") -> dict:
-        """执行期鉴权下的工具调用（未授权/缺参数/未过人审都会被拒并留审计）。"""
-        spec = None
+        """执行期鉴权下的工具调用（未授权/缺参数/未过人审都会被拒并留审计）。
+
+        **鉴权专项**：`role` 与 `allow_ungated` 都来自请求体 = 调用方自述权限，等于没有权限。
+        现在：
+        - `allow_ungated`（绕过人审依据）默认**不认**，仅在 `TOOLS_ALLOW_UNGATED=1` 时放行；
+          平台自己（SOP 图内部）不走这个 HTTP 入口，所以关掉它不影响正常流程。
+        - `SERVICE_AUTH_MODE=token`（有管控的部署）下，`role` 也不再采信，除非显式
+          `TOOLS_ALLOW_CLIENT_ROLE=1`——否则任何调用方都能自称 `dev-agent` 越权用工具。
+        """
+        allow_ungated = False
+        if body.allow_ungated:
+            if os.getenv("TOOLS_ALLOW_UNGATED", "0") == "1":
+                allow_ungated = True
+            else:
+                raise HTTPException(status_code=403, detail={
+                    "error": "allow_ungated 来自请求体，默认不予采信（人审依据不得由调用方自行豁免）",
+                    "reason": "ungated_not_allowed",
+                    "hint": "演练/内网需要时设 TOOLS_ALLOW_UNGATED=1",
+                })
+        role = body.role
+        if role and os.getenv("SERVICE_AUTH_MODE", "off").lower() == "token" \
+                and os.getenv("TOOLS_ALLOW_CLIENT_ROLE", "0") != "1":
+            raise HTTPException(status_code=403, detail={
+                "error": "受管控部署下不接受请求体自述的 role（调用方可自称任意岗位越权）",
+                "reason": "role_not_trusted",
+                "hint": "确需由调用方指定岗位时设 TOOLS_ALLOW_CLIENT_ROLE=1，并通过受信通道调用",
+            })
         role_tools = None
-        if body.role:
-            role_spec = role_registry.load_role(body.role)
+        if role:
+            role_spec = role_registry.load_role(role)
             role_tools = role_spec.tool_ids
         try:
             return tool_registry.invoke(
-                body.tool, body.params, role=body.role, role_tools=role_tools,
-                approval_ref=body.approval_ref, allow_ungated=body.allow_ungated,
+                body.tool, body.params, role=role, role_tools=role_tools,
+                approval_ref=body.approval_ref, allow_ungated=allow_ungated,
             )
         except ToolDenied as exc:
             raise HTTPException(status_code=403, detail={"error": str(exc), "reason": exc.reason}) from exc

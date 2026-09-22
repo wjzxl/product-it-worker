@@ -45,11 +45,12 @@ def python_of(service: str) -> str:
     return str(SERVICES / service / ".venv" / "bin" / "python")
 
 
-def start_gateway() -> subprocess.Popen:
+def start_gateway(port: int = PORT, extra_env: dict | None = None) -> subprocess.Popen:
     env = dict(os.environ)
     env.update({"DATABASE_URL": f"sqlite:///{TMP}/gateway.db", "DEFAULT_TENANT": "drill"})
+    env.update(extra_env or {})
     return subprocess.Popen(
-        [python_of("approval-gateway"), "-m", "uvicorn", "app.main:app", "--port", str(PORT)],
+        [python_of("approval-gateway"), "-m", "uvicorn", "app.main:app", "--port", str(port)],
         cwd=SERVICES / "approval-gateway", env=env,
         stdout=open(f"{TMP}/gateway.log", "w"), stderr=subprocess.STDOUT,
     )
@@ -103,12 +104,34 @@ def main() -> int:
         check("④ 判定留痕含规则指纹", bool(r.get("check_id")) and bool(r.get("fingerprint")),
               f"check_id={r.get('check_id')} fingerprint={r.get('fingerprint')}")
 
-        # 场景 2：warn 灰度 → 记录但不阻断
-        warn = httpx.post(f"{base}/eng-gates/E1/check",
-                          json={"task_ref": "wp2-drill-2", "context": partial, "mode": "warn"},
-                          headers={"X-Tenant": "drill"}, timeout=30).json()
-        check("⑤ warn 模式只记录不阻断", warn["mode"] == "warn" and warn["blocked"] is False and warn["passed"] is False,
-              f"mode={warn['mode']} blocked={warn['blocked']}")
+        # 场景 2：客户端**不能**把闸门调成 warn（BUG-003/014：模式由服务端权威决定）
+        override = httpx.post(f"{base}/eng-gates/E1/check",
+                              json={"task_ref": "wp2-drill-2", "context": partial,
+                                    "mode": "warn", "persist": False},
+                              headers={"X-Tenant": "drill"}, timeout=30).json()
+        check("⑤ 客户端不能把闸门降级为 warn（mode 覆盖被忽略）",
+              override["mode"] == "block" and override["blocked"] is True and bool(override.get("check_id")),
+              f"mode={override['mode']} blocked={override['blocked']} check_id={override.get('check_id')}")
+
+        # 场景 2b：真正的灰度是**服务端配置**（ENG_GATES_MODE=warn）→ 只记录不阻断
+        warn_proc = start_gateway(port=PORT + 1, extra_env={"ENG_GATES_MODE": "warn"})
+        try:
+            warn_base = f"http://127.0.0.1:{PORT + 1}"
+            for _ in range(40):
+                try:
+                    if httpx.get(f"{warn_base}/health", timeout=3).status_code == 200:
+                        break
+                except Exception:
+                    time.sleep(1.5)
+            warn = httpx.post(f"{warn_base}/eng-gates/E1/check",
+                              json={"task_ref": "wp2-drill-2b", "context": partial},
+                              headers={"X-Tenant": "drill"}, timeout=30).json()
+            check("⑤b 服务端 ENG_GATES_MODE=warn 时只记录不阻断",
+                  warn["mode"] == "warn" and warn["blocked"] is False and warn["passed"] is False
+                  and bool(warn.get("check_id")),
+                  f"mode={warn['mode']} blocked={warn['blocked']} check_id={warn.get('check_id')}")
+        finally:
+            warn_proc.terminate()
 
         # 场景 3：补齐 impact_scope → 放行
         full = {**partial, "impact_scope": "复用现有 /api/v1/report/export，不改表结构，不影响其它调用方"}

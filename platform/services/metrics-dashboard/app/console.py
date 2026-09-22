@@ -21,6 +21,8 @@ from typing import Any, Optional
 
 import httpx
 
+from .service_auth import outbound_headers
+
 logger = logging.getLogger(__name__)
 
 APPROVAL_URL = os.getenv("APPROVAL_GATEWAY_URL", "http://127.0.0.1:8001")
@@ -30,7 +32,7 @@ RUNTIME_URL = os.getenv("AGENT_RUNTIME_URL", "http://127.0.0.1:8002")
 def _get(url: str, params: Optional[dict] = None, timeout: float = 8.0) -> Any:
     """容错读取：某个上游不可用时返回 None，并在结果里标注（不编造数据）。"""
     try:
-        resp = httpx.get(url, params=params or {}, timeout=timeout)
+        resp = httpx.get(url, params=params or {}, timeout=timeout, headers=outbound_headers())
         resp.raise_for_status()
         return resp.json()
     except Exception as exc:
@@ -140,22 +142,37 @@ def build_queue(tenant: str = "default") -> dict:
     }
 
 
-def submit_decision(approval_id: str, decision: str, comment: str, decided_by: str) -> dict:
+def forward_headers(raw_headers) -> dict:
+    """把调用方的身份/租户头透传给审批网关（鉴权专项）。
+
+    此前驾驶舱转调网关时**不带任何身份头**：`AUTH_MODE=oidc` 下网关直接 401，
+    驾驶舱的"批准"按钮永远失败（只看到 502）；而放行模式下网关又无从知道是谁批的。
+    透传后：人的身份来自 SSO 入口，角色校验（approver/admin）在网关侧照常生效。
+    """
+    keep = {"authorization", "x-tenant", "x-service-token", "x-platform-user", "cookie"}
+    return {k: v for k, v in dict(raw_headers or {}).items() if k.lower() in keep}
+
+
+def submit_decision(approval_id: str, decision: str, comment: str, decided_by: str,
+                    headers: Optional[dict] = None) -> dict:
     """从驾驶舱直接提交决策（仍走审批网关留痕，不绕过审计）。"""
     resp = httpx.post(
         f"{APPROVAL_URL.rstrip('/')}/approvals/{approval_id}/decision",
         json={"decision": decision, "comment": comment, "decided_by": decided_by},
+        headers=outbound_headers(headers),
         timeout=20,
     )
     resp.raise_for_status()
     return resp.json()
 
 
-def submit_feedback(check_id: str, verdict: str, note: str, by: str) -> dict:
+def submit_feedback(check_id: str, verdict: str, note: str, by: str,
+                    headers: Optional[dict] = None) -> dict:
     """误拦反馈（M1 决策 D3）：让人能一键标记"其实该放行"。"""
     resp = httpx.post(
         f"{APPROVAL_URL.rstrip('/')}/eng-gates/checks/{check_id}/feedback",
         json={"verdict": verdict, "note": note, "by": by},
+        headers=outbound_headers(headers),
         timeout=20,
     )
     resp.raise_for_status()

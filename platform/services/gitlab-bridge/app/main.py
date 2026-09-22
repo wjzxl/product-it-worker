@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 from .client import GitLabAPIError, GitLabClient
 from .events import new_event, publisher_from_env
 from .normalize import normalize
+from .service_auth import install_service_auth
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -82,6 +83,8 @@ def create_app(settings: Settings) -> FastAPI:
         description="GitLab 双向集成桥：webhook→平台事件；平台→GitLab API",
         version="0.1.0",
     )
+    # 入站 webhook 自带 Token/HMAC 校验（见 /webhooks/gitlab），故豁免服务令牌
+    install_service_auth(app, "gitlab-bridge", extra_exempt=("/webhooks/gitlab",))
     app.state.settings = settings
     app.state.gitlab = GitLabClient(settings.gitlab_url, settings.gitlab_token)
     app.state.publisher = publisher_from_env(settings.publish_targets)
