@@ -116,14 +116,33 @@ class TestResumeRequiresRealDecision:
                                json={"decision": "revise", "comment": "本地调试"})
         assert r.status_code == 200, r.text
 
-    def test_default_mode_follows_service_auth(self, monkeypatch):
+    def test_default_mode_follows_platform_env(self, monkeypatch):
+        """默认值随部署档位：dev=warn（本地可跑通），staging/prod=block（不接受自述批准）。"""
         from app import gate_decisions
 
         monkeypatch.delenv("GATE_DECISION_VERIFY", raising=False)
         monkeypatch.setenv("SERVICE_AUTH_MODE", "off")
+        for env, expected in (("dev", "warn"), ("staging", "block"), ("prod", "block")):
+            monkeypatch.setenv("PLATFORM_ENV", env)
+            assert gate_decisions.mode() == expected, f"PLATFORM_ENV={env}"
+
+    def test_token_mode_still_forces_block_without_platform_env(self, monkeypatch):
+        """只设了令牌、没设档位的老部署不得因此变松。"""
+        from app import gate_decisions
+
+        monkeypatch.delenv("GATE_DECISION_VERIFY", raising=False)
+        monkeypatch.delenv("PLATFORM_ENV", raising=False)
+        monkeypatch.setenv("SERVICE_AUTH_MODE", "off")
         assert gate_decisions.mode() == "warn"
         monkeypatch.setenv("SERVICE_AUTH_MODE", "token")
-        assert gate_decisions.mode() == "block", "受管控部署下必须默认强校验"
+        assert gate_decisions.mode() == "block"
+
+    def test_explicit_override_wins_in_prod(self, monkeypatch):
+        from app import gate_decisions
+
+        monkeypatch.setenv("PLATFORM_ENV", "prod")
+        monkeypatch.setenv("GATE_DECISION_VERIFY", "warn")
+        assert gate_decisions.mode() == "warn"   # 显式灰度允许，但要靠体检脚本发现
 
 
 class TestToolsInvokeTrust:

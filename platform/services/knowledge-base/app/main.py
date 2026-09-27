@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from .embedder import EmbeddingDimError, embedder_from_env
 from .ingest import chunk_markdown
 from .store import MemoryStore, QdrantStore, VectorDimMismatch
-from .service_auth import install_service_auth
+from .service_auth import install_service_auth, security_posture
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
@@ -102,6 +102,7 @@ def create_app(store=None, embedder=None) -> FastAPI:
             "status": status,
             "service": "knowledge-base",
             "version": "0.1.0",
+            "security": security_posture("knowledge-base"),
             "embedder": type(embedder).__name__,
             "store": store_info,
         }

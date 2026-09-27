@@ -5,7 +5,7 @@ from fastapi import FastAPI
 
 from .db import Base, engine
 from .router import router
-from .service_auth import install_service_auth
+from .service_auth import install_service_auth, security_posture
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
@@ -43,7 +43,8 @@ app.include_router(router)
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "service": "task-center", "version": "0.1.0"}
+    return {"status": "ok", "service": "task-center", "version": "0.1.0",
+            "security": security_posture("task-center")}
 
 def _ensure_task_ref_constraint() -> None:
     """轻量迁移：把 external_ref 的**全局唯一**改为 **(tenant, external_ref)** 复合唯一。

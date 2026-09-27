@@ -208,3 +208,50 @@ SQLite 单写者，多线程测不出真实语义；因此单测断言**结构�
 **新增上线前置条件（务必配置，否则相应功能会 fail-closed）**：
 `SERVICE_AUTH_MODE=token` + `SERVICE_AUTH_TOKEN`、`ALERT_WEBHOOK_SECRET`、`IM_CALLBACK_SIGNING_KEY`（或 `FEISHU_VERIFY_TOKEN`）、
 `GATE_DECISION_VERIFY=block`、`TRUST_PROXY_AUTH=1`（且入口剥离同名头）；`TOOLS_ALLOW_UNGATED`/`TOOLS_ALLOW_CLIENT_ROLE` 保持 0。
+
+---
+
+# 专项复验（2026-09-22，第 3 轮）：治理默认值取舍 → 部署档位
+
+> 触发：第 9 节发现 22/33 写接口无鉴权后，追问"为什么会这样"——根因不是忘了加锁，是**默认值**。
+> 本轮把"严格 vs 开发便利"这个取舍收拢成一个变量并做成可见、可卡点的机制，详见 `21-治理默认值取舍与部署档位.md`。
+
+## 12. 取舍结论
+
+**严格程度按"失败后果是否可逆"分档，而不是按"开发便利"一刀切**：
+
+| 类别 | 策略 | 例 |
+|---|---|---|
+| 不可逆的治理动作 | fail-closed（缺配置即拒绝启动/拒绝服务） | 服务令牌、人审决策核验、`allow_ungated`、审计署名 |
+| 可逆、可事后补齐 | 允许宽松但必须吵（WARNING + `/health` + 体检提示） | `ENG_GATES_MODE`、`ENG_GATES_REQUIRED` |
+| 纯开发体验 | 宽松，但必须看起来不像生产 | `CHECKPOINTER=memory`、`SANDBOX_MODE=host` |
+
+不采用"默认一律从严"，因为它会以两种方式失败：① 本地起不来 → 团队把默认值改回去，
+"关掉"变成习惯动作而不是显式决定；② 带着 503 跑起来的服务**看起来**有鉴权配置，
+反而掩盖"生产没配"。真正的严格是**缺配置就拒绝启动**。
+
+## 13. 落地机制与验证
+
+| 机制 | 实现 | 验证证据 |
+|---|---|---|
+| 一个档位旋钮 | `PLATFORM_ENV=dev\|staging\|prod`（默认 dev），各开关缺省值由档位派生，显式环境变量永远优先 | `strict_expectations()` 单测（task-center 6 条、agent-runtime 3 条、approval-gateway 5 条） |
+| 宽松看得见 | 7 个服务 `/health` 新增 `security` 段（档位/是否合规/未开开关清单） | `test_health_exposes_posture`（两个服务）+ SUT 实测 |
+| 缺凭据拒绝启动 | prod 档位无任何凭据 → `install_service_auth` 抛 `RuntimeError` | 实测：`PLATFORM_ENV=prod` 无令牌 → `CRITICAL … 拒绝启动`；带令牌 → 正常启动 |
+| 上线卡点 | `scripts/check_deployment_readiness.py`（dev 只提示，staging/prod 不达标 exit 1） | `--selftest` 5 个场景全通过；`--env-file platform/.env.prod.example` → ✅ 上线就绪 |
+| 档位进部署 | `docker-compose.prod.yml` 8 个服务统一注入（此前 compose 里**完全没有**这些变量）；补上遗漏的 `process-mining` 服务 | YAML 解析通过，8/8 服务带 `PLATFORM_ENV` |
+
+## 14. 不可协商清单（任何档位都拦）
+
+IM 回调签名密钥、告警 webhook 密钥、工具 `allow_ungated`、审计署名以登录主体为准。
+理由：这四项的"宽松放行"没有任何真实收益（本地调试可一次性显式打开），失败后果却不可逆。
+
+## 15. 本轮新增的代价与未验证项（追加到第 11 节）
+
+- **老部署兼容**：只设 `SERVICE_AUTH_MODE=token` 未设 `PLATFORM_ENV` 的部署行为不变；新部署必须显式选档位，不选即 dev。
+- **`TRUST_PROXY_AUTH` 默认关是刻意的**：它在"入口剥离同名头"的前提下才成立，默认打开等于替部署方做了假设；
+  staging/prod 要求**显式声明**（0 或 1 都要写出来），体检脚本会拦未声明的情况。
+- **`ENG_GATES_REQUIRED=1` 在 prod 会降低可用性**：闸门服务故障时流水线停在原地。这是有意的取舍，
+  但**前提是闸门服务有冗余**——目前没有，属于上线前要补的项。
+- **体检脚本只检查环境变量**，不能证明服务真的按这些值在跑；端到端证明仍依赖探针与真实部署（第 11 节公网入口一项仍未验证）。
+
+**本轮回归**：全平台 **533** 测试全绿（+13）；鉴权探针 5/5、原 18 探针抽检 4/4 复跑通过。

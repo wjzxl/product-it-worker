@@ -118,3 +118,43 @@ class TestApproverRoleRequired:
         apv = _approval(client)
         r = client.post(f"/approvals/{apv['id']}/decision", json={"decision": "approve", "comment": "本地", "decided_by": "本地值班"})
         assert r.status_code == 200, r.text
+
+
+class TestGateModeFollowsPlatformEnv:
+    """ENG_GATES_MODE 缺省时按部署档位取默认（21 号文档：生产"忘了配"≠"闸门变装饰"）。"""
+
+    def test_prod_default_is_block(self, monkeypatch):
+        from app import gate_rules
+
+        monkeypatch.delenv("ENG_GATES_MODE", raising=False)
+        monkeypatch.setenv("PLATFORM_ENV", "prod")
+        assert gate_rules.gate_mode("warn") == "block"
+
+    def test_dev_default_follows_rule(self, monkeypatch):
+        from app import gate_rules
+
+        monkeypatch.delenv("ENG_GATES_MODE", raising=False)
+        monkeypatch.setenv("PLATFORM_ENV", "dev")
+        assert gate_rules.gate_mode("warn") == "warn"
+        assert gate_rules.gate_mode("block") == "block"
+
+    def test_explicit_value_still_wins_in_prod(self, monkeypatch):
+        from app import gate_rules
+
+        monkeypatch.setenv("PLATFORM_ENV", "prod")
+        monkeypatch.setenv("ENG_GATES_MODE", "warn")
+        assert gate_rules.gate_mode("block") == "warn"
+
+    def test_typo_still_degrades_to_warn(self, monkeypatch):
+        """配置笔误不能让流水线被硬阻断（阻断必须来自明确意图）—— 这条老语义保留。"""
+        from app import gate_rules
+
+        monkeypatch.setenv("PLATFORM_ENV", "prod")
+        monkeypatch.setenv("ENG_GATES_MODE", "blcok")
+        assert gate_rules.gate_mode("warn") == "warn"
+
+    def test_health_exposes_posture(self, client, monkeypatch):
+        monkeypatch.delenv("PLATFORM_ENV", raising=False)
+        body = client.get("/health").json()
+        assert body["security"]["platform_env"] == "dev"
+        assert body["security"]["compliant"] is False

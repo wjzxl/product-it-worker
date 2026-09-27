@@ -37,6 +37,17 @@ services:
       - PUBLISH_TARGETS=http://task-center:8002/events
       - AUTH_MODE=${AUTH_MODE:-oidc}
       - DEFAULT_TENANT=${DEFAULT_TENANT:-default}
+      # 治理档位与开关（详见 .env.prod.example 与 21 号文档）
+      - PLATFORM_ENV=${PLATFORM_ENV:-prod}
+      - SERVICE_AUTH_MODE=${SERVICE_AUTH_MODE:-token}
+      - SERVICE_AUTH_TOKEN=${SERVICE_AUTH_TOKEN:?必须在 .env.prod 配置}
+      - TRUST_PROXY_AUTH=${TRUST_PROXY_AUTH:-1}
+      - GATE_DECISION_VERIFY=${GATE_DECISION_VERIFY:-block}
+      - ENG_GATES_MODE=${ENG_GATES_MODE:-block}
+      - ENG_GATES_REQUIRED=${ENG_GATES_REQUIRED:-1}
+      - CHECKPOINTER=${CHECKPOINTER:-postgres}
+      - TOOLS_ALLOW_UNGATED=${TOOLS_ALLOW_UNGATED:-0}
+      - TOOLS_ALLOW_CLIENT_ROLE=${TOOLS_ALLOW_CLIENT_ROLE:-0}
     depends_on:
       postgres:
         condition: service_healthy
@@ -55,6 +66,17 @@ services:
       - WEBHOOK_SECRET=${WEBHOOK_SECRET:?必须在 .env.prod 配置}
       - PUBLISH_TARGETS=http://task-center:8002/events
       - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-https://platform.example.com}
+      # 治理档位与开关（详见 .env.prod.example 与 21 号文档）
+      - PLATFORM_ENV=${PLATFORM_ENV:-prod}
+      - SERVICE_AUTH_MODE=${SERVICE_AUTH_MODE:-token}
+      - SERVICE_AUTH_TOKEN=${SERVICE_AUTH_TOKEN:?必须在 .env.prod 配置}
+      - TRUST_PROXY_AUTH=${TRUST_PROXY_AUTH:-1}
+      - GATE_DECISION_VERIFY=${GATE_DECISION_VERIFY:-block}
+      - ENG_GATES_MODE=${ENG_GATES_MODE:-block}
+      - ENG_GATES_REQUIRED=${ENG_GATES_REQUIRED:-1}
+      - CHECKPOINTER=${CHECKPOINTER:-postgres}
+      - TOOLS_ALLOW_UNGATED=${TOOLS_ALLOW_UNGATED:-0}
+      - TOOLS_ALLOW_CLIENT_ROLE=${TOOLS_ALLOW_CLIENT_ROLE:-0}
 
   task-center:
     build:
@@ -70,6 +92,17 @@ services:
       - DATABASE_URL=postgresql+psycopg://platform:platform@postgres:5432/platform
       - AGENT_RUNTIME_URL=http://agent-runtime:8003
       - OPS_PROJECT_ID=${OPS_PROJECT_ID:-}
+      # 治理档位与开关（详见 .env.prod.example 与 21 号文档）
+      - PLATFORM_ENV=${PLATFORM_ENV:-prod}
+      - SERVICE_AUTH_MODE=${SERVICE_AUTH_MODE:-token}
+      - SERVICE_AUTH_TOKEN=${SERVICE_AUTH_TOKEN:?必须在 .env.prod 配置}
+      - TRUST_PROXY_AUTH=${TRUST_PROXY_AUTH:-1}
+      - GATE_DECISION_VERIFY=${GATE_DECISION_VERIFY:-block}
+      - ENG_GATES_MODE=${ENG_GATES_MODE:-block}
+      - ENG_GATES_REQUIRED=${ENG_GATES_REQUIRED:-1}
+      - CHECKPOINTER=${CHECKPOINTER:-postgres}
+      - TOOLS_ALLOW_UNGATED=${TOOLS_ALLOW_UNGATED:-0}
+      - TOOLS_ALLOW_CLIENT_ROLE=${TOOLS_ALLOW_CLIENT_ROLE:-0}
     depends_on:
       postgres:
         condition: service_healthy
@@ -91,6 +124,17 @@ services:
       - SANDBOX_MODE=${SANDBOX_MODE:-docker}
       - OPS_EXECUTOR=${OPS_EXECUTOR:-dryrun}
       - OPS_EXECUTOR_URL=${OPS_EXECUTOR_URL:-}
+      # 治理档位与开关（详见 .env.prod.example 与 21 号文档）
+      - PLATFORM_ENV=${PLATFORM_ENV:-prod}
+      - SERVICE_AUTH_MODE=${SERVICE_AUTH_MODE:-token}
+      - SERVICE_AUTH_TOKEN=${SERVICE_AUTH_TOKEN:?必须在 .env.prod 配置}
+      - TRUST_PROXY_AUTH=${TRUST_PROXY_AUTH:-1}
+      - GATE_DECISION_VERIFY=${GATE_DECISION_VERIFY:-block}
+      - ENG_GATES_MODE=${ENG_GATES_MODE:-block}
+      - ENG_GATES_REQUIRED=${ENG_GATES_REQUIRED:-1}
+      - CHECKPOINTER=${CHECKPOINTER:-postgres}
+      - TOOLS_ALLOW_UNGATED=${TOOLS_ALLOW_UNGATED:-0}
+      - TOOLS_ALLOW_CLIENT_ROLE=${TOOLS_ALLOW_CLIENT_ROLE:-0}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # 沙箱执行（受限：仅用于拉起 platform-sandbox）
 
@@ -106,6 +150,17 @@ services:
     env_file: [.env.prod]
     environment:
       - QDRANT_URL=http://qdrant:6333
+      # 治理档位与开关（详见 .env.prod.example 与 21 号文档）
+      - PLATFORM_ENV=${PLATFORM_ENV:-prod}
+      - SERVICE_AUTH_MODE=${SERVICE_AUTH_MODE:-token}
+      - SERVICE_AUTH_TOKEN=${SERVICE_AUTH_TOKEN:?必须在 .env.prod 配置}
+      - TRUST_PROXY_AUTH=${TRUST_PROXY_AUTH:-1}
+      - GATE_DECISION_VERIFY=${GATE_DECISION_VERIFY:-block}
+      - ENG_GATES_MODE=${ENG_GATES_MODE:-block}
+      - ENG_GATES_REQUIRED=${ENG_GATES_REQUIRED:-1}
+      - CHECKPOINTER=${CHECKPOINTER:-postgres}
+      - TOOLS_ALLOW_UNGATED=${TOOLS_ALLOW_UNGATED:-0}
+      - TOOLS_ALLOW_CLIENT_ROLE=${TOOLS_ALLOW_CLIENT_ROLE:-0}
 
   metrics-dashboard:
     build:
@@ -120,6 +175,45 @@ services:
     environment:
       - PLATFORM_DSN=host=postgres port=5432 dbname=platform user=platform password=platform
       - LITELLM_DSN=host=postgres port=5432 dbname=litellm user=platform password=platform
+      # 治理档位与开关（详见 .env.prod.example 与 21 号文档）
+      - PLATFORM_ENV=${PLATFORM_ENV:-prod}
+      - SERVICE_AUTH_MODE=${SERVICE_AUTH_MODE:-token}
+      - SERVICE_AUTH_TOKEN=${SERVICE_AUTH_TOKEN:?必须在 .env.prod 配置}
+      - TRUST_PROXY_AUTH=${TRUST_PROXY_AUTH:-1}
+      - GATE_DECISION_VERIFY=${GATE_DECISION_VERIFY:-block}
+      - ENG_GATES_MODE=${ENG_GATES_MODE:-block}
+      - ENG_GATES_REQUIRED=${ENG_GATES_REQUIRED:-1}
+      - CHECKPOINTER=${CHECKPOINTER:-postgres}
+      - TOOLS_ALLOW_UNGATED=${TOOLS_ALLOW_UNGATED:-0}
+      - TOOLS_ALLOW_CLIENT_ROLE=${TOOLS_ALLOW_CLIENT_ROLE:-0}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  process-mining:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE: process-mining
+    image: platform/process-mining:latest
+    restart: unless-stopped
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8006"]
+    env_file: [.env.prod]
+    environment:
+      - APPROVAL_GATEWAY_URL=http://approval-gateway:8000
+      - GITLAB_BRIDGE_URL=http://gitlab-bridge:8001
+      # 治理档位与开关（详见 .env.prod.example 与 21 号文档）
+      - PLATFORM_ENV=${PLATFORM_ENV:-prod}
+      - SERVICE_AUTH_MODE=${SERVICE_AUTH_MODE:-token}
+      - SERVICE_AUTH_TOKEN=${SERVICE_AUTH_TOKEN:?必须在 .env.prod 配置}
+      - TRUST_PROXY_AUTH=${TRUST_PROXY_AUTH:-1}
+      - GATE_DECISION_VERIFY=${GATE_DECISION_VERIFY:-block}
+      - ENG_GATES_MODE=${ENG_GATES_MODE:-block}
+      - ENG_GATES_REQUIRED=${ENG_GATES_REQUIRED:-1}
+      - CHECKPOINTER=${CHECKPOINTER:-postgres}
+      - TOOLS_ALLOW_UNGATED=${TOOLS_ALLOW_UNGATED:-0}
+      - TOOLS_ALLOW_CLIENT_ROLE=${TOOLS_ALLOW_CLIENT_ROLE:-0}
     depends_on:
       postgres:
         condition: service_healthy

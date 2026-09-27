@@ -101,12 +101,16 @@ def rule_dir() -> Path:
 def gate_mode(default: str = "warn") -> str:
     """读取全局灰度开关 `ENG_GATES_MODE`。
 
-    - 未设置 → 返回 `default`（调用方传规则自身的 mode）；
+    - 未设置 → 按**部署档位**取默认：`PLATFORM_ENV=prod` ⇒ `block`，否则用调用方给的
+      `default`（规则自身声明的 mode）。治理默认值取舍见 21 号文档：
+      生产环境"忘了配"不应该等于"闸门变装饰"。
     - 设置了非法值 → **按 warn 处理并告警**：该变量是灰度/熔断开关，
       配置笔误绝不能让流水线被硬阻断（阻断必须来自明确的意图）。
     """
     raw = (os.getenv("ENG_GATES_MODE", "") or "").strip().lower()
     if not raw:
+        if os.getenv("PLATFORM_ENV", "").strip().lower() == "prod":
+            return "block"
         return default
     if raw in SUPPORTED_MODES:
         return raw

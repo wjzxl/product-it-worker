@@ -58,6 +58,9 @@ def base_env(args) -> dict:
     """统一注入环境（闸门口径、持久化、知识库、跨服务地址）。"""
     env = dict(os.environ)
     env.update({
+        # 部署档位：本机一键起栈 = dev（宽松但可见，见 21 号文档）。
+        # 显式写出来，避免"以为在跑生产档位"这种自欺。
+        "PLATFORM_ENV": os.getenv("PLATFORM_ENV", "dev"),
         # 工程闸门：默认 warn —— 先收真实样本，别一上来就 block
         "ENG_GATES_MODE": args.gates_mode,
         "ENG_GATES_REQUIRED": os.getenv("ENG_GATES_REQUIRED", "0"),
@@ -95,7 +98,7 @@ def base_env(args) -> dict:
 
 
 def show_config(env: dict, args) -> None:
-    interesting = ("ENG_GATES_MODE", "ENG_GATES_REQUIRED", "CHECKPOINTER", "DEFAULT_TENANT",
+    interesting = ("PLATFORM_ENV", "ENG_GATES_MODE", "ENG_GATES_REQUIRED", "CHECKPOINTER", "DEFAULT_TENANT",
                    "DATABASE_URL", "RUNS_DB_URL", "KB_COLLECTION", "EMBEDDING_MODEL")
     print("生效配置：")
     for key in interesting:

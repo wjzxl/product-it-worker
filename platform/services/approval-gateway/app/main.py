@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from .db import Base, SessionLocal, engine
 from .router import router
 from .sweeper import sweep
-from .service_auth import install_service_auth
+from .service_auth import install_service_auth, security_posture
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -164,7 +164,8 @@ app.include_router(router)
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "service": "approval-gateway", "version": "0.1.0"}
+    return {"status": "ok", "service": "approval-gateway", "version": "0.1.0",
+            "security": security_posture("approval-gateway")}
 
 
 # Web 审批台（静态单页，挂载在最后，不影响 /docs 与 API 路由）

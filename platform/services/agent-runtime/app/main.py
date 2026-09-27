@@ -29,7 +29,7 @@ from .llm import llm_from_env
 from .prompts import active_versions, get_prompt
 from .sop import FlowContext, build_dev_graph, build_graph, build_ops_graph, build_test_graph
 from .tester import TestEngine
-from .service_auth import install_service_auth
+from .service_auth import install_service_auth, security_posture
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -638,6 +638,8 @@ def create_app(
             "version": "0.3.0",
             # WP7：如实说明"状态存哪里"——内存态不能声称支持重启恢复
             "checkpointer": checkpointer_describe(),
+            # 治理姿态：宽松必须是看得见的（PLATFORM_ENV=dev 时这里会列出全部未开开关）
+            "security": security_posture("agent-runtime"),
         }
 
     return app

@@ -17,7 +17,8 @@
 | `warn`（本地默认） | 带了 approval_id 就核验并不符即拒；没带则放行 + WARNING |
 | `block`（生产默认） | 必须带 approval_id 且核验通过，否则 409 |
 
-默认值随 `SERVICE_AUTH_MODE` 走：`SERVICE_AUTH_MODE=token` ⇒ `block`，否则 `warn`。
+默认值随**部署档位**走（`PLATFORM_ENV`）：`staging`/`prod` ⇒ `block`，`dev` ⇒ `warn`；
+档位未设时再看 `SERVICE_AUTH_MODE`（`token` ⇒ `block`），以兼容只设了令牌的老部署。
 """
 from __future__ import annotations
 
@@ -25,6 +26,8 @@ import logging
 import os
 
 from fastapi import status
+
+from .service_auth import platform_env, resolve_setting
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +55,14 @@ def mode() -> str:
     explicit = os.getenv("GATE_DECISION_VERIFY", "").strip().lower()
     if explicit in ("off", "warn", "block"):
         return explicit
-    return "block" if os.getenv("SERVICE_AUTH_MODE", "off").lower() == "token" else "warn"
+    # 档位优先（PLATFORM_ENV=prod 自动 block）；未设档位时退回"看令牌模式"以免老部署变松
+    resolved = resolve_setting("GATE_DECISION_VERIFY", dev="warn", staging="block", prod="block")
+    if resolved in ("off", "warn", "block"):
+        if resolved != os.getenv("GATE_DECISION_VERIFY", "") and platform_env() == "dev" \
+                and os.getenv("SERVICE_AUTH_MODE", "off").lower() == "token":
+            return "block"
+        return resolved
+    return "warn"
 
 
 def verify(approval: dict, *, approval_id: str, decision: str, node: str = "", task_ref: str = "") -> None:

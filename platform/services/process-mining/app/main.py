@@ -38,7 +38,7 @@ from .algorithms import (
 from .apply import apply_action, config_path, record_improvement
 from .mining import mine
 from .proposals import generate
-from .service_auth import install_service_auth
+from .service_auth import install_service_auth, security_posture
 
 from .service_auth import outbound_headers
 
@@ -211,4 +211,5 @@ def applied_history() -> dict:
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "service": "process-mining", "version": "0.1.0"}
+    return {"status": "ok", "service": "process-mining", "version": "0.1.0",
+            "security": security_posture("process-mining")}

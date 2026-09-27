@@ -17,7 +17,7 @@ from pydantic import BaseModel
 
 from . import console
 from .metrics import collect
-from .service_auth import install_service_auth
+from .service_auth import install_service_auth, security_posture
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
@@ -36,7 +36,8 @@ def metrics() -> dict:
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "service": "metrics-dashboard", "version": "0.1.0"}
+    return {"status": "ok", "service": "metrics-dashboard", "version": "0.1.0",
+            "security": security_posture("metrics-dashboard")}
 
 
 class DecideIn(BaseModel):
