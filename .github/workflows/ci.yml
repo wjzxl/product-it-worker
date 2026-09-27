@@ -58,3 +58,25 @@ jobs:
       - name: 项目规则包校验
         working-directory: platform
         run: python scripts/check_project_rules.py
+
+  # 治理体检：鉴权覆盖、鉴权模块漂移、部署档位——都是纯标准库脚本，不需要装依赖。
+  # 这些检查此前只存在于仓库里、没有任何地方会跑它们，等于没有。
+  governance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+      - name: 端点鉴权清点（无鉴权写接口必须为 0）
+        working-directory: platform
+        run: python scripts/audit_endpoint_auth.py --strict
+      - name: 服务间鉴权模块无漂移
+        working-directory: platform
+        run: python scripts/sync_service_auth.py --check
+      - name: 部署档位体检（自检：prod 该拦的必须拦）
+        working-directory: platform
+        run: python scripts/check_deployment_readiness.py --selftest
+      - name: 生产档位模板必须是"可上线"的
+        working-directory: platform
+        run: python scripts/check_deployment_readiness.py --env-file .env.prod.example
