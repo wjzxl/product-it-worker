@@ -18,6 +18,9 @@ dependencies = [
     "pyjwt>=2.8",
     "cryptography>=41,<45",  # 本机 Python 3.9 需预编译 wheel（>=45 无 wheel）
     "python-multipart>=0.0.9",  # WP5 证据上传（Form/File）
+    # 平台库（approval-gateway / task-center / agent-runtime 共享）的迁移工具。
+    # 迁移目录在仓库级 platform/migrations/，用本服务的 venv 运行（见该目录 README）。
+    "alembic>=1.13",
 ]
 
 [project.optional-dependencies]

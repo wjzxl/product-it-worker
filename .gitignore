@@ -11,6 +11,11 @@ venv/
 # 本地数据与密钥（严禁入库）
 *.db
 .env
+# 真实部署配置一律不入库：`.env.prod` / `.env.staging` / `.env.dev` 都不匹配上面的 `.env`
+# （gitignore 的 `.env` 只匹配同名文件），漏掉这条会把生产密钥提交上去
+.env.*
+!.env.example
+!*.env.example
 *.local
 
 # Node（未来 Web 控制台）
@@ -19,6 +24,9 @@ dist/
 
 # 证据工件（本地卷；元数据在 PG，工件不入库）
 platform/evidence/
+
+# 数据库备份（体积大且含业务数据；生产应放对象存储，不入库）
+platform/backups/
 
 # WP7 运行归档（本地 sqlite；生产用 DATABASE_URL 指向 PG）
 platform/services/agent_runs.db

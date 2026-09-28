@@ -48,7 +48,7 @@ SERVICE_TOKEN_HEADER_HTTP = "X-Service-Token"
 class ServiceAuthConfig:
     """每次请求实时读环境变量（配置热更新与测试注入都简单）。"""
 
-    def __init__(self, extra_exempt: tuple[str, ...] = ()) -> None:
+    def __init__(self, extra_exempt: tuple[str, ...] = (), static_dir=None) -> None:
         self.platform_env = platform_env()
         self.mode = resolve_setting("SERVICE_AUTH_MODE", dev="off", staging="token", prod="token").lower()
         self.token = os.getenv("SERVICE_AUTH_TOKEN", "")
@@ -57,7 +57,17 @@ class ServiceAuthConfig:
         # 它在入口剥离同名头的前提下才成立，默认打开等于替部署方做了一个它可能没做的假设。
         self.trust_proxy = resolve_bool("TRUST_PROXY_AUTH", dev=False, staging=False, prod=False)
         raw = os.getenv("SERVICE_AUTH_EXEMPT", "")
-        self.exempt = DEFAULT_EXEMPT + tuple(extra_exempt) + tuple(p.strip() for p in raw.split(",") if p.strip())
+        # 静态页面的资源按**目录实际内容**豁免，而不是硬编码文件名：
+        # 硬编码的结果是"加一个 app.js 就忘了加豁免 → 页面白屏"（这个坑真的踩到了）。
+        # 静态资源不含业务数据，且逐文件精确匹配，不会扩大暴露面。
+        static_exempt: tuple[str, ...] = ()
+        if static_dir is not None:
+            try:
+                static_exempt = tuple(f"/{f.name}" for f in sorted(static_dir.iterdir()) if f.is_file())
+            except OSError:
+                static_exempt = ()
+        self.exempt = (DEFAULT_EXEMPT + tuple(extra_exempt) + static_exempt
+                       + tuple(p.strip() for p in raw.split(",") if p.strip()))
         for entry in self.exempt:  # "/" 当前缀会豁免一切 —— 只允许它做精确匹配，其余照常
             if entry == "":
                 raise ValueError("SERVICE_AUTH_EXEMPT 含空项（会豁免所有路径）")
@@ -208,9 +218,10 @@ def _constant_eq(a: str, b: str) -> bool:
     return hmac.compare_digest(a.encode(), b.encode())
 
 
-def check_request(request: "Request", extra_exempt: tuple[str, ...] = ()) -> tuple[bool, str]:
+def check_request(request: "Request", extra_exempt: tuple[str, ...] = (),
+                  static_dir=None) -> tuple[bool, str]:
     """返回 (是否放行, 原因)。抽成纯函数，便于单测与在别处复用。"""
-    cfg = ServiceAuthConfig(extra_exempt)
+    cfg = ServiceAuthConfig(extra_exempt, static_dir)
     if cfg.mode != "token":
         return True, "mode=off"
     if _is_exempt(request.url.path, cfg.exempt):
@@ -229,19 +240,23 @@ def check_request(request: "Request", extra_exempt: tuple[str, ...] = ()) -> tup
     return False, "missing-or-invalid-credential"
 
 
-def install_service_auth(app: "FastAPI", service: str, extra_exempt: tuple[str, ...] = ()) -> None:
+def install_service_auth(app: "FastAPI", service: str, extra_exempt: tuple[str, ...] = (),
+                         static_dir=None) -> None:
     """挂上统一鉴权中间件。**每个服务都必须在 create_app 里调用**。
 
     `extra_exempt` 用于"自带签名校验的入站 webhook"（GitLab `/webhooks/gitlab`、
-    IM 卡片 `/callbacks/im`、Alertmanager `/alerts/prometheus`）与纯静态审批台页面。
+    IM 卡片 `/callbacks/im`、Alertmanager `/alerts/prometheus`）。
     加豁免前先确认那条路径真的验了签名——否则豁免就是后门。
+
+    `static_dir` 用于"纯静态控制台页面"：目录里每个文件按文件名精确豁免，
+    因此**新增一个 js/css 不会让页面白屏**（硬编码文件名踩过这个坑）。
 
     档位（`PLATFORM_ENV`）：
     - `dev`（默认）：宽松，启动打 WARNING 说明"当前无服务间鉴权"；
     - `staging`/`prod`：默认 `token`，且**没有任何凭据时直接拒绝启动**——
       "跑着但看起来有鉴权"比"根本没起"危险得多（后者一定会被发现）。
     """
-    cfg = ServiceAuthConfig(extra_exempt)
+    cfg = ServiceAuthConfig(extra_exempt, static_dir)
     posture = security_posture(service)
 
     if cfg.mode == "token" and not (cfg.token or cfg.static_token or cfg.trust_proxy):
@@ -269,7 +284,7 @@ def install_service_auth(app: "FastAPI", service: str, extra_exempt: tuple[str, 
     async def _service_auth_guard(request: "Request", call_next):  # type: ignore[no-untyped-def]
         from fastapi.responses import JSONResponse
 
-        allowed, reason = check_request(request, extra_exempt)
+        allowed, reason = check_request(request, extra_exempt, static_dir)
         if not allowed:
             if reason.startswith("misconfigured"):
                 logger.error("%s 鉴权配置错误：%s", service, reason)

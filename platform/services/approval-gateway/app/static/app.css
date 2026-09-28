@@ -1,0 +1,39 @@
+/* 平台审批台样式（安全专项：从 index.html 内联 <style> 移出，以便 CSP 使用 style-src 'self'） */
+:root { --bg:#f5f6f8; --card:#fff; --border:#e3e5e8; --primary:#2f6fed; --danger:#d54941;
+        --warn:#e6a23c; --text:#1f2329; --muted:#8a919f; }
+* { box-sizing: border-box; margin: 0; }
+body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+       background: var(--bg); color: var(--text); }
+header { background: var(--card); border-bottom: 1px solid var(--border); padding: 14px 24px;
+         display: flex; align-items: center; gap: 12px; }
+header h1 { font-size: 18px; }
+.badge { background: var(--primary); color: #fff; border-radius: 10px; padding: 2px 10px; font-size: 12px; }
+.version { color: var(--muted); font-size: 12px; }
+/* 治理姿态：宽松模式必须显眼（PLATFORM_ENV=dev 时提示闸门/鉴权是松的） */
+.posture { margin-left: auto; background: #fff7e6; border: 1px solid var(--warn); color: #8a6100;
+           border-radius: 6px; padding: 4px 10px; font-size: 12px; }
+main { max-width: 1080px; margin: 24px auto; display: grid; grid-template-columns: 1fr 1fr;
+       gap: 20px; padding: 0 16px; }
+.panel { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+.panel h2 { font-size: 15px; margin-bottom: 12px; }
+.row { padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 8px;
+       cursor: pointer; }
+.row:hover { border-color: var(--primary); }
+.row.active { border-color: var(--primary); background: #f0f5ff; }
+.row .stage { font-weight: 600; font-size: 14px; }
+.row .id { color: var(--muted); font-weight: 400; }
+.row .meta { color: var(--muted); font-size: 12px; margin-top: 4px; }
+.field { margin-bottom: 12px; }
+.field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.field pre { white-space: pre-wrap; font-size: 13px; background: #f7f8fa; padding: 10px;
+             border-radius: 6px; font-family: inherit; word-break: break-word; }
+.actions { display: flex; gap: 10px; margin-top: 8px; }
+button { padding: 8px 16px; border-radius: 6px; border: 1px solid var(--border); background: #fff;
+         cursor: pointer; font-size: 14px; }
+button.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+button.warn { background: var(--warn); color: #fff; border-color: var(--warn); }
+button.danger { background: var(--danger); color: #fff; border-color: var(--danger); }
+button:disabled { opacity: .5; cursor: not-allowed; }
+.empty { color: var(--muted); text-align: center; padding: 30px 0; }
+#toast { position: fixed; top: 16px; right: 16px; background: #30353d; color: #fff;
+         padding: 10px 16px; border-radius: 6px; }

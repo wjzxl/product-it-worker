@@ -80,3 +80,27 @@ jobs:
       - name: 生产档位模板必须是"可上线"的
         working-directory: platform
         run: python scripts/check_deployment_readiness.py --env-file .env.prod.example
+      - name: 生产配置生成器自检（密钥必须真的被生成、占位值必须被拦）
+        working-directory: platform
+        run: python scripts/init_prod_env.py --selftest
+      - name: 备份/恢复脚本自检（无 docker 时必须明确报 INVALID）
+        working-directory: platform
+        run: python scripts/backup_restore.py --selftest
+
+  # 迁移体检：模型改了没补迁移必须红。需要 alembic（在 approval-gateway 的依赖里）
+  migrations:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+          cache: pip
+      - name: Install
+        working-directory: platform/services/approval-gateway
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: 模型与迁移零漂移 + 空库可建 + 可回滚
+        working-directory: platform
+        run: python scripts/check_migrations.py --selftest

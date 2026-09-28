@@ -156,8 +156,10 @@ app = FastAPI(
     description="统一审批状态机 + Web/IM 双通道 + 超时升级（设计文档 03 §3）",
     version="0.1.0",
 )
-# IM 卡片回调自带飞书签名校验、Web 审批台是纯静态页，故豁免这两类路径
-install_service_auth(app, "approval-gateway", extra_exempt=("/callbacks/im", "/index.html", "/"))
+# IM 卡片回调自带飞书签名校验；审批台是纯静态页，其资源按**目录内容**豁免
+# （新增 js/css 时不需要记得回来改豁免清单——漏改的表现是页面白屏）
+install_service_auth(app, "approval-gateway", extra_exempt=("/callbacks/im", "/"),
+                     static_dir=Path(__file__).parent / "static")
 
 app.include_router(router)
 
