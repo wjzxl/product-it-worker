@@ -84,6 +84,7 @@ services/approval-gateway/.venv/bin/python scripts/gate_readiness.py           #
 | [20-业务确认落地记录](20-业务确认落地记录.md) | E1 六项检查（3 critical，含两个豁免口）、模糊词表可配置化（B1–B4）、误拦反馈流程与可信度门槛（C1–C5）、warn→block 就绪度检查（D2）、临时默认值待确认清单 |
 | [21-治理默认值取舍与部署档位](21-治理默认值取舍与部署档位.md) | 严格 vs 开发便利的取舍：按「失败后果是否可逆」分档；收拢到 `PLATFORM_ENV=dev|staging|prod` 一个旋钮；`/health` 暴露安全姿态、prod 缺凭据拒绝启动、上线体检脚本卡点；含 4 项不可协商清单与代价说明 |
 | [22-上线前最小路径与验收记录](22-上线前最小路径与验收记录.md) | 回答「能不能正式运行」：审批台 XSS、生产配置生成器、备份恢复演练、Alembic 迁移四步的落地证据，以及必须由业主走的 5–8 步与试点边界 |
+| [平台运维手册（部署/回滚/故障）](platform/ops/deploy-rollback.md) | 部署顺序、回滚的三岔口、常见故障对照表、值班升级约定；另含健康看门狗 `scripts/watch_health.py` 的两条告警通道 |
 
 ## 建议阅读顺序
 

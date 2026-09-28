@@ -25,6 +25,7 @@ TEMPLATE = PLATFORM / ".env.prod.example"
 
 # 自动生成强随机的项（值是"共享密钥"性质，人编不出来也不该人编）
 GENERATED = {
+    "POSTGRES_PASSWORD": "数据库口令（会同时替换下面三条 DSN 里的占位值）",
     "SERVICE_AUTH_TOKEN": "服务间令牌",
     "WEBHOOK_SECRET": "GitLab webhook 密钥",
     "ALERT_WEBHOOK_SECRET": "告警 webhook 密钥",
@@ -42,8 +43,6 @@ HUMAN_REQUIRED = {
     "GITLAB_URL": "GitLab 地址（内网或 gitlab.com）",
     "GITLAB_TOKEN": "GitLab 访问令牌",
     "QWEN_API_KEY": "通义千问 Key（或换成你们在用的模型 Key）",
-    "PLATFORM_DSN": "PG 连接串（平台库）",
-    "LITELLM_DSN": "PG 连接串（LiteLLM 计量库）",
 }
 
 # 占位值的三种形态：空、change-me 开头（模板习惯）、内含 example.com（示例域名/地址）。
@@ -62,9 +61,12 @@ def generate(template: Path, out: Path, force: bool) -> int:
         return 1
     text = template.read_text(encoding="utf-8")
     replaced: list[str] = []
+    pg_password = ""
     for key, why in GENERATED.items():
         prefix = "sk" if key.endswith("MASTER_KEY") else "pst"
         value = _gen(prefix)
+        if key == "POSTGRES_PASSWORD":
+            pg_password = value
         pattern = re.compile(rf"^{re.escape(key)}=.*$", flags=re.M)
         if pattern.search(text):
             text = pattern.sub(f"{key}={value}", text)
@@ -72,6 +74,9 @@ def generate(template: Path, out: Path, force: bool) -> int:
         else:
             text = text.rstrip("\n") + f"\n{key}={value}\n"
             replaced.append(f"{key}（{why}，模板里原本没有，已追加）")
+    # 库口令只生成一次，同时替换三条连接串里的占位值（避免"改了密码忘了改 DSN"）
+    if pg_password:
+        text = text.replace("change-me-pg-password", pg_password)
     out.write_text(text, encoding="utf-8")
     os.chmod(out, stat.S_IRUSR | stat.S_IWUSR)   # 600：密钥文件不该被同机其它账号读到
     print(f"已生成 {out}（权限 600），自动生成 {len(replaced)} 项：")

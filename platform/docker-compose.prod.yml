@@ -31,9 +31,16 @@ services:
     image: platform/approval-gateway:latest
     restart: unless-stopped
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    # 健康检查：容器「活着」不等于「能用」——/health 会报 checkpointer、知识库降级、治理姿态
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     env_file: [.env.prod]
     environment:
-      - DATABASE_URL=postgresql+psycopg://platform:platform@postgres:5432/platform
+      - DATABASE_URL=${PLATFORM_DATABASE_URL:?必须在 .env.prod 配置（含数据库口令）}
       - PUBLISH_TARGETS=http://task-center:8002/events
       - AUTH_MODE=${AUTH_MODE:-oidc}
       - DEFAULT_TENANT=${DEFAULT_TENANT:-default}
@@ -61,6 +68,13 @@ services:
     image: platform/gitlab-bridge:latest
     restart: unless-stopped
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]
+    # 健康检查：容器「活着」不等于「能用」——/health 会报 checkpointer、知识库降级、治理姿态
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     env_file: [.env.prod]
     environment:
       - WEBHOOK_SECRET=${WEBHOOK_SECRET:?必须在 .env.prod 配置}
@@ -87,9 +101,16 @@ services:
     image: platform/task-center:latest
     restart: unless-stopped
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8002"]
+    # 健康检查：容器「活着」不等于「能用」——/health 会报 checkpointer、知识库降级、治理姿态
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8002/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     env_file: [.env.prod]
     environment:
-      - DATABASE_URL=postgresql+psycopg://platform:platform@postgres:5432/platform
+      - DATABASE_URL=${PLATFORM_DATABASE_URL:?必须在 .env.prod 配置（含数据库口令）}
       - AGENT_RUNTIME_URL=http://agent-runtime:8003
       - OPS_PROJECT_ID=${OPS_PROJECT_ID:-}
       # 治理档位与开关（详见 .env.prod.example 与 21 号文档）
@@ -116,6 +137,13 @@ services:
     image: platform/agent-runtime:latest
     restart: unless-stopped
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8003"]
+    # 健康检查：容器「活着」不等于「能用」——/health 会报 checkpointer、知识库降级、治理姿态
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8003/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     env_file: [.env.prod]
     environment:
       - APPROVAL_GATEWAY_URL=http://approval-gateway:8000
@@ -147,6 +175,13 @@ services:
     image: platform/knowledge-base:latest
     restart: unless-stopped
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8004"]
+    # 健康检查：容器「活着」不等于「能用」——/health 会报 checkpointer、知识库降级、治理姿态
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8004/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     env_file: [.env.prod]
     environment:
       - QDRANT_URL=http://qdrant:6333
@@ -171,10 +206,17 @@ services:
     image: platform/metrics-dashboard:latest
     restart: unless-stopped
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8005"]
+    # 健康检查：容器「活着」不等于「能用」——/health 会报 checkpointer、知识库降级、治理姿态
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8005/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     env_file: [.env.prod]
     environment:
-      - PLATFORM_DSN=host=postgres port=5432 dbname=platform user=platform password=platform
-      - LITELLM_DSN=host=postgres port=5432 dbname=litellm user=platform password=platform
+      - PLATFORM_DSN=${PLATFORM_DSN:?必须在 .env.prod 配置}
+      - LITELLM_DSN=${LITELLM_DSN:?必须在 .env.prod 配置}
       # 治理档位与开关（详见 .env.prod.example 与 21 号文档）
       - PLATFORM_ENV=${PLATFORM_ENV:-prod}
       - SERVICE_AUTH_MODE=${SERVICE_AUTH_MODE:-token}
@@ -199,6 +241,13 @@ services:
     image: platform/process-mining:latest
     restart: unless-stopped
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8006"]
+    # 健康检查：容器「活着」不等于「能用」——/health 会报 checkpointer、知识库降级、治理姿态
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8006/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     env_file: [.env.prod]
     environment:
       - APPROVAL_GATEWAY_URL=http://approval-gateway:8000
@@ -217,6 +266,26 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+  # 平台自身的健康看门狗：定时问每个服务的 /health，异常时发飞书 / 建运维任务。
+  # 只依赖 python 标准库，所以直接用官方 slim 镜像挂载脚本，不需要为它构建服务镜像。
+  watchdog:
+    image: python:3.9-slim
+    container_name: platform-watchdog
+    restart: unless-stopped
+    command: ["python", "/scripts/watch_health.py", "--loop", "--interval", "${WATCH_INTERVAL:-60}"]
+    volumes:
+      - ./scripts:/scripts:ro
+    environment:
+      # 容器内用服务名 + 内部端口（与上面的 command 端口一致）
+      - WATCH_TARGETS=approval-gateway=http://approval-gateway:8000,gitlab-bridge=http://gitlab-bridge:8001,task-center=http://task-center:8002,agent-runtime=http://agent-runtime:8003,knowledge-base=http://knowledge-base:8004,metrics-dashboard=http://metrics-dashboard:8005,process-mining=http://process-mining:8006
+      # 通知通道：飞书机器人 webhook（外部通道，平台全挂时也能发出去）
+      - ALERT_NOTIFY_WEBHOOK=${ALERT_NOTIFY_WEBHOOK:-}
+      # 平台自己的告警入口（吃自己的狗粮：故障 → 运维任务）；task-center 也挂了时它会失败，故非唯一通道
+      - TASK_CENTER_URL=http://task-center:8002
+      - ALERT_WEBHOOK_SECRET=${ALERT_WEBHOOK_SECRET:?必须在 .env.prod 配置}
+    depends_on:
+      - approval-gateway
 
 volumes:
   caddy_data:

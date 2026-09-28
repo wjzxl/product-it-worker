@@ -86,6 +86,9 @@ jobs:
       - name: 备份/恢复脚本自检（无 docker 时必须明确报 INVALID）
         working-directory: platform
         run: python scripts/backup_restore.py --selftest
+      - name: 健康看门狗自检（判级、去重、通知送达）
+        working-directory: platform
+        run: python scripts/watch_health.py --selftest
 
   # 迁移体检：模型改了没补迁移必须红。需要 alembic（在 approval-gateway 的依赖里）
   migrations:
