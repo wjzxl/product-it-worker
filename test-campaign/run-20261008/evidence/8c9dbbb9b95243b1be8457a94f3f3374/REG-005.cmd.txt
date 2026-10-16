@@ -1,0 +1,9 @@
+$ bash test-campaign/probes.sh gate-persist
+exit: 0
+duration_ms: 248.0
+--- stdout ---
+audit rows before=1 after_a_persist_false_check=2
+RESULT: PASS every gate check is persisted
+
+--- stderr ---
+

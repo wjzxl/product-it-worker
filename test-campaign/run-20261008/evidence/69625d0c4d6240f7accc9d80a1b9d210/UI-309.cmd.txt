@@ -1,0 +1,30 @@
+$ python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui/UI-309 --report-json evidence/ui/UI-309/report.json --only UI-309 --baselines baselines
+exit: 1
+duration_ms: 2601.6
+--- stdout ---
+套件      : 审批台（人做决策的界面）  (http://127.0.0.1:18001)
+  UI-309     FAIL   在界面上完成一次决策（浏览器端到端）
+             ! 断言失败：expected to find text '审批已处理' | 实际观测："平台审批台\nPhase 0\nv0.1.0\n⚠ dev 档位：1 项治理开关未开（仅限内部试用）\n访问令牌（已配置的个人 JWT 或静态访问令牌）  登录 / 刷新 仅保留在本页内存，刷新页面后清除\n待审批
+  UI-301     NONE   审批台加载：静态外壳可见、登录后可列出待办且无控制台报错
+             ! not selected
+  UI-302     NONE   待审列表渲染出已存在的审批单（数据链路可用）
+             ! not selected
+  UI-303     NONE   点击审批单后详情渲染三要素（做了什么/依据/风险自评）
+             ! not selected
+  UI-304     NONE   XSS 载荷只作为文本出现：不生成元素、不执行脚本
+             ! not selected
+  UI-305     NONE   审批台可访问性：按钮有可访问名（屏幕阅读器可用）
+             ! not selected
+  UI-306     NONE   视觉基线：审批台外壳（列表为动态区，已遮蔽）
+             ! not selected
+  UI-307     NONE   视觉比对负向控制：注入真实样式缺陷必须被发现
+             ! not selected
+  UI-308     NONE   无令牌时必须显示鉴权错误，不得伪装成空审批队列
+             ! not selected
+
+结果      : {'FAIL': 1, 'NOT_EXECUTED': 8}
+截图      : 1 张 -> evidence/ui/UI-309/screenshots
+报告      : evidence/ui/UI-309/report.json
+
+--- stderr ---
+

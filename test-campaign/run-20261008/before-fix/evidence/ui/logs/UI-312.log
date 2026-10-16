@@ -1,0 +1,9 @@
+# UI-312 队列渲染出真实待决策事项（含深链动作按钮）
+started 2026-10-08T15:10:07+0800
+
+step 1 goto ok  [http://127.0.0.1:18015/]
+step 2 wait_for_text ok  [待决策队列]
+step 3 assert_js ok  [js -> True]
+step 4 assert_js ok  [js -> True]
+
+screenshot: screenshots/UI-312-151007.png

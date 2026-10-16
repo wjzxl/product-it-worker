@@ -21,6 +21,7 @@ import argparse
 import concurrent.futures
 import datetime
 import json
+import os
 import subprocess
 import sys
 import urllib.error
@@ -31,8 +32,12 @@ DEFAULT_TC = "http://127.0.0.1:18004"
 TOKEN = "pst-sut-token"
 
 
+HUMAN_TOKEN = os.getenv("AUTH_STATIC_TOKEN", "pst-sut-personal-token")
+
+
 def _post(url: str, body: dict, token: str, tenant: str = "") -> int:
-    headers = {"Content-Type": "application/json", "X-Service-Token": token}
+    # 决策类接口要求人类凭据；**不可与服务令牌同带**（同时带会被判 invalid-personal-bearer）
+    headers = {"Content-Type": "application/json", "Authorization": "Bearer " + HUMAN_TOKEN}
     if tenant:
         headers["X-Tenant"] = tenant
     req = urllib.request.Request(url, data=json.dumps(body).encode(), headers=headers, method="POST")

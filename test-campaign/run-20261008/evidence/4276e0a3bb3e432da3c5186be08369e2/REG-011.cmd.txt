@@ -1,0 +1,8 @@
+$ bash test-campaign/probes.sh reject-archive
+exit: 2
+duration_ms: 332.0
+--- stdout ---
+INVALID: could not record the human decision (HTTP 401)
+
+--- stderr ---
+

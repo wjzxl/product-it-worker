@@ -1,0 +1,8 @@
+$ bash probes-authz.sh tools-selfdeclared
+exit: 1
+duration_ms: 90.3
+--- stdout ---
+FINDING: 请求体自带的 allow_ungated 被采信（reason=）——人审依据可由调用方自行豁免
+
+--- stderr ---
+

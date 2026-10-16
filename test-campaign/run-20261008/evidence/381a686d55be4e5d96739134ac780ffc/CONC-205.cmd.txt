@@ -1,0 +1,9 @@
+$ bash probes-concurrency.sh evidence-race
+exit: 1
+duration_ms: 350.5
+--- stdout ---
+uploads=6 failed=6 rows_inserted=0
+FINDING: concurrent evidence upload lost artifacts (failed=6 inserted=0)
+
+--- stderr ---
+

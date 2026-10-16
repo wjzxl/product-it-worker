@@ -1,0 +1,9 @@
+$ for f in '' index.html app.js app.css; do curl -s -o /dev/null -w "$f=%{http_code} " http://127.0.0.1:18001/$f; done; echo; curl -s -o /dev/null -w 'api=%{http_code}\n' http://127.0.0.1:18001/approvals
+exit: 0
+duration_ms: 99.8
+--- stdout ---
+=200 index.html=200 app.js=200 app.css=200 
+api=401
+
+--- stderr ---
+

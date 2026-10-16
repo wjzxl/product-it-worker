@@ -1,0 +1,114 @@
+{
+ "suite": "运营驾驶舱（决策台）",
+ "base_url": "http://127.0.0.1:18015",
+ "tests": [
+  {
+   "id": "UI-311",
+   "title": "经入口代理后驾驶舱可读，并渲染待决策队列与 KPI",
+   "priority": "P0",
+   "screenshot": "always",
+   "steps": [
+    {
+     "action": "goto",
+     "url": "/"
+    },
+    {
+     "action": "wait_for_text",
+     "value": "待决策队列",
+     "timeout": 15
+    },
+    {
+     "action": "assert_text",
+     "value": "平台度量面板"
+    },
+    {
+     "action": "assert_text",
+     "value": "误拦率"
+    },
+    {
+     "action": "assert_visible",
+     "selector": "table"
+    },
+    {
+     "action": "assert_no_console_errors"
+    }
+   ]
+  },
+  {
+   "id": "UI-312",
+   "title": "队列渲染出真实待决策事项（含深链动作按钮）",
+   "priority": "P0",
+   "screenshot": "always",
+   "steps": [
+    {
+     "action": "goto",
+     "url": "/"
+    },
+    {
+     "action": "wait_for_text",
+     "value": "待决策队列",
+     "timeout": 15
+    },
+    {
+     "action": "assert_js",
+     "js": "document.querySelectorAll('table')[0].querySelectorAll('tr').length > 1"
+    },
+    {
+     "action": "assert_js",
+     "js": "/approval|gate_block|run_waiting/.test(document.body.innerText) || document.body.innerText.includes('当前没有待决策事项')"
+    }
+   ]
+  },
+  {
+   "id": "UI-313",
+   "title": "驾驶舱可访问性树可用（表格与标题可被读出）",
+   "priority": "P2",
+   "screenshot": "always",
+   "steps": [
+    {
+     "action": "goto",
+     "url": "/"
+    },
+    {
+     "action": "wait_for_text",
+     "value": "待决策队列",
+     "timeout": 15
+    },
+    {
+     "action": "snapshot"
+    },
+    {
+     "action": "assert_visible",
+     "selector": "role=table"
+    }
+   ]
+  },
+  {
+   "id": "UI-314",
+   "title": "视觉基线：驾驶舱标题区（数据区为动态，已排除）",
+   "priority": "P2",
+   "screenshot": "always",
+   "steps": [
+    {
+     "action": "goto",
+     "url": "/"
+    },
+    {
+     "action": "wait_for_text",
+     "value": "待决策队列",
+     "timeout": 15
+    },
+    {
+     "action": "wait_ms",
+     "value": 500
+    },
+    {
+     "action": "visual",
+     "name": "dashboard-title",
+     "selector": "h1",
+     "max_diff_ratio": 0.05
+    }
+   ]
+  }
+ ]
+}

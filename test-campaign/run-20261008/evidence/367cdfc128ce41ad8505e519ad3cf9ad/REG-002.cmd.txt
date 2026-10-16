@@ -1,0 +1,8 @@
+$ bash test-campaign/probes.sh cross-tenant-read
+exit: 2
+duration_ms: 85.1
+--- stdout ---
+INVALID: could not create approval
+
+--- stderr ---
+

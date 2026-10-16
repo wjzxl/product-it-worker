@@ -1,0 +1,9 @@
+$ bash test-campaign/probes.sh resubmit-tenant
+exit: 0
+duration_ms: 435.9
+--- stdout ---
+before=pending resubmit_as_tenantB_http=401 after=pending
+RESULT: PASS resubmit honours tenant scope
+
+--- stderr ---
+

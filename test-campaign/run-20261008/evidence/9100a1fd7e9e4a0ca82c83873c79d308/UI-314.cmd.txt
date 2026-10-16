@@ -1,0 +1,20 @@
+$ python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/dashboard-suite.json --out-dir evidence/ui --only UI-314 --baselines baselines
+exit: 0
+duration_ms: 2466.7
+--- stdout ---
+套件      : 运营驾驶舱（决策台）  (http://127.0.0.1:18015)
+  UI-314     PASS   视觉基线：驾驶舱标题区（数据区为动态，已排除）
+  UI-311     NONE   经入口代理后驾驶舱可读，并渲染待决策队列与 KPI
+             ! not selected
+  UI-312     NONE   队列渲染出真实待决策事项（含深链动作按钮）
+             ! not selected
+  UI-313     NONE   驾驶舱可访问性树可用（表格与标题可被读出）
+             ! not selected
+
+结果      : {'NOT_EXECUTED': 3, 'PASS': 1}
+截图      : 1 张 -> evidence/ui/screenshots
+视觉回归  : {'MATCH': 1} (基线 4 张于 /Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008/baselines)
+报告      : evidence/ui/browser-report.json
+
+--- stderr ---
+

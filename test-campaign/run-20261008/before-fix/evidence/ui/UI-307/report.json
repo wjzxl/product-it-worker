@@ -1,0 +1,113 @@
+{
+  "suite": "审批台（人做决策的界面）",
+  "base_url": "http://127.0.0.1:18001",
+  "started_at": "2026-10-08T15:13:54+0800",
+  "finished_at": "2026-10-08T15:14:05+0800",
+  "headless": true,
+  "environment": {
+    "platform": "macOS-26.7-x86_64-i386-64bit",
+    "python": "3.9.6",
+    "chrome": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "chrome_version": "Google Chrome 154.0.8037.98"
+  },
+  "blocked_reason": null,
+  "tests": [
+    {
+      "id": "UI-307",
+      "title": "视觉比对负向控制：注入真实样式缺陷必须被发现",
+      "layer": "e2e",
+      "priority": "P0",
+      "verdict": "PASS",
+      "expected": "全部步骤通过且页面无控制台错误",
+      "actual": "6 个步骤全部通过",
+      "duration_ms": 8994.7,
+      "steps": [
+        "goto: http://127.0.0.1:18001/",
+        "wait_for: .panel",
+        "change_baseline: 变更前截图：change-probe/UI-307/console-negative-control.png",
+        "eval: \"injected\"",
+        "wait_ms: Nonems",
+        "assert_visual_changed: [DIFF] console-negative-control: 1119850 of 1296000 pixels differ (86.408% > 0.200% allowed) (1119850 px, 1 处区域)"
+      ],
+      "evidence": [
+        {
+          "kind": "screenshot",
+          "path": "screenshots/UI-307-151405.png",
+          "detail": "UI-307 界面截图"
+        },
+        {
+          "kind": "log",
+          "path": "logs/UI-307.log",
+          "detail": "逐步操作与页面控制台"
+        }
+      ],
+      "tags": [],
+      "executed_at": "2026-10-08T15:14:05+0800"
+    }
+  ],
+  "visual": {
+    "baseline_dir": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008/baselines",
+    "baselines_available": 3,
+    "update_requested": false,
+    "tally": {},
+    "results": []
+  },
+  "accessibility": {
+    "snapshots": 0,
+    "summary": []
+  },
+  "change_checks": {
+    "count": 1,
+    "confirmed": 1,
+    "results": [
+      {
+        "name": "console-negative-control",
+        "current": "evidence/ui/UI-307/screenshots/changed-console-negative-control.png",
+        "baseline": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008/evidence/ui/UI-307/change-probe/UI-307/console-negative-control.png",
+        "pixel_threshold": 0.02,
+        "max_diff_ratio": 0.002,
+        "full_page": false,
+        "masks": [],
+        "checked_at": "2026-10-08T15:13:57+0800",
+        "masks_applied": [],
+        "reason": "1119850 of 1296000 pixels differ (86.408% > 0.200% allowed)",
+        "width": 1440,
+        "height": 900,
+        "total_pixels": 1296000,
+        "diff_pixels": 1119850,
+        "diff_ratio": 0.86408179,
+        "max_channel_delta": 255,
+        "mean_channel_delta": 190.5891,
+        "passed": false,
+        "size": [
+          1440,
+          900
+        ],
+        "baseline_size": [
+          1440,
+          900
+        ],
+        "verdict": "DIFF",
+        "regions": [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1440,
+            "height": 900,
+            "changed_pixels": 1119850
+          }
+        ],
+        "region_count": 1,
+        "diff_image": "evidence/ui/UI-307/visual-changed/negative-control/visual/console-negative-control/diff.png",
+        "baseline_image": "evidence/ui/UI-307/visual-changed/negative-control/visual/console-negative-control/baseline.png",
+        "current_image": "evidence/ui/UI-307/visual-changed/negative-control/visual/console-negative-control/current.png",
+        "test": "UI-307",
+        "negative_control": true
+      }
+    ]
+  },
+  "tracing": {
+    "enabled": false,
+    "traces": []
+  }
+}

@@ -1,0 +1,9 @@
+$ python3 flows/run_flow.py --domain ops
+exit: 0
+duration_ms: 2990.1
+--- stdout ---
+RESULT: PASS 运维域：告警 → SOP → G5 挂起 → 人审决策被接受（批准后执行需 GitLab 凭证，本环境未覆盖）（approval=apv_050d0483e3f4）
+（耗时 2.9s）
+
+--- stderr ---
+

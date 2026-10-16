@@ -1,0 +1,8 @@
+$ python3 scripts/sync_service_auth.py --check
+exit: 0
+duration_ms: 92.7
+--- stdout ---
+OK: 7 个服务的 service_auth.py 与真源一致（798cca5bab10）
+
+--- stderr ---
+

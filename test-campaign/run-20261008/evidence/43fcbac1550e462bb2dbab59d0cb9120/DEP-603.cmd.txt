@@ -1,0 +1,8 @@
+$ cp .env.prod.example .env.prod && docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod config -q && echo 'RESULT: PASS 编排可解析'; rm -f .env.prod
+exit: 0
+duration_ms: 204.4
+--- stdout ---
+RESULT: PASS 编排可解析
+
+--- stderr ---
+

@@ -1,0 +1,9 @@
+$ python3 flows/run_flow.py --domain product
+exit: 0
+duration_ms: 354.2
+--- stdout ---
+RESULT: PASS 产品域：挂起 G1 → 人审否决 → 归档 rejected（approval=apv_1031b070e5f4，来源链条目=0）
+（耗时 0.2s）
+
+--- stderr ---
+

@@ -1,0 +1,173 @@
+{
+  "suite": "运营驾驶舱（决策台）",
+  "base_url": "http://127.0.0.1:18015",
+  "started_at": "2026-10-16T11:07:53+0800",
+  "finished_at": "2026-10-16T11:07:55+0800",
+  "headless": true,
+  "environment": {
+    "platform": "macOS-26.7-x86_64-i386-64bit",
+    "python": "3.9.6",
+    "chrome": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "chrome_version": "Google Chrome 155.0.8059.80"
+  },
+  "blocked_reason": null,
+  "tests": [
+    {
+      "id": "UI-314",
+      "title": "视觉基线：驾驶舱标题区（数据区为动态，已排除）",
+      "layer": "e2e",
+      "priority": "P2",
+      "verdict": "PASS",
+      "expected": "全部步骤通过且页面无控制台错误",
+      "actual": "4 个步骤全部通过",
+      "duration_ms": 1284.8,
+      "steps": [
+        "goto: http://127.0.0.1:18015/",
+        "wait_for_text: 待决策队列",
+        "wait_ms: Nonems",
+        "visual: [MATCH] dashboard-title: 0 of 38976 pixels differ (within tolerance)"
+      ],
+      "evidence": [
+        {
+          "kind": "screenshot",
+          "path": "36b5fa03454d464c80892b0ec1625e1e/screenshots/UI-314-110755.png",
+          "detail": "UI-314 界面截图",
+          "sha256": "3414fc292a8072c52f187c3e3ab7c30e1cfa7e1a94d99c81bc0c6d2090609989",
+          "attempt_id": "36b5fa03454d464c80892b0ec1625e1e",
+          "run_id": "36b5fa03454d464c80892b0ec1625e1e"
+        },
+        {
+          "kind": "log",
+          "path": "36b5fa03454d464c80892b0ec1625e1e/logs/UI-314.log",
+          "detail": "逐步操作与页面控制台",
+          "sha256": "d401b11252586de1bc5591ef95e424a0dd18dc5862512495d6c545f403a77eb8",
+          "attempt_id": "36b5fa03454d464c80892b0ec1625e1e",
+          "run_id": "36b5fa03454d464c80892b0ec1625e1e"
+        }
+      ],
+      "tags": [],
+      "executed_at": "2026-10-16T11:07:55+0800",
+      "visual": [
+        {
+          "name": "dashboard-title",
+          "current": "evidence/ui/36b5fa03454d464c80892b0ec1625e1e/screenshots/visual-dashboard-title.png",
+          "baseline": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008/baselines/dashboard-title.png",
+          "pixel_threshold": 0.02,
+          "max_diff_ratio": 0.05,
+          "full_page": false,
+          "masks": [],
+          "checked_at": "2026-10-16T11:07:55+0800",
+          "masks_applied": [],
+          "reason": "0 of 38976 pixels differ (within tolerance)",
+          "width": 1392,
+          "height": 28,
+          "total_pixels": 38976,
+          "diff_pixels": 0,
+          "diff_ratio": 0.0,
+          "max_channel_delta": 0,
+          "mean_channel_delta": 0.0,
+          "passed": true,
+          "size": [
+            1392,
+            28
+          ],
+          "baseline_size": [
+            1392,
+            28
+          ],
+          "verdict": "MATCH",
+          "test": "UI-314"
+        }
+      ],
+      "attempt_id": "36b5fa03454d464c80892b0ec1625e1e",
+      "run_id": "36b5fa03454d464c80892b0ec1625e1e"
+    },
+    {
+      "id": "UI-311",
+      "title": "经入口代理后驾驶舱可读，并渲染待决策队列与 KPI",
+      "priority": "P0",
+      "layer": "e2e",
+      "verdict": "NOT_EXECUTED",
+      "actual": "not selected",
+      "evidence": [],
+      "attempt_id": "36b5fa03454d464c80892b0ec1625e1e",
+      "run_id": "36b5fa03454d464c80892b0ec1625e1e"
+    },
+    {
+      "id": "UI-312",
+      "title": "队列渲染出真实待决策事项（含深链动作按钮）",
+      "priority": "P0",
+      "layer": "e2e",
+      "verdict": "NOT_EXECUTED",
+      "actual": "not selected",
+      "evidence": [],
+      "attempt_id": "36b5fa03454d464c80892b0ec1625e1e",
+      "run_id": "36b5fa03454d464c80892b0ec1625e1e"
+    },
+    {
+      "id": "UI-313",
+      "title": "驾驶舱可访问性树可用（表格与标题可被读出）",
+      "priority": "P2",
+      "layer": "e2e",
+      "verdict": "NOT_EXECUTED",
+      "actual": "not selected",
+      "evidence": [],
+      "attempt_id": "36b5fa03454d464c80892b0ec1625e1e",
+      "run_id": "36b5fa03454d464c80892b0ec1625e1e"
+    }
+  ],
+  "visual": {
+    "baseline_dir": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008/baselines",
+    "baselines_available": 4,
+    "update_requested": false,
+    "tally": {
+      "MATCH": 1
+    },
+    "results": [
+      {
+        "name": "dashboard-title",
+        "current": "evidence/ui/36b5fa03454d464c80892b0ec1625e1e/screenshots/visual-dashboard-title.png",
+        "baseline": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008/baselines/dashboard-title.png",
+        "pixel_threshold": 0.02,
+        "max_diff_ratio": 0.05,
+        "full_page": false,
+        "masks": [],
+        "checked_at": "2026-10-16T11:07:55+0800",
+        "masks_applied": [],
+        "reason": "0 of 38976 pixels differ (within tolerance)",
+        "width": 1392,
+        "height": 28,
+        "total_pixels": 38976,
+        "diff_pixels": 0,
+        "diff_ratio": 0.0,
+        "max_channel_delta": 0,
+        "mean_channel_delta": 0.0,
+        "passed": true,
+        "size": [
+          1392,
+          28
+        ],
+        "baseline_size": [
+          1392,
+          28
+        ],
+        "verdict": "MATCH",
+        "test": "UI-314"
+      }
+    ]
+  },
+  "accessibility": {
+    "snapshots": 0,
+    "summary": []
+  },
+  "change_checks": {
+    "count": 0,
+    "confirmed": 0,
+    "results": []
+  },
+  "tracing": {
+    "enabled": false,
+    "traces": []
+  },
+  "evidence_base": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008/evidence/ui"
+}

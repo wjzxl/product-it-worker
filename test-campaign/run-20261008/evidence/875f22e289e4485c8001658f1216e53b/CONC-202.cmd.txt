@@ -1,0 +1,8 @@
+$ STRESS_ROUNDS=6 STRESS_N=30 bash probes-concurrency.sh task-race-stress
+exit: 2
+duration_ms: 196.3
+--- stdout ---
+INVALID: HTTPError: HTTP Error 403: Forbidden（SUT 是否已启动？）
+
+--- stderr ---
+

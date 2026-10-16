@@ -1,0 +1,2808 @@
+{
+ "schema_version": "1.0",
+ "task": {
+  "mode": "release",
+  "decision": "当前 revision 能否从 NO_RELEASE 改为可发布（含上轮 7 个缺陷的修复验证）",
+  "scope": [
+   "七个服务 + 两个浏览器界面（审批台 / 驾驶舱）的功能与业务流",
+   "上轮 7 个缺陷的修复复验（DEF-001…DEF-007）",
+   "鉴权与并发正确性回归",
+   "迁移/备份/部署就绪",
+   "性能基线（健康端点 + 业务路径）与短程稳定性"
+  ],
+  "out_of_scope": [
+   "真实 LLM 质量与提示注入（SUT 使用确定性兜底 LLM）",
+   "真实飞书推送与真实 GitLab 仓库写入",
+   "公网 Caddy + 企业 SSO 的真实部署",
+   "多副本水平扩展与浏览器兼容性矩阵"
+  ],
+  "access": "disposable",
+  "constraints": [
+   "只对一次性环境 pst_sut 写入；测试数据带 camp1008 标记",
+   "被测系统仅在授权修复范围内改动，且必须逐卡复验"
+  ]
+ },
+ "campaign": {
+  "id": "camp-pst-20261008",
+  "name": "产品研发智能化平台 · 发布判定复测（第 2 次完整战役）",
+  "target": "http://127.0.0.1:18001",
+  "commit": "643e610",
+  "environment": "local-disposable (PG pst_sut + qdrant + 7 services)",
+  "run_marker": "camp1008",
+  "objective": "回答：当前 revision 是否可以从 NO_RELEASE 改为可发布；新增 UI 与性能两个此前未覆盖的维度。",
+  "out_of_scope": [
+   "真实 LLM 质量与提示注入（SUT 使用确定性兜底 LLM，模型质量未测）",
+   "真实飞书推送（无企业应用凭证）",
+   "真实 GitLab MR 全生命周期（无仓库令牌）",
+   "公网 Caddy + 企业 SSO 入口（本机无域名/证书/IdP）",
+   "多副本水平扩展（单实例环境）",
+   "浏览器兼容性矩阵（仅 Chrome 系）"
+  ],
+  "executed_by": "DSH deepseek-flash + full-system-testing skill",
+  "variables": {
+   "gw": "http://127.0.0.1:18001",
+   "rt": "http://127.0.0.1:18002",
+   "kb": "http://127.0.0.1:18003",
+   "tc": "http://127.0.0.1:18004",
+   "md": "http://127.0.0.1:18005",
+   "gl": "http://127.0.0.1:18006",
+   "pm": "http://127.0.0.1:18007",
+   "proxy": "http://127.0.0.1:18015",
+   "token": "pst-sut-token",
+   "marker": "camp1008"
+  },
+  "defaults": {
+   "timeout_ms": 180000
+  }
+ },
+ "features": [
+  {
+   "id": "F-health",
+   "name": "健康与治理姿态",
+   "priority": "P0",
+   "risk": "所有服务 /health 暴露档位/合规/checkpointer；探针与看门狗依赖它",
+   "entry_points": [
+    "GET /health ×7"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-authz",
+   "name": "服务间鉴权",
+   "priority": "P0",
+   "risk": "令牌中间件 + 显式豁免；缺失即所有写接口裸奔（历史缺陷根因）",
+   "entry_points": [
+    "X-Service-Token",
+    "SERVICE_AUTH_EXEMPT"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-gate",
+   "name": "人审闸门 G1–G7",
+   "priority": "P0",
+   "risk": "平台的核心承诺：AI 执行、人在闸门决策；被绕过则产品价值归零",
+   "entry_points": [
+    "POST /approvals",
+    "POST /approvals/{id}/decision",
+    "POST /callbacks/im/card"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-decision-verify",
+   "name": "决策依据核验",
+   "priority": "P0",
+   "risk": "恢复人审挂起必须出示真实决策，否则闸门形同虚设",
+   "entry_points": [
+    "POST /runs/{tid}/resume"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-enggate",
+   "name": "工程闸门 E1–E3",
+   "priority": "P0",
+   "risk": "规则即代码；mode 必须服务端权威、留痕强制",
+   "entry_points": [
+    "POST /eng-gates/{code}/check"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-taskfsm",
+   "name": "任务状态机与租户隔离",
+   "priority": "P0",
+   "risk": "多产品线共用平台的前提是租户隔离不可破",
+   "entry_points": [
+    "POST /tasks",
+    "POST /tasks/{id}/transition"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-event",
+   "name": "平台事件接入",
+   "priority": "P1",
+   "risk": "事件驱动状态联动；幂等与歧义处理决定数据一致性",
+   "entry_points": [
+    "POST /events"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-tools",
+   "name": "工具注册表与执行期鉴权",
+   "priority": "P0",
+   "risk": "AI 能改外部状态，权限边界必须由服务端判定",
+   "entry_points": [
+    "POST /tools/invoke"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-runtime",
+   "name": "Agent 运行与归档",
+   "priority": "P0",
+   "risk": "运行状态与成本是度量体系的唯一来源",
+   "entry_points": [
+    "POST /runs",
+    "GET /runs/{tid}/archive"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-evidence",
+   "name": "证据库",
+   "priority": "P1",
+   "risk": "验收结论要能复验（sha256），否则证据只是附件",
+   "entry_points": [
+    "POST /evidence",
+    "GET /evidence/verify"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-provenance",
+   "name": "需求来源链反查",
+   "priority": "P1",
+   "risk": "争论口径时能回查当初是谁在哪句话提的",
+   "entry_points": [
+    "GET /requirements/{ref}/provenance"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-mining",
+   "name": "流程挖掘与 SOP 自进化",
+   "priority": "P1",
+   "risk": "瓶颈→提案→G7→应用；错误应用会改掉流程配置",
+   "entry_points": [
+    "POST /mining/proposals",
+    "POST /mining/proposals/apply"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-ui-console",
+   "name": "审批台（人做决策的界面）",
+   "priority": "P0",
+   "risk": "审批人看到的就是它；静默空列表会让决策停摆",
+   "entry_points": [
+    "GET / (18001)",
+    "app.js/app.css"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-ui-dashboard",
+   "name": "驾驶舱（监督与介入）",
+   "priority": "P0",
+   "risk": "试点期唯一的全局视图；读不出等于没有视图",
+   "entry_points": [
+    "GET / (18005)"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-alert-ingest",
+   "name": "告警接入",
+   "priority": "P1",
+   "risk": "真实告警→运维任务→自动拉起 SOP；无验签则可被凭空触发",
+   "entry_points": [
+    "POST /alerts/prometheus"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-gitlab",
+   "name": "GitLab 双向集成",
+   "priority": "P1",
+   "risk": "入站 webhook 验签 + 出站 API；仓库写入权限在平台手里",
+   "entry_points": [
+    "POST /webhooks/gitlab",
+    "POST /gitlab/*"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-kb",
+   "name": "知识库入库与检索",
+   "priority": "P1",
+   "risk": "RAG 是运维域诊断的依据；来源必须可追溯",
+   "entry_points": [
+    "POST /documents",
+    "POST /search"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-migration",
+   "name": "数据库迁移与备份",
+   "priority": "P0",
+   "risk": "上线硬前提：空库可建、模型与迁移零漂移、可回滚、可恢复",
+   "entry_points": [
+    "alembic upgrade head",
+    "backup_restore.py"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-watchdog",
+   "name": "平台自监控与告警",
+   "priority": "P1",
+   "risk": "平台自己挂了要有人知道（试点期最尴尬的失败）",
+   "entry_points": [
+    "watch_health.py"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-deploy",
+   "name": "部署就绪与配置生成",
+   "priority": "P0",
+   "risk": "带着宽松开关上生产＝修复等于没修",
+   "entry_points": [
+    "check_deployment_readiness.py",
+    "init_prod_env.py"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  }
+ ],
+ "flows": [
+  {
+   "id": "FLOW-prod",
+   "name": "产品域：需求 → 澄清 → PRD → G1 人审",
+   "priority": "P0",
+   "actors": [
+    "AI 产品岗",
+    "人类审批人"
+   ],
+   "steps": [
+    "POST /runs（产品域）",
+    "生成 PRD 并创建 G1 审批",
+    "人在审批台批准/退回",
+    "POST /runs/{tid}/resume"
+   ],
+   "invariant": "每次 PRD 都有对应的人审决策；退回后版本递增而不是覆盖",
+   "failure_modes": [
+    "自述批准绕过闸门",
+    "归档丢失否决"
+   ]
+  },
+  {
+   "id": "FLOW-dev",
+   "name": "研发域：issue → 方案 → G2 → 编码 → MR → G3",
+   "priority": "P1",
+   "actors": [
+    "AI 研发岗",
+    "人类审批人",
+    "GitLab"
+   ],
+   "steps": [
+    "事件建任务",
+    "方案 + G2",
+    "编码（沙箱）",
+    "MR + G3"
+   ],
+   "invariant": "代码变更必须经过 G3 才合并",
+   "failure_modes": [
+    "跳过 G2/G3",
+    "沙箱内逃逸"
+   ]
+  },
+  {
+   "id": "FLOW-test",
+   "name": "测试域：独立用例 → 报告 → G4 发布决策",
+   "priority": "P1",
+   "actors": [
+    "AI 测试岗",
+    "人类审批人"
+   ],
+   "steps": [
+    "独立生成用例",
+    "执行并出报告",
+    "G4 决策"
+   ],
+   "invariant": "发布决策有人审留痕",
+   "failure_modes": [
+    "用例与研发同源（失去独立性）"
+   ]
+  },
+  {
+   "id": "FLOW-ops",
+   "name": "运维域：告警 → 任务 → RAG 诊断 → G5 → 执行 → G6 复盘",
+   "priority": "P0",
+   "actors": [
+    "Alertmanager",
+    "AI 运维岗",
+    "人类审批人"
+   ],
+   "steps": [
+    "POST /alerts/prometheus",
+    "自动触发 ops SOP",
+    "RAG 检索 Runbook",
+    "G5 变更审批",
+    "执行（受控）",
+    "G6 复盘"
+   ],
+   "invariant": "无验签不得建任务；变更执行必须有人审依据",
+   "failure_modes": [
+    "匿名告警拉栈",
+    "未审批执行变更"
+   ]
+  },
+  {
+   "id": "FLOW-platform",
+   "name": "平台域：挖掘 → 提案 → G7 → 应用 → 知识入库",
+   "priority": "P1",
+   "actors": [
+    "AI 平台岗",
+    "人类审批人"
+   ],
+   "steps": [
+    "挖掘瓶颈",
+    "生成提案",
+    "G7 审批",
+    "apply 改配置"
+   ],
+   "invariant": "未获批的提案不得改动 SOP 配置",
+   "failure_modes": [
+    "未批先应用",
+    "配置被改坏无回滚"
+   ]
+  },
+  {
+   "id": "FLOW-approve-ui",
+   "name": "人在审批台的决策（UI 端到端）",
+   "priority": "P0",
+   "actors": [
+    "人类审批人"
+   ],
+   "steps": [
+    "打开审批台",
+    "看到待审列表",
+    "查看三要素",
+    "批准/退回/拒绝",
+    "留痕可查"
+   ],
+   "invariant": "审批人看到的就是数据库里的真实待办；不得静默显示空",
+   "failure_modes": [
+    "静默空列表",
+    "渲染注入执行"
+   ]
+  }
+ ],
+ "requirements": [
+  {
+   "id": "REQ-001",
+   "title": "服务健康且如实报告自身状态（含治理姿态与 checkpointer）",
+   "priority": "P0",
+   "source": "设计文档 + 历史缺陷",
+   "feature_ids": [
+    "F-health"
+   ]
+  },
+  {
+   "id": "REQ-002",
+   "title": "未鉴权请求不得触达业务读写接口",
+   "priority": "P0",
+   "source": "设计文档 + 历史缺陷",
+   "feature_ids": [
+    "F-authz"
+   ]
+  },
+  {
+   "id": "REQ-003",
+   "title": "鉴权不得把服务间调用一起关掉",
+   "priority": "P0",
+   "source": "设计文档 + 历史缺陷",
+   "feature_ids": [
+    "F-authz"
+   ]
+  },
+  {
+   "id": "REQ-004",
+   "title": "人审闸门不可被自述决策绕过",
+   "priority": "P0",
+   "source": "设计文档 + 历史缺陷",
+   "feature_ids": [
+    "F-gate",
+    "F-decision-verify"
+   ]
+  },
+  {
+   "id": "REQ-005",
+   "title": "工程闸门宽严由服务端决定，且每次判定留痕",
+   "priority": "P0",
+   "source": "设计文档 + 历史缺陷",
+   "feature_ids": [
+    "F-enggate"
+   ]
+  },
+  {
+   "id": "REQ-006",
+   "title": "任务状态机拒绝非法流转，等待审批不得被跳过",
+   "priority": "P0",
+   "source": "设计文档 + 历史缺陷",
+   "feature_ids": [
+    "F-taskfsm"
+   ]
+  },
+  {
+   "id": "REQ-007",
+   "title": "跨租户读写必须被隔离",
+   "priority": "P0",
+   "source": "设计文档 + 历史缺陷",
+   "feature_ids": [
+    "F-taskfsm",
+    "F-gate"
+   ]
+  },
+  {
+   "id": "REQ-008",
+   "title": "并发下同一单据只产生一个决策（不重复写入）",
+   "priority": "P0",
+   "source": "设计文档 + 历史缺陷",
+   "feature_ids": [
+    "F-gate",
+    "F-taskfsm"
+   ]
+  },
+  {
+   "id": "REQ-009",
+   "title": "工具调用权限由服务端判定，不接受请求体自述",
+   "priority": "P0",
+   "source": "设计文档 + 历史缺陷",
+   "feature_ids": [
+    "F-tools"
+   ]
+  },
+  {
+   "id": "REQ-010",
+   "title": "运行结果与成本如实归档（否决可见）",
+   "priority": "P1",
+   "source": "设计文档 + 历史缺陷",
+   "feature_ids": [
+    "F-runtime"
+   ]
+  },
+  {
+   "id": "REQ-011",
+   "title": "证据可复验（哈希一致）",
+   "priority": "P1",
+   "source": "设计文档 + 历史缺陷",
+   "feature_ids": [
+    "F-evidence"
+   ]
+  },
+  {
+   "id": "REQ-012",
+   "title": "来源链可反查",
+   "priority": "P1",
+   "source": "设计文档 + 历史缺陷",
+   "feature_ids": [
+    "F-provenance"
+   ]
+  },
+  {
+   "id": "REQ-013",
+   "title": "流程挖掘结论正确且提案不会绕过 G7",
+   "priority": "P1",
+   "source": "设计文档 + 历史缺陷",
+   "feature_ids": [
+    "F-mining"
+   ]
+  },
+  {
+   "id": "REQ-014",
+   "title": "审批台在有数据时必须显示待办，且不得渲染注入内容",
+   "priority": "P0",
+   "source": "设计文档 + 历史缺陷",
+   "feature_ids": [
+    "F-ui-console"
+   ]
+  },
+  {
+   "id": "REQ-015",
+   "title": "驾驶舱在文档所述入口拓扑下可读",
+   "priority": "P0",
+   "source": "设计文档 + 历史缺陷",
+   "feature_ids": [
+    "F-ui-dashboard"
+   ]
+  },
+  {
+   "id": "REQ-016",
+   "title": "告警入口必须验签，未配密钥不得放行",
+   "priority": "P1",
+   "source": "设计文档 + 历史缺陷",
+   "feature_ids": [
+    "F-alert-ingest"
+   ]
+  },
+  {
+   "id": "REQ-017",
+   "title": "GitLab webhook 必须验签",
+   "priority": "P1",
+   "source": "设计文档 + 历史缺陷",
+   "feature_ids": [
+    "F-gitlab"
+   ]
+  },
+  {
+   "id": "REQ-018",
+   "title": "知识库入库/检索可用且来源可追溯",
+   "priority": "P1",
+   "source": "设计文档 + 历史缺陷",
+   "feature_ids": [
+    "F-kb"
+   ]
+  },
+  {
+   "id": "REQ-019",
+   "title": "空库可建、模型与迁移零漂移、可回滚、备份可恢复",
+   "priority": "P0",
+   "source": "设计文档 + 历史缺陷",
+   "feature_ids": [
+    "F-migration"
+   ]
+  },
+  {
+   "id": "REQ-020",
+   "title": "平台自身故障可被发现并通知",
+   "priority": "P1",
+   "source": "设计文档 + 历史缺陷",
+   "feature_ids": [
+    "F-watchdog"
+   ]
+  },
+  {
+   "id": "REQ-021",
+   "title": "生产档位下不得带着宽松开关上线",
+   "priority": "P0",
+   "source": "设计文档 + 历史缺陷",
+   "feature_ids": [
+    "F-deploy"
+   ]
+  },
+  {
+   "id": "REQ-022",
+   "title": "外部身份头不得被直连客户端伪造",
+   "priority": "P0",
+   "source": "设计文档 + 历史缺陷",
+   "feature_ids": [
+    "F-authz",
+    "F-ui-dashboard"
+   ]
+  }
+ ],
+ "quality_gates": [
+  {
+   "id": "G1",
+   "description": "所有 P0 卡通过",
+   "metric": "p0_pass_rate",
+   "comparator": "gte",
+   "threshold": 1.0
+  },
+  {
+   "id": "G2",
+   "description": "无未关闭的 BLOCKER/CRITICAL 缺陷",
+   "metric": "open_blocker_critical_count",
+   "comparator": "lte",
+   "threshold": 0
+  },
+  {
+   "id": "G3",
+   "description": "整体通过率 ≥ 85%",
+   "metric": "overall_pass_rate",
+   "comparator": "gte",
+   "threshold": 0.85
+  },
+  {
+   "id": "G4",
+   "description": "执行率 100%（不得有未执行卡）",
+   "metric": "execution_rate",
+   "comparator": "gte",
+   "threshold": 1.0
+  },
+  {
+   "id": "G5",
+   "description": "需求覆盖由**通过**的卡验证（独立验证覆盖率）",
+   "metric": "verified_coverage_rate",
+   "comparator": "gte",
+   "threshold": 0.9
+  }
+ ],
+ "cards": [
+  {
+   "id": "REG-001",
+   "title": "IM 回调必须验签（BUG-001）",
+   "repro": "bash test-campaign/probes.sh im-callback",
+   "layer": "api",
+   "priority": "P0",
+   "feature_ids": [
+    "F-gate"
+   ],
+   "requirement_ids": [
+    "REQ-004"
+   ],
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "expected": "im-callback 探针输出 RESULT: PASS",
+   "check": {
+    "type": "command",
+    "command": "bash test-campaign/probes.sh im-callback",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "im-callback 探针输出 RESULT: PASS"
+   }
+  },
+  {
+   "id": "REG-002",
+   "title": "跨租户读取被拒（BUG-002 同源）",
+   "repro": "bash test-campaign/probes.sh cross-tenant-read",
+   "layer": "api",
+   "priority": "P0",
+   "feature_ids": [
+    "F-taskfsm"
+   ],
+   "requirement_ids": [
+    "REQ-007"
+   ],
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "expected": "cross-tenant-read 探针输出 RESULT: PASS",
+   "check": {
+    "type": "command",
+    "command": "bash test-campaign/probes.sh cross-tenant-read",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "cross-tenant-read 探针输出 RESULT: PASS"
+   }
+  },
+  {
+   "id": "REG-003",
+   "title": "resubmit 遵守租户边界（BUG-002）",
+   "repro": "bash test-campaign/probes.sh resubmit-tenant",
+   "layer": "api",
+   "priority": "P1",
+   "feature_ids": [
+    "F-gate"
+   ],
+   "requirement_ids": [
+    "REQ-007"
+   ],
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "expected": "resubmit-tenant 探针输出 RESULT: PASS",
+   "check": {
+    "type": "command",
+    "command": "bash test-campaign/probes.sh resubmit-tenant",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "resubmit-tenant 探针输出 RESULT: PASS"
+   }
+  },
+  {
+   "id": "REG-004",
+   "title": "闸门模式不可被调用方覆盖（BUG-003）",
+   "repro": "bash test-campaign/probes.sh gate-mode",
+   "layer": "api",
+   "priority": "P0",
+   "feature_ids": [
+    "F-enggate"
+   ],
+   "requirement_ids": [
+    "REQ-005"
+   ],
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "expected": "gate-mode 探针输出 RESULT: PASS",
+   "check": {
+    "type": "command",
+    "command": "bash test-campaign/probes.sh gate-mode",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "gate-mode 探针输出 RESULT: PASS"
+   }
+  },
+  {
+   "id": "REG-005",
+   "title": "每次闸门判定都留痕（BUG-014）",
+   "repro": "bash test-campaign/probes.sh gate-persist",
+   "layer": "api",
+   "priority": "P0",
+   "feature_ids": [
+    "F-enggate"
+   ],
+   "requirement_ids": [
+    "REQ-005"
+   ],
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "expected": "gate-persist 探针输出 RESULT: PASS",
+   "check": {
+    "type": "command",
+    "command": "bash test-campaign/probes.sh gate-persist",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "gate-persist 探针输出 RESULT: PASS"
+   }
+  },
+  {
+   "id": "REG-006",
+   "title": "超时处置取服务端信任等级（BUG-004）",
+   "repro": "bash test-campaign/probes.sh timeout-auto",
+   "layer": "api",
+   "priority": "P0",
+   "feature_ids": [
+    "F-gate"
+   ],
+   "requirement_ids": [
+    "REQ-004"
+   ],
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "expected": "timeout-auto 探针输出 RESULT: PASS",
+   "check": {
+    "type": "command",
+    "command": "bash test-campaign/probes.sh timeout-auto",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "timeout-auto 探针输出 RESULT: PASS"
+   }
+  },
+  {
+   "id": "REG-007",
+   "title": "等待审批不得被无据流转（BUG-005）",
+   "repro": "bash test-campaign/probes.sh task-fsm",
+   "layer": "api",
+   "priority": "P0",
+   "feature_ids": [
+    "F-taskfsm"
+   ],
+   "requirement_ids": [
+    "REQ-006"
+   ],
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "expected": "task-fsm 探针输出 RESULT: PASS",
+   "check": {
+    "type": "command",
+    "command": "bash test-campaign/probes.sh task-fsm",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "task-fsm 探针输出 RESULT: PASS"
+   }
+  },
+  {
+   "id": "REG-008",
+   "title": "非法流转 409（FSM-002）",
+   "repro": "bash test-campaign/probes.sh task-fsm-illegal",
+   "layer": "api",
+   "priority": "P1",
+   "feature_ids": [
+    "F-taskfsm"
+   ],
+   "requirement_ids": [
+    "REQ-006"
+   ],
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "expected": "task-fsm-illegal 探针输出 RESULT: PASS",
+   "check": {
+    "type": "command",
+    "command": "bash test-campaign/probes.sh task-fsm-illegal",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "task-fsm-illegal 探针输出 RESULT: PASS"
+   }
+  },
+  {
+   "id": "REG-009",
+   "title": "任务详情租户隔离（BUG-006）",
+   "repro": "bash test-campaign/probes.sh task-tenant",
+   "layer": "api",
+   "priority": "P0",
+   "feature_ids": [
+    "F-taskfsm"
+   ],
+   "requirement_ids": [
+    "REQ-007"
+   ],
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "expected": "task-tenant 探针输出 RESULT: PASS",
+   "check": {
+    "type": "command",
+    "command": "bash test-campaign/probes.sh task-tenant",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "task-tenant 探针输出 RESULT: PASS"
+   }
+  },
+  {
+   "id": "REG-010",
+   "title": "重复外部引用不 500（BUG-015）",
+   "repro": "bash test-campaign/probes.sh task-dup-ref",
+   "layer": "api",
+   "priority": "P1",
+   "feature_ids": [
+    "F-taskfsm"
+   ],
+   "requirement_ids": [
+    "REQ-007"
+   ],
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "expected": "task-dup-ref 探针输出 RESULT: PASS",
+   "check": {
+    "type": "command",
+    "command": "bash test-campaign/probes.sh task-dup-ref",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "task-dup-ref 探针输出 RESULT: PASS"
+   }
+  },
+  {
+   "id": "REG-011",
+   "title": "被否决的运行归档可见（BUG-012）",
+   "repro": "bash test-campaign/probes.sh reject-archive",
+   "layer": "api",
+   "priority": "P0",
+   "feature_ids": [
+    "F-runtime"
+   ],
+   "requirement_ids": [
+    "REQ-010"
+   ],
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "expected": "reject-archive 探针输出 RESULT: PASS",
+   "check": {
+    "type": "command",
+    "command": "bash test-campaign/probes.sh reject-archive",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "reject-archive 探针输出 RESULT: PASS"
+   }
+  },
+  {
+   "id": "REG-012",
+   "title": "等待人审不得被 /wake 吞掉（BUG-007）",
+   "repro": "bash test-campaign/probes.sh wake-guard",
+   "layer": "api",
+   "priority": "P0",
+   "feature_ids": [
+    "F-runtime"
+   ],
+   "requirement_ids": [
+    "REQ-004"
+   ],
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "expected": "wake-guard 探针输出 RESULT: PASS",
+   "check": {
+    "type": "command",
+    "command": "bash test-campaign/probes.sh wake-guard",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "wake-guard 探针输出 RESULT: PASS"
+   }
+  },
+  {
+   "id": "REG-013",
+   "title": "启发式挖掘方向正确（BUG-008）",
+   "repro": "bash test-campaign/probes.sh heuristic",
+   "layer": "api",
+   "priority": "P1",
+   "feature_ids": [
+    "F-mining"
+   ],
+   "requirement_ids": [
+    "REQ-013"
+   ],
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "expected": "heuristic 探针输出 RESULT: PASS",
+   "check": {
+    "type": "command",
+    "command": "bash test-campaign/probes.sh heuristic",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "heuristic 探针输出 RESULT: PASS"
+   }
+  },
+  {
+   "id": "REG-014",
+   "title": "α 挖掘自洽（BUG-009）",
+   "repro": "bash test-campaign/probes.sh alpha",
+   "layer": "api",
+   "priority": "P1",
+   "feature_ids": [
+    "F-mining"
+   ],
+   "requirement_ids": [
+    "REQ-013"
+   ],
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "expected": "alpha 探针输出 RESULT: PASS",
+   "check": {
+    "type": "command",
+    "command": "bash test-campaign/probes.sh alpha",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "alpha 探针输出 RESULT: PASS"
+   }
+  },
+  {
+   "id": "REG-015",
+   "title": "DFG 一致性检出异常（BUG-010）",
+   "repro": "bash test-campaign/probes.sh dfg-conformance",
+   "layer": "api",
+   "priority": "P1",
+   "feature_ids": [
+    "F-mining"
+   ],
+   "requirement_ids": [
+    "REQ-013"
+   ],
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "expected": "dfg-conformance 探针输出 RESULT: PASS",
+   "check": {
+    "type": "command",
+    "command": "bash test-campaign/probes.sh dfg-conformance",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "dfg-conformance 探针输出 RESULT: PASS"
+   }
+  },
+  {
+   "id": "REG-016",
+   "title": "LLM 畸形输出回退规则（BUG-011）",
+   "repro": "bash test-campaign/probes.sh llm-fallback",
+   "layer": "api",
+   "priority": "P1",
+   "feature_ids": [
+    "F-mining"
+   ],
+   "requirement_ids": [
+    "REQ-013"
+   ],
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "expected": "llm-fallback 探针输出 RESULT: PASS",
+   "check": {
+    "type": "command",
+    "command": "bash test-campaign/probes.sh llm-fallback",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "llm-fallback 探针输出 RESULT: PASS"
+   }
+  },
+  {
+   "id": "REG-017",
+   "title": "证据上传与哈希复验（EVD）",
+   "repro": "bash test-campaign/probes.sh evidence",
+   "layer": "api",
+   "priority": "P1",
+   "feature_ids": [
+    "F-evidence"
+   ],
+   "requirement_ids": [
+    "REQ-011"
+   ],
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "expected": "evidence 探针输出 RESULT: PASS",
+   "check": {
+    "type": "command",
+    "command": "bash test-campaign/probes.sh evidence",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "evidence 探针输出 RESULT: PASS"
+   }
+  },
+  {
+   "id": "REG-018",
+   "title": "健康如实报告持久化形态（WP7）",
+   "repro": "bash test-campaign/probes.sh health-checkpointer",
+   "layer": "api",
+   "priority": "P1",
+   "feature_ids": [
+    "F-health"
+   ],
+   "requirement_ids": [
+    "REQ-001"
+   ],
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "expected": "health-checkpointer 探针输出 RESULT: PASS",
+   "check": {
+    "type": "command",
+    "command": "bash test-campaign/probes.sh health-checkpointer",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "health-checkpointer 探针输出 RESULT: PASS"
+   }
+  },
+  {
+   "id": "SEC-101",
+   "title": "写接口鉴权覆盖率为 100%（清点）",
+   "repro": "python3 platform/scripts/audit_endpoint_auth.py --strict",
+   "layer": "security",
+   "priority": "P0",
+   "feature_ids": [
+    "F-authz"
+   ],
+   "requirement_ids": [
+    "REQ-002"
+   ],
+   "risk": "有写接口无鉴权＝端口可达即有写权限",
+   "expected": "audit 输出“无鉴权 0 个”",
+   "check": {
+    "type": "command",
+    "command": "python3 platform/scripts/audit_endpoint_auth.py --strict",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "无鉴权 0 个"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "audit 输出“无鉴权 0 个”"
+   }
+  },
+  {
+   "id": "SEC-102",
+   "title": "无令牌的读写请求被拒，健康检查豁免",
+   "repro": "bash probes-authz.sh no-token",
+   "layer": "security",
+   "priority": "P0",
+   "feature_ids": [
+    "F-authz"
+   ],
+   "requirement_ids": [
+    "REQ-002"
+   ],
+   "risk": "鉴权未生效则所有治理开关形同虚设",
+   "expected": "探针输出 RESULT: PASS",
+   "check": {
+    "type": "command",
+    "command": "bash probes-authz.sh no-token",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "探针输出 RESULT: PASS"
+   }
+  },
+  {
+   "id": "SEC-103",
+   "title": "带令牌的审批与决策链路仍可用",
+   "repro": "bash probes-authz.sh with-token",
+   "layer": "security",
+   "priority": "P0",
+   "feature_ids": [
+    "F-authz"
+   ],
+   "requirement_ids": [
+    "REQ-003"
+   ],
+   "risk": "鉴权把功能一起关掉＝不可上线",
+   "expected": "探针输出 RESULT: PASS",
+   "check": {
+    "type": "command",
+    "command": "bash probes-authz.sh with-token",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "探针输出 RESULT: PASS"
+   }
+  },
+  {
+   "id": "SEC-104",
+   "title": "自述决策不得恢复人审挂起",
+   "repro": "bash probes-authz.sh resume-bypass",
+   "layer": "security",
+   "priority": "P0",
+   "feature_ids": [
+    "F-decision-verify"
+   ],
+   "requirement_ids": [
+    "REQ-004"
+   ],
+   "risk": "闸门可被绕过则平台核心价值归零",
+   "expected": "探针输出 RESULT: PASS",
+   "check": {
+    "type": "command",
+    "command": "bash probes-authz.sh resume-bypass",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "探针输出 RESULT: PASS"
+   }
+  },
+  {
+   "id": "SEC-105",
+   "title": "工具调用不接受请求体自述岗位/免人审",
+   "repro": "bash probes-authz.sh tools-selfdeclared",
+   "layer": "security",
+   "priority": "P0",
+   "feature_ids": [
+    "F-tools"
+   ],
+   "requirement_ids": [
+    "REQ-009"
+   ],
+   "risk": "自述权限＝没有权限边界",
+   "expected": "探针输出 RESULT: PASS",
+   "check": {
+    "type": "command",
+    "command": "bash probes-authz.sh tools-selfdeclared",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "探针输出 RESULT: PASS"
+   }
+  },
+  {
+   "id": "SEC-106",
+   "title": "告警 webhook 验签（无凭据/错密钥拒绝）",
+   "repro": "bash probes-authz.sh alert-signature",
+   "layer": "security",
+   "priority": "P1",
+   "feature_ids": [
+    "F-alert-ingest"
+   ],
+   "requirement_ids": [
+    "REQ-016"
+   ],
+   "risk": "无验签则可被凭空拉起运维 SOP",
+   "expected": "探针输出 RESULT: PASS",
+   "check": {
+    "type": "command",
+    "command": "bash probes-authz.sh alert-signature",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "探针输出 RESULT: PASS"
+   }
+  },
+  {
+   "id": "SEC-107",
+   "title": "令牌模式下审批台静态资源可达、业务接口仍需令牌",
+   "repro": "for f in '' index.html app.js app.css; do curl -s -o /dev/null -w \"$f=%{http_code} \" http://127.0.0.1:18001/$f; done; echo; curl -s -o /dev/null -w 'api=%{http_code}\\n' http://127.0.0.1:18001/approvals",
+   "layer": "security",
+   "priority": "P0",
+   "feature_ids": [
+    "F-ui-console",
+    "F-authz"
+   ],
+   "requirement_ids": [
+    "REQ-014"
+   ],
+   "risk": "资源被鉴权挡住会让审批台白屏（历史缺陷）",
+   "expected": "index/app.js/app.css 均 200 且 /approvals 401",
+   "check": {
+    "type": "command",
+    "command": "for f in '' index.html app.js app.css; do curl -s -o /dev/null -w \"$f=%{http_code} \" http://127.0.0.1:18001/$f; done; echo; curl -s -o /dev/null -w 'api=%{http_code}\\n' http://127.0.0.1:18001/approvals",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "app.js=200"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "index/app.js/app.css 均 200 且 /approvals 401"
+   }
+  },
+  {
+   "id": "SEC-108",
+   "title": "直连服务伪造入口身份头必须无效",
+   "repro": "curl -s -o /dev/null -w 'status=%{http_code}\\n' -H 'X-Platform-User: attacker' http://127.0.0.1:18005/",
+   "layer": "security",
+   "priority": "P0",
+   "feature_ids": [
+    "F-authz",
+    "F-ui-dashboard"
+   ],
+   "requirement_ids": [
+    "REQ-022"
+   ],
+   "risk": "TRUST_PROXY_AUTH 只在入口剥离同名头时成立；直连伪造得逞说明缺少纵深防御",
+   "expected": "伪造 X-Platform-User 直连驾驶舱应得 401",
+   "check": {
+    "type": "command",
+    "command": "curl -s -o /dev/null -w 'status=%{http_code}\\n' -H 'X-Platform-User: attacker' http://127.0.0.1:18005/",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "status=401"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "伪造 X-Platform-User 直连驾驶舱应得 401"
+   }
+  },
+  {
+   "id": "SEC-109",
+   "title": "GitLab webhook 未签名被拒、正确签名放行",
+   "repro": "curl -s -o /dev/null -w 'no_sig=%{http_code} ' -X POST http://127.0.0.1:18006/webhooks/gitlab -H 'Content-Type: application/json' -d '{\"object_kind\":\"issue\"}'; curl -s -o /dev/null -w 'signed=%{http_code}\\n' -X POST http://127.0.0.1:18006/webhooks/gitlab -H 'Content-Type: application/json' -H 'X-Gitlab-Token: pst-sut-webhook' -d '{\"object_kind\":\"issue\",\"project\":{\"id\":1,\"path_with_namespace\":\"a/b\"},\"object_attributes\":{\"iid\":1,\"title\":\"t\",\"action\":\"open\",\"labels\":[]}}'",
+   "layer": "security",
+   "priority": "P1",
+   "feature_ids": [
+    "F-gitlab"
+   ],
+   "requirement_ids": [
+    "REQ-017"
+   ],
+   "risk": "伪造 webhook 可凭空建任务/改状态",
+   "expected": "无签名 401、带 X-Gitlab-Token 200",
+   "check": {
+    "type": "command",
+    "command": "curl -s -o /dev/null -w 'no_sig=%{http_code} ' -X POST http://127.0.0.1:18006/webhooks/gitlab -H 'Content-Type: application/json' -d '{\"object_kind\":\"issue\"}'; curl -s -o /dev/null -w 'signed=%{http_code}\\n' -X POST http://127.0.0.1:18006/webhooks/gitlab -H 'Content-Type: application/json' -H 'X-Gitlab-Token: pst-sut-webhook' -d '{\"object_kind\":\"issue\",\"project\":{\"id\":1,\"path_with_namespace\":\"a/b\"},\"object_attributes\":{\"iid\":1,\"title\":\"t\",\"action\":\"open\",\"labels\":[]}}'",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "signed=200"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "无签名 401、带 X-Gitlab-Token 200"
+   }
+  },
+  {
+   "id": "CONC-201",
+   "title": "30 并发决策：恰好一个成功、一条决策",
+   "repro": "STRESS_ROUNDS=6 STRESS_N=30 bash probes-concurrency.sh decide-race-stress",
+   "layer": "stability",
+   "priority": "P0",
+   "feature_ids": [
+    "F-gate"
+   ],
+   "requirement_ids": [
+    "REQ-008"
+   ],
+   "risk": "并发重复决策会重复触发下游恢复与惩罚",
+   "expected": "命令输出 RESULT: PASS",
+   "check": {
+    "type": "command",
+    "command": "STRESS_ROUNDS=6 STRESS_N=30 bash probes-concurrency.sh decide-race-stress",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 600000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "命令输出 RESULT: PASS"
+   }
+  },
+  {
+   "id": "CONC-202",
+   "title": "30 并发流转：恰好一个成功、一条时间线",
+   "repro": "STRESS_ROUNDS=6 STRESS_N=30 bash probes-concurrency.sh task-race-stress",
+   "layer": "stability",
+   "priority": "P0",
+   "feature_ids": [
+    "F-taskfsm"
+   ],
+   "requirement_ids": [
+    "REQ-008"
+   ],
+   "risk": "并发流转会写坏状态机与时间线",
+   "expected": "命令输出 RESULT: PASS",
+   "check": {
+    "type": "command",
+    "command": "STRESS_ROUNDS=6 STRESS_N=30 bash probes-concurrency.sh task-race-stress",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 600000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "命令输出 RESULT: PASS"
+   }
+  },
+  {
+   "id": "CONC-203",
+   "title": "人工决策与超时扫描并发：不双决策",
+   "repro": "bash probes-concurrency.sh decide-vs-sweep 2>&1 | iconv -f utf-8 -t utf-8 -c",
+   "layer": "stability",
+   "priority": "P0",
+   "feature_ids": [
+    "F-gate"
+   ],
+   "requirement_ids": [
+    "REQ-008"
+   ],
+   "risk": "双决策会让审批出现两个终态",
+   "expected": "探针输出 RESULT: PASS",
+   "check": {
+    "type": "command",
+    "command": "bash probes-concurrency.sh decide-vs-sweep 2>&1 | iconv -f utf-8 -t utf-8 -c",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "探针输出 RESULT: PASS"
+   }
+  },
+  {
+   "id": "CONC-204",
+   "title": "IM 回调与 Web 决策并发：互斥",
+   "repro": "bash probes-concurrency.sh im-vs-decide",
+   "layer": "stability",
+   "priority": "P0",
+   "feature_ids": [
+    "F-gate"
+   ],
+   "requirement_ids": [
+    "REQ-008"
+   ],
+   "risk": "双通道同时决策会重复落库",
+   "expected": "探针输出 RESULT: PASS",
+   "check": {
+    "type": "command",
+    "command": "bash probes-concurrency.sh im-vs-decide",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "探针输出 RESULT: PASS"
+   }
+  },
+  {
+   "id": "CONC-205",
+   "title": "并发上传证据不丢件",
+   "repro": "bash probes-concurrency.sh evidence-race 2>&1 | iconv -f utf-8 -t utf-8 -c",
+   "layer": "stability",
+   "priority": "P1",
+   "feature_ids": [
+    "F-evidence"
+   ],
+   "requirement_ids": [
+    "REQ-011"
+   ],
+   "risk": "丢件等于验收证据不完整",
+   "expected": "探针输出 RESULT: PASS",
+   "check": {
+    "type": "command",
+    "command": "bash probes-concurrency.sh evidence-race 2>&1 | iconv -f utf-8 -t utf-8 -c",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "探针输出 RESULT: PASS"
+   }
+  },
+  {
+   "id": "UI-301",
+   "title": "审批台加载：静态外壳可见、无控制台报错",
+   "repro": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui/UI-301 --report-json evidence/ui/UI-301/report.json --only UI-301 --baselines baselines",
+   "layer": "e2e",
+   "priority": "P0",
+   "feature_ids": [
+    "F-ui-console"
+   ],
+   "requirement_ids": [
+    "REQ-014"
+   ],
+   "risk": "审批人看到的第一屏就是它",
+   "expected": "步骤全通过且页面无控制台错误",
+   "check": {
+    "type": "command",
+    "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui/UI-301 --report-json evidence/ui/UI-301/report.json --only UI-301 --baselines baselines",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "not_contains": "BLOCK"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "步骤全通过且页面无控制台错误"
+   }
+  },
+  {
+   "id": "UI-302",
+   "title": "待审列表必须显示真实待办（不得静默空）",
+   "repro": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui --only UI-302 --baselines baselines",
+   "layer": "e2e",
+   "priority": "P0",
+   "feature_ids": [
+    "F-ui-console"
+   ],
+   "requirement_ids": [
+    "REQ-014"
+   ],
+   "risk": "静默空列表会让审批人以为无事可做，闸门停摆且无人察觉",
+   "expected": "列表渲染出至少一条待审单据",
+   "check": {
+    "type": "command",
+    "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui --only UI-302 --baselines baselines",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "not_contains": "BLOCK"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "列表渲染出至少一条待审单据"
+   }
+  },
+  {
+   "id": "UI-303",
+   "title": "详情渲染三要素与动作按钮",
+   "repro": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui --only UI-303 --baselines baselines",
+   "layer": "e2e",
+   "priority": "P0",
+   "feature_ids": [
+    "F-ui-console"
+   ],
+   "requirement_ids": [
+    "REQ-014"
+   ],
+   "risk": "决策依据不完整＝人无法负责任地批准",
+   "expected": "详情出现①②③三要素与批准/拒绝按钮",
+   "check": {
+    "type": "command",
+    "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui --only UI-303 --baselines baselines",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "not_contains": "BLOCK"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "详情出现①②③三要素与批准/拒绝按钮"
+   }
+  },
+  {
+   "id": "UI-304",
+   "title": "XSS 载荷只作为文本出现，不生成元素、不执行",
+   "repro": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui --only UI-304 --baselines baselines",
+   "layer": "e2e",
+   "priority": "P0",
+   "feature_ids": [
+    "F-ui-console"
+   ],
+   "requirement_ids": [
+    "REQ-014"
+   ],
+   "risk": "审批人权限最高，在他的浏览器里执行脚本＝最高危",
+   "expected": "无 img/script 元素、无脚本执行、无控制台错误",
+   "check": {
+    "type": "command",
+    "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui --only UI-304 --baselines baselines",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "not_contains": "BLOCK"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "无 img/script 元素、无脚本执行、无控制台错误"
+   }
+  },
+  {
+   "id": "UI-305",
+   "title": "审批台可访问性：按钮有可访问名",
+   "repro": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui --only UI-305 --baselines baselines",
+   "layer": "e2e",
+   "priority": "P1",
+   "feature_ids": [
+    "F-ui-console"
+   ],
+   "requirement_ids": [
+    "REQ-014"
+   ],
+   "risk": "屏幕阅读器读不出动作按钮，等于部分人无法审批",
+   "expected": "accessibility tree 中存在名为“批准”“拒绝”的按钮",
+   "check": {
+    "type": "command",
+    "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui --only UI-305 --baselines baselines",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "not_contains": "BLOCK"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "accessibility tree 中存在名为“批准”“拒绝”的按钮"
+   }
+  },
+  {
+   "id": "UI-306",
+   "title": "视觉基线比对（审批台首屏）",
+   "repro": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui --only UI-306 --baselines baselines",
+   "layer": "e2e",
+   "priority": "P1",
+   "feature_ids": [
+    "F-ui-console"
+   ],
+   "requirement_ids": [
+    "REQ-014"
+   ],
+   "risk": "DOM 正确而屏幕坏掉是功能断言看不见的发布阻断项",
+   "expected": "与基线差异比例 ≤ 2%",
+   "check": {
+    "type": "command",
+    "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui --only UI-306 --baselines baselines",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "not_contains": "BLOCK"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "与基线差异比例 ≤ 2%"
+   }
+  },
+  {
+   "id": "UI-309",
+   "title": "在界面上完成一次决策（浏览器端到端）",
+   "repro": "python3 ui/seed.py --marker camp1008 >/dev/null && python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui/UI-309 --report-json evidence/ui/UI-309/report.json --only UI-309 --baselines baselines",
+   "layer": "e2e",
+   "priority": "P0",
+   "feature_ids": [
+    "F-ui-console",
+    "F-gate"
+   ],
+   "requirement_ids": [
+    "REQ-014",
+    "REQ-004"
+   ],
+   "risk": "控制台是人审的唯一界面；能列出但批不了等于闸门停摆",
+   "expected": "输入令牌后点击批准，页面提示已提交（原生 prompt 由测试替换）",
+   "check": {
+    "type": "command",
+    "command": "python3 ui/seed.py --marker camp1008 >/dev/null && python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui/UI-309 --report-json evidence/ui/UI-309/report.json --only UI-309 --baselines baselines",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "not_contains": "BLOCK"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "输入令牌后点击批准，页面提示已提交（原生 prompt 由测试替换）"
+   }
+  },
+  {
+   "id": "UI-308",
+   "title": "无令牌时必须显示鉴权错误，不得伪装成空审批队列",
+   "repro": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui/UI-308 --report-json evidence/ui/UI-308/report.json --only UI-308 --baselines baselines",
+   "layer": "e2e",
+   "priority": "P0",
+   "feature_ids": [
+    "F-ui-console"
+   ],
+   "requirement_ids": [
+    "REQ-014"
+   ],
+   "risk": "把 401 渲染成“暂无待审批事项”会让闸门静默停摆（上轮 DEF-001 的核心危害）",
+   "expected": "未登录时页面必须显示错误提示与“审批列表加载失败”，且不得出现空态文案",
+   "check": {
+    "type": "command",
+    "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui/UI-308 --report-json evidence/ui/UI-308/report.json --only UI-308 --baselines baselines",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "not_contains": "BLOCK"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "未登录时页面必须显示错误提示与“审批列表加载失败”，且不得出现空态文案"
+   }
+  },
+  {
+   "id": "UI-307",
+   "title": "视觉比对负向控制：注入样式缺陷必须被发现",
+   "repro": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui/UI-307 --report-json evidence/ui/UI-307/report.json --only UI-307 --baselines baselines",
+   "layer": "e2e",
+   "priority": "P0",
+   "feature_ids": [
+    "F-ui-console"
+   ],
+   "requirement_ids": [
+    "REQ-014"
+   ],
+   "risk": "一个恒返回“匹配”的比较器与健康界面产生完全相同的报告",
+   "expected": "改动基线样式后差异比例必须超过阈值",
+   "check": {
+    "type": "command",
+    "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui/UI-307 --report-json evidence/ui/UI-307/report.json --only UI-307 --baselines baselines",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "not_contains": "BLOCK"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "改动基线样式后差异比例必须超过阈值"
+   }
+  },
+  {
+   "id": "UI-311",
+   "title": "驾驶舱经入口代理可读并渲染队列",
+   "repro": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/dashboard-suite.json --out-dir evidence/ui --only UI-311 --baselines baselines",
+   "layer": "e2e",
+   "priority": "P0",
+   "feature_ids": [
+    "F-ui-dashboard"
+   ],
+   "requirement_ids": [
+    "REQ-015"
+   ],
+   "risk": "试点期唯一全局视图；读不出等于没有视图",
+   "expected": "页面出现待决策队列与误拦率文案",
+   "check": {
+    "type": "command",
+    "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/dashboard-suite.json --out-dir evidence/ui --only UI-311 --baselines baselines",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "not_contains": "BLOCK"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "页面出现待决策队列与误拦率文案"
+   }
+  },
+  {
+   "id": "UI-312",
+   "title": "驾驶舱队列渲染真实事项",
+   "repro": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/dashboard-suite.json --out-dir evidence/ui --only UI-312 --baselines baselines",
+   "layer": "e2e",
+   "priority": "P0",
+   "feature_ids": [
+    "F-ui-dashboard"
+   ],
+   "requirement_ids": [
+    "REQ-015"
+   ],
+   "risk": "空队列会让人误判“系统没问题”",
+   "expected": "表格存在且含 approval/gate_block/空态说明之一",
+   "check": {
+    "type": "command",
+    "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/dashboard-suite.json --out-dir evidence/ui --only UI-312 --baselines baselines",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "not_contains": "BLOCK"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "表格存在且含 approval/gate_block/空态说明之一"
+   }
+  },
+  {
+   "id": "UI-313",
+   "title": "驾驶舱可访问性树可用",
+   "repro": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/dashboard-suite.json --out-dir evidence/ui --only UI-313 --baselines baselines",
+   "layer": "e2e",
+   "priority": "P2",
+   "feature_ids": [
+    "F-ui-dashboard"
+   ],
+   "requirement_ids": [
+    "REQ-015"
+   ],
+   "risk": "表格结构对辅助技术可读",
+   "expected": "存在 role=table",
+   "check": {
+    "type": "command",
+    "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/dashboard-suite.json --out-dir evidence/ui --only UI-313 --baselines baselines",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "not_contains": "BLOCK"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "存在 role=table"
+   }
+  },
+  {
+   "id": "UI-314",
+   "title": "视觉基线比对（驾驶舱首屏）",
+   "repro": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/dashboard-suite.json --out-dir evidence/ui --only UI-314 --baselines baselines",
+   "layer": "e2e",
+   "priority": "P2",
+   "feature_ids": [
+    "F-ui-dashboard"
+   ],
+   "requirement_ids": [
+    "REQ-015"
+   ],
+   "risk": "样式回归的兜底",
+   "expected": "与基线差异比例 ≤ 5%",
+   "check": {
+    "type": "command",
+    "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/dashboard-suite.json --out-dir evidence/ui --only UI-314 --baselines baselines",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "not_contains": "BLOCK"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "与基线差异比例 ≤ 5%"
+   }
+  },
+  {
+   "id": "DATA-401",
+   "title": "迁移：空库可建 + 模型零漂移 + 可回滚",
+   "repro": "platform/services/approval-gateway/.venv/bin/python platform/scripts/check_migrations.py --selftest",
+   "layer": "data",
+   "priority": "P0",
+   "feature_ids": [
+    "F-migration"
+   ],
+   "requirement_ids": [
+    "REQ-019"
+   ],
+   "risk": "没有迁移路径＝改不动库、回不了滚",
+   "expected": "命令输出“迁移体检通过”",
+   "check": {
+    "type": "command",
+    "command": "platform/services/approval-gateway/.venv/bin/python platform/scripts/check_migrations.py --selftest",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "迁移体检通过"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "命令输出“迁移体检通过”"
+   }
+  },
+  {
+   "id": "DATA-402",
+   "title": "迁移与模型建表结果一致（零漂移）",
+   "repro": "python3 flows/schema_compare.py",
+   "layer": "data",
+   "priority": "P0",
+   "feature_ids": [
+    "F-migration"
+   ],
+   "requirement_ids": [
+    "REQ-019"
+   ],
+   "risk": "迁移与模型漂移会让新环境与老环境 schema 不同",
+   "expected": "命令输出“迁移与模型一致”",
+   "check": {
+    "type": "command",
+    "command": "python3 flows/schema_compare.py",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "迁移与模型一致"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "命令输出“迁移与模型一致”"
+   }
+  },
+  {
+   "id": "DATA-405",
+   "title": "运行归档与平台库同库（度量才看得到运行）",
+   "repro": "python3 flows/runs_db_check.py",
+   "layer": "data",
+   "priority": "P1",
+   "feature_ids": [
+    "F-migration",
+    "F-runtime"
+   ],
+   "requirement_ids": [
+    "REQ-019",
+    "REQ-010"
+   ],
+   "risk": "RUNS_DB_URL 与 DATABASE_URL 不一致时，运行归档落在别处：度量从平台库读会看到 0 次运行，而运维以为没有运行",
+   "expected": "运行时库应包含 agent_runs（或明确声明归档另存并在度量中体现）",
+   "check": {
+    "type": "command",
+    "command": "python3 flows/runs_db_check.py",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "运行时库应包含 agent_runs（或明确声明归档另存并在度量中体现）"
+   }
+  },
+  {
+   "id": "DATA-403",
+   "title": "备份可恢复（恢复演练）",
+   "repro": "python3 platform/scripts/backup_restore.py drill --dbs platform",
+   "layer": "data",
+   "priority": "P0",
+   "feature_ids": [
+    "F-migration"
+   ],
+   "requirement_ids": [
+    "REQ-019"
+   ],
+   "risk": "审计留痕只存在 PG 里，没有可验证的恢复路径＝出事无法收敛",
+   "expected": "命令输出“恢复演练通过”",
+   "check": {
+    "type": "command",
+    "command": "python3 platform/scripts/backup_restore.py drill --dbs platform",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "恢复演练通过"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "命令输出“恢复演练通过”"
+   }
+  },
+  {
+   "id": "DATA-404",
+   "title": "证据哈希复验：篡改可被发现",
+   "repro": "bash test-campaign/probes.sh evidence",
+   "layer": "data",
+   "priority": "P1",
+   "feature_ids": [
+    "F-evidence"
+   ],
+   "requirement_ids": [
+    "REQ-011"
+   ],
+   "risk": "证据不能复验就只是附件",
+   "expected": "篡改后 verify 报告 broken ≥ 1",
+   "check": {
+    "type": "command",
+    "command": "bash test-campaign/probes.sh evidence",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "篡改后 verify 报告 broken ≥ 1"
+   }
+  },
+  {
+   "id": "OPS-501",
+   "title": "看门狗判级/去重/通知自检",
+   "repro": "python3 platform/scripts/watch_health.py --selftest",
+   "layer": "other",
+   "priority": "P1",
+   "feature_ids": [
+    "F-watchdog"
+   ],
+   "requirement_ids": [
+    "REQ-020"
+   ],
+   "risk": "刷屏或漏报的告警等于没有告警",
+   "expected": "命令输出“自检通过”",
+   "check": {
+    "type": "command",
+    "command": "python3 platform/scripts/watch_health.py --selftest",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "自检通过"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "命令输出“自检通过”"
+   }
+  },
+  {
+   "id": "OPS-502",
+   "title": "看门狗对 7 服务判定为健康",
+   "repro": "WATCH_TARGETS='approval-gateway=http://127.0.0.1:18001,agent-runtime=http://127.0.0.1:18002,knowledge-base=http://127.0.0.1:18003,task-center=http://127.0.0.1:18004,metrics-dashboard=http://127.0.0.1:18005,gitlab-bridge=http://127.0.0.1:18006,process-mining=http://127.0.0.1:18007' WATCH_STATE_FILE=/tmp/wh-camp.json python3 platform/scripts/watch_health.py --once",
+   "layer": "other",
+   "priority": "P1",
+   "feature_ids": [
+    "F-watchdog"
+   ],
+   "requirement_ids": [
+    "REQ-020"
+   ],
+   "risk": "看门狗误报会让真故障被忽略",
+   "expected": "输出“平台健康：ok”",
+   "check": {
+    "type": "command",
+    "command": "WATCH_TARGETS='approval-gateway=http://127.0.0.1:18001,agent-runtime=http://127.0.0.1:18002,knowledge-base=http://127.0.0.1:18003,task-center=http://127.0.0.1:18004,metrics-dashboard=http://127.0.0.1:18005,gitlab-bridge=http://127.0.0.1:18006,process-mining=http://127.0.0.1:18007' WATCH_STATE_FILE=/tmp/wh-camp.json python3 platform/scripts/watch_health.py --once",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "平台健康：ok"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "输出“平台健康：ok”"
+   }
+  },
+  {
+   "id": "OPS-503",
+   "title": "7 个服务都暴露治理姿态",
+   "repro": "for p in 18001 18002 18003 18004 18005 18006 18007; do curl -s -m 5 -H 'X-Service-Token: pst-sut-token' http://127.0.0.1:$p/health | python3 -c 'import sys,json;d=json.load(sys.stdin);print(d[\"service\"],\"compliant=\"+str(d[\"security\"][\"compliant\"]))'; done",
+   "layer": "other",
+   "priority": "P1",
+   "feature_ids": [
+    "F-health",
+    "F-deploy"
+   ],
+   "requirement_ids": [
+    "REQ-001",
+    "REQ-021"
+   ],
+   "risk": "宽松不可见＝没人会发现自己在裸奔",
+   "expected": "7 个 /health 都含 security.compliant 字段",
+   "check": {
+    "type": "command",
+    "command": "for p in 18001 18002 18003 18004 18005 18006 18007; do curl -s -m 5 -H 'X-Service-Token: pst-sut-token' http://127.0.0.1:$p/health | python3 -c 'import sys,json;d=json.load(sys.stdin);print(d[\"service\"],\"compliant=\"+str(d[\"security\"][\"compliant\"]))'; done",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "compliant="
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "7 个 /health 都含 security.compliant 字段"
+   }
+  },
+  {
+   "id": "OPS-504",
+   "title": "生产档位缺凭据必须拒绝启动",
+   "repro": "cd platform/services/task-center && PLATFORM_ENV=prod SERVICE_AUTH_MODE= SERVICE_AUTH_TOKEN= AUTH_STATIC_TOKEN= TRUST_PROXY_AUTH= .venv/bin/python -c 'import app.main' 2>&1 | grep -q '拒绝启动' && echo 'RESULT: PASS 已拒绝启动'",
+   "layer": "other",
+   "priority": "P0",
+   "feature_ids": [
+    "F-deploy"
+   ],
+   "requirement_ids": [
+    "REQ-021"
+   ],
+   "risk": "带着“看起来有鉴权”的状态运行比起不来更危险",
+   "expected": "进程非 0 退出且日志含“拒绝启动”",
+   "check": {
+    "type": "command",
+    "command": "cd platform/services/task-center && PLATFORM_ENV=prod SERVICE_AUTH_MODE= SERVICE_AUTH_TOKEN= AUTH_STATIC_TOKEN= TRUST_PROXY_AUTH= .venv/bin/python -c 'import app.main' 2>&1 | grep -q '拒绝启动' && echo 'RESULT: PASS 已拒绝启动'",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "进程非 0 退出且日志含“拒绝启动”"
+   }
+  },
+  {
+   "id": "DEP-601",
+   "title": "上线体检：prod 模板必须可上线",
+   "repro": "python3 scripts/check_deployment_readiness.py --env-file .env.prod.example",
+   "layer": "other",
+   "priority": "P0",
+   "feature_ids": [
+    "F-deploy"
+   ],
+   "requirement_ids": [
+    "REQ-021"
+   ],
+   "risk": "生产带着宽松开关上线＝修复等于没修",
+   "expected": "命令输出“上线就绪”",
+   "check": {
+    "type": "command",
+    "command": "python3 scripts/check_deployment_readiness.py --env-file .env.prod.example",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "上线就绪"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/platform"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "命令输出“上线就绪”"
+   }
+  },
+  {
+   "id": "DEP-602",
+   "title": "生产配置生成器自检",
+   "repro": "python3 scripts/init_prod_env.py --selftest",
+   "layer": "other",
+   "priority": "P1",
+   "feature_ids": [
+    "F-deploy"
+   ],
+   "requirement_ids": [
+    "REQ-021"
+   ],
+   "risk": "密钥没生成/占位值没拦住都会导致生产裸奔",
+   "expected": "命令输出“自检通过”",
+   "check": {
+    "type": "command",
+    "command": "python3 scripts/init_prod_env.py --selftest",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "自检通过"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/platform"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "命令输出“自检通过”"
+   }
+  },
+  {
+   "id": "DEP-603",
+   "title": "生产编排可解析（叠加式）",
+   "repro": "cp .env.prod.example .env.prod && docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod config -q && echo 'RESULT: PASS 编排可解析'; rm -f .env.prod",
+   "layer": "other",
+   "priority": "P0",
+   "feature_ids": [
+    "F-deploy"
+   ],
+   "requirement_ids": [
+    "REQ-021"
+   ],
+   "risk": "编排文件写错会在部署当刻才暴露",
+   "expected": "docker compose config 退出 0",
+   "check": {
+    "type": "command",
+    "command": "cp .env.prod.example .env.prod && docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod config -q && echo 'RESULT: PASS 编排可解析'; rm -f .env.prod",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/platform"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "docker compose config 退出 0"
+   }
+  },
+  {
+   "id": "DEP-604",
+   "title": "鉴权模块 7 份副本无漂移",
+   "repro": "python3 scripts/sync_service_auth.py --check",
+   "layer": "other",
+   "priority": "P1",
+   "feature_ids": [
+    "F-authz"
+   ],
+   "requirement_ids": [
+    "REQ-002"
+   ],
+   "risk": "漂移会让某个服务的鉴权行为跟其它服务不一致",
+   "expected": "命令输出 OK",
+   "check": {
+    "type": "command",
+    "command": "python3 scripts/sync_service_auth.py --check",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "OK:"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/platform"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "命令输出 OK"
+   }
+  },
+  {
+   "id": "INT-801",
+   "title": "告警 → 建任务 → 自动拉起运维 SOP",
+   "repro": "curl -s -m 20 -X POST http://127.0.0.1:18004/alerts/prometheus -H 'Content-Type: application/json' -H 'X-Webhook-Token: pst-sut-webhook' -d '{\"status\":\"firing\",\"alerts\":[{\"status\":\"firing\",\"labels\":{\"alertname\":\"Camp1008Probe\",\"severity\":\"P1\",\"fingerprint\":\"camp1008\"},\"annotations\":{\"summary\":\"战役探针\",\"description\":\"camp1008 告警链路验证\"}}]}' >/dev/null; sleep 1; docker exec platform-pg psql -U platform -d pst_sut -tAc \"select count(*) from tasks where sop='ops-domain/alert-to-postmortem'\"",
+   "layer": "integration",
+   "priority": "P0",
+   "feature_ids": [
+    "F-alert-ingest"
+   ],
+   "requirement_ids": [
+    "REQ-016"
+   ],
+   "risk": "运维域入口不通＝整个运维域没有输入",
+   "expected": "带密钥告警返回 200 且建出 ops-domain 任务",
+   "check": {
+    "type": "command",
+    "command": "curl -s -m 20 -X POST http://127.0.0.1:18004/alerts/prometheus -H 'Content-Type: application/json' -H 'X-Webhook-Token: pst-sut-webhook' -d '{\"status\":\"firing\",\"alerts\":[{\"status\":\"firing\",\"labels\":{\"alertname\":\"Camp1008Probe\",\"severity\":\"P1\",\"fingerprint\":\"camp1008\"},\"annotations\":{\"summary\":\"战役探针\",\"description\":\"camp1008 告警链路验证\"}}]}' >/dev/null; sleep 1; docker exec platform-pg psql -U platform -d pst_sut -tAc \"select count(*) from tasks where sop='ops-domain/alert-to-postmortem'\"",
+    "expect_exit": 0,
+    "assert_stdout": {},
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "带密钥告警返回 200 且建出 ops-domain 任务"
+   }
+  },
+  {
+   "id": "INT-802",
+   "title": "事件投递：approval.decided → task-center /events",
+   "repro": "T=apv_evt_$(date +%s); curl -s -m 10 -X POST http://127.0.0.1:18004/events -H 'Content-Type: application/json' -H 'X-Service-Token: pst-sut-token' -d \"{\\\"event_id\\\":\\\"$T\\\",\\\"event_type\\\":\\\"approval.decided\\\",\\\"source\\\":\\\"probe\\\",\\\"trace_id\\\":\\\"$T\\\",\\\"payload\\\":{\\\"approval_id\\\":\\\"a\\\",\\\"task_ref\\\":\\\"$T\\\",\\\"decision\\\":\\\"approve\\\"}}\" >/dev/null; curl -s -m 10 -X POST http://127.0.0.1:18004/events -H 'Content-Type: application/json' -H 'X-Service-Token: pst-sut-token' -d \"{\\\"event_id\\\":\\\"$T\\\",\\\"event_type\\\":\\\"approval.decided\\\",\\\"source\\\":\\\"probe\\\",\\\"trace_id\\\":\\\"$T\\\",\\\"payload\\\":{\\\"approval_id\\\":\\\"a\\\",\\\"task_ref\\\":\\\"$T\\\",\\\"decision\\\":\\\"approve\\\"}}\" | grep -q duplicate_skipped && echo 'RESULT: PASS 幂等去重生效'",
+   "layer": "integration",
+   "priority": "P0",
+   "feature_ids": [
+    "F-event"
+   ],
+   "requirement_ids": [
+    "REQ-006"
+   ],
+   "risk": "事件不通则任务状态与审批脱节",
+   "expected": "投递后 task_events 出现审批决策事件",
+   "check": {
+    "type": "command",
+    "command": "T=apv_evt_$(date +%s); curl -s -m 10 -X POST http://127.0.0.1:18004/events -H 'Content-Type: application/json' -H 'X-Service-Token: pst-sut-token' -d \"{\\\"event_id\\\":\\\"$T\\\",\\\"event_type\\\":\\\"approval.decided\\\",\\\"source\\\":\\\"probe\\\",\\\"trace_id\\\":\\\"$T\\\",\\\"payload\\\":{\\\"approval_id\\\":\\\"a\\\",\\\"task_ref\\\":\\\"$T\\\",\\\"decision\\\":\\\"approve\\\"}}\" >/dev/null; curl -s -m 10 -X POST http://127.0.0.1:18004/events -H 'Content-Type: application/json' -H 'X-Service-Token: pst-sut-token' -d \"{\\\"event_id\\\":\\\"$T\\\",\\\"event_type\\\":\\\"approval.decided\\\",\\\"source\\\":\\\"probe\\\",\\\"trace_id\\\":\\\"$T\\\",\\\"payload\\\":{\\\"approval_id\\\":\\\"a\\\",\\\"task_ref\\\":\\\"$T\\\",\\\"decision\\\":\\\"approve\\\"}}\" | grep -q duplicate_skipped && echo 'RESULT: PASS 幂等去重生效'",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "投递后 task_events 出现审批决策事件"
+   }
+  },
+  {
+   "id": "INT-803",
+   "title": "受管知识：项目授权下可入库与检索",
+   "repro": "python3 flows/kb_check.py",
+   "layer": "integration",
+   "priority": "P1",
+   "feature_ids": [
+    "F-kb"
+   ],
+   "requirement_ids": [
+    "REQ-018"
+   ],
+   "risk": "RAG 是运维诊断依据；新契约要求可验证的项目授权（fail-closed）",
+   "expected": "注册项目版本后入库成功、检索命中且来源在授权范围内",
+   "check": {
+    "type": "command",
+    "command": "python3 flows/kb_check.py",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "注册项目版本后入库成功、检索命中且来源在授权范围内"
+   }
+  },
+  {
+   "id": "INT-804",
+   "title": "流程挖掘提案 → G7 审批单创建",
+   "repro": "bash test-campaign/probes.sh heuristic",
+   "layer": "integration",
+   "priority": "P1",
+   "feature_ids": [
+    "F-mining"
+   ],
+   "requirement_ids": [
+    "REQ-013"
+   ],
+   "risk": "提案绕过 G7 会直接改流程配置",
+   "expected": "提案接口产出提案且 submit 建出审批",
+   "check": {
+    "type": "command",
+    "command": "bash test-campaign/probes.sh heuristic",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "提案接口产出提案且 submit 建出审批"
+   }
+  },
+  {
+   "id": "INT-805",
+   "title": "驾驶舱决策代理透传身份（不绕过审计）",
+   "repro": "curl -s -o /dev/null -w 'status=%{http_code}\\n' -X POST http://127.0.0.1:18005/console/decide -H 'Content-Type: application/json' -d '{\"approval_id\":\"apv_x\",\"decision\":\"approve\",\"comment\":\"probe\",\"decided_by\":\"probe\"}'",
+   "layer": "integration",
+   "priority": "P0",
+   "feature_ids": [
+    "F-ui-dashboard",
+    "F-gate"
+   ],
+   "requirement_ids": [
+    "REQ-004",
+    "REQ-015"
+   ],
+   "risk": "驾驶舱替人落决策，若不带身份则 oidc 下必然 502、放行模式下无法记录是谁批的",
+   "expected": "无身份的 /console/decide 被拒（401/403/502），而不是 200",
+   "check": {
+    "type": "command",
+    "command": "curl -s -o /dev/null -w 'status=%{http_code}\\n' -X POST http://127.0.0.1:18005/console/decide -H 'Content-Type: application/json' -d '{\"approval_id\":\"apv_x\",\"decision\":\"approve\",\"comment\":\"probe\",\"decided_by\":\"probe\"}'",
+    "expect_exit": 0,
+    "assert_stdout": {},
+    "timeout_ms": 180000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "无身份的 /console/decide 被拒（401/403/502），而不是 200"
+   }
+  },
+  {
+   "id": "FLOW-801",
+   "title": "产品域端到端：需求→PRD→G1 人审→否决→归档",
+   "repro": "python3 flows/run_flow.py --domain product",
+   "layer": "flow",
+   "priority": "P0",
+   "feature_ids": [
+    "F-gate",
+    "F-runtime"
+   ],
+   "requirement_ids": [
+    "REQ-004",
+    "REQ-010"
+   ],
+   "risk": "业务流在中间断掉时，单接口测试可能全绿",
+   "expected": "挂起 G1、人审决策被接受、否决反映到归档",
+   "check": {
+    "type": "command",
+    "command": "python3 flows/run_flow.py --domain product",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 300000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "挂起 G1、人审决策被接受、否决反映到归档"
+   },
+   "flow_ids": [
+    "FLOW-prod"
+   ]
+  },
+  {
+   "id": "FLOW-807",
+   "title": "研发域端到端：issue→方案→G2 人审决策",
+   "repro": "python3 flows/run_flow.py --domain dev",
+   "layer": "flow",
+   "priority": "P1",
+   "feature_ids": [
+    "F-gate",
+    "F-runtime"
+   ],
+   "requirement_ids": [
+    "REQ-004"
+   ],
+   "risk": "业务流在中间断掉时，单接口测试可能全绿",
+   "expected": "挂起 G2 且人审决策被接受（编码/MR 段见声明缺口）",
+   "check": {
+    "type": "command",
+    "command": "python3 flows/run_flow.py --domain dev",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 300000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "挂起 G2 且人审决策被接受（编码/MR 段见声明缺口）"
+   },
+   "flow_ids": [
+    "FLOW-dev"
+   ]
+  },
+  {
+   "id": "FLOW-802",
+   "title": "测试域端到端：用例→执行→G4 人审",
+   "repro": "python3 flows/run_flow.py --domain test",
+   "layer": "flow",
+   "priority": "P1",
+   "feature_ids": [
+    "F-gate",
+    "F-runtime"
+   ],
+   "requirement_ids": [
+    "REQ-004"
+   ],
+   "risk": "业务流在中间断掉时，单接口测试可能全绿",
+   "expected": "挂起人审并可恢复（本环境无仓库令牌，执行段见声明缺口）",
+   "check": {
+    "type": "command",
+    "command": "python3 flows/run_flow.py --domain test",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 300000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "挂起人审并可恢复（本环境无仓库令牌，执行段见声明缺口）"
+   },
+   "flow_ids": [
+    "FLOW-test"
+   ]
+  },
+  {
+   "id": "FLOW-803",
+   "title": "运维域端到端：告警→SOP→G5 人审决策被接受",
+   "repro": "python3 flows/run_flow.py --domain ops",
+   "layer": "flow",
+   "priority": "P0",
+   "feature_ids": [
+    "F-alert-ingest",
+    "F-gate"
+   ],
+   "requirement_ids": [
+    "REQ-004",
+    "REQ-016"
+   ],
+   "risk": "业务流在中间断掉时，单接口测试可能全绿",
+   "expected": "挂起 G5 且人审决策落库",
+   "check": {
+    "type": "command",
+    "command": "python3 flows/run_flow.py --domain ops",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 300000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "挂起 G5 且人审决策落库"
+   },
+   "flow_ids": [
+    "FLOW-ops"
+   ]
+  },
+  {
+   "id": "FLOW-804",
+   "title": "平台域端到端：挖掘→提案→G7 审批；未批不得应用",
+   "repro": "python3 flows/run_flow.py --domain platform",
+   "layer": "flow",
+   "priority": "P1",
+   "feature_ids": [
+    "F-mining",
+    "F-authz"
+   ],
+   "requirement_ids": [
+    "REQ-013",
+    "REQ-003"
+   ],
+   "risk": "业务流在中间断掉时，单接口测试可能全绿",
+   "expected": "产出提案、建出 G7 审批单、未获批应用被拒",
+   "check": {
+    "type": "command",
+    "command": "python3 flows/run_flow.py --domain platform",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 300000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "产出提案、建出 G7 审批单、未获批应用被拒"
+   },
+   "flow_ids": [
+    "FLOW-platform"
+   ]
+  },
+  {
+   "id": "FLOW-805",
+   "title": "决策闭环（浏览器）：审批人在界面上完成一次决策",
+   "repro": "python3 flows/run_flow.py --domain ui",
+   "layer": "flow",
+   "priority": "P0",
+   "feature_ids": [
+    "F-ui-console"
+   ],
+   "requirement_ids": [
+    "REQ-014"
+   ],
+   "risk": "业务流在中间断掉时，单接口测试可能全绿",
+   "expected": "界面可完成决策且无失败提示",
+   "check": {
+    "type": "command",
+    "command": "python3 flows/run_flow.py --domain ui",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 300000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "界面可完成决策且无失败提示"
+   },
+   "flow_ids": [
+    "FLOW-approve-ui"
+   ]
+  },
+  {
+   "id": "FLOW-806",
+   "title": "运维域契约：task_ref 与告警 id 不一致时不得死锁",
+   "repro": "python3 flows/run_flow.py --domain ops-taskref-mismatch",
+   "layer": "flow",
+   "priority": "P0",
+   "feature_ids": [
+    "F-decision-verify",
+    "F-gate"
+   ],
+   "requirement_ids": [
+    "REQ-004"
+   ],
+   "risk": "业务流在中间断掉时，单接口测试可能全绿",
+   "expected": "审批单 task_ref 与运行 task_ref 不一致时，恢复仍应可用",
+   "check": {
+    "type": "command",
+    "command": "python3 flows/run_flow.py --domain ops-taskref-mismatch",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 300000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "审批单 task_ref 与运行 task_ref 不一致时，恢复仍应可用"
+   },
+   "flow_ids": [
+    "FLOW-ops"
+   ]
+  },
+  {
+   "id": "PROV-901",
+   "title": "需求来源链可反查（谁在哪句话提的）",
+   "repro": "python3 flows/prov_check.py",
+   "layer": "api",
+   "priority": "P1",
+   "feature_ids": [
+    "F-provenance"
+   ],
+   "requirement_ids": [
+    "REQ-012"
+   ],
+   "risk": "无出处的需求在争论时只能翻聊天记录",
+   "expected": "反查返回带 quote/confirmed_by 的来源条目且 has_provenance=true",
+   "check": {
+    "type": "command",
+    "command": "python3 flows/prov_check.py",
+    "expect_exit": 0,
+    "assert_stdout": {
+     "contains": "RESULT: PASS"
+    },
+    "timeout_ms": 120000,
+    "cwd": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008"
+   },
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "反查返回带 quote/confirmed_by 的来源条目且 has_provenance=true"
+   },
+   "flow_ids": [
+    "FLOW-prod"
+   ]
+  }
+ ]
+}

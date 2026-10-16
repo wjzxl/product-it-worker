@@ -1,0 +1,38 @@
+$ python3 scripts/init_prod_env.py --selftest
+exit: 0
+duration_ms: 95.2
+--- stdout ---
+已生成 /var/folders/sn/18dsy4bx4nzb0y2gx65k315h0000gn/T/init-prod-env-mek2r4gb/.env.prod（权限 600），自动生成 7 项：
+  · POSTGRES_PASSWORD（数据库口令（会同时替换下面三条 DSN 里的占位值））
+  · SERVICE_AUTH_TOKEN（服务间令牌）
+  · WEBHOOK_SECRET（GitLab webhook 密钥）
+  · ALERT_WEBHOOK_SECRET（告警 webhook 密钥）
+  · IM_CALLBACK_SIGNING_KEY（飞书卡片签名密钥）
+  · AUTH_STATIC_TOKEN（人类 API 静态令牌（AUTH_MODE=static 时用））
+  · LITELLM_MASTER_KEY（模型网关主密钥）
+
+仍需人工填写（脚本无法代劳）：
+  · PLATFORM_DOMAIN：对外域名（Caddy 自动签证书用）
+  · PUBLIC_BASE_URL：对外基址（写给 GitLab/飞书的回调地址）
+  · OIDC_ISSUER：SSO issuer（AUTH_MODE=oidc）
+  · OIDC_AUDIENCE：SSO 客户端 ID
+  · GITLAB_URL：GitLab 地址（内网或 gitlab.com）
+  · GITLAB_TOKEN：GitLab 访问令牌
+  · QWEN_API_KEY：通义千问 Key（或换成你们在用的模型 Key）
+
+下一步：填完后跑 `python3 platform/scripts/check_deployment_readiness.py --env-file /var/folders/sn/18dsy4bx4nzb0y2gx65k315h0000gn/T/init-prod-env-mek2r4gb/.env.prod`（不通过就不要部署）
+✅ 密钥文件权限为 600（实际 0o600）
+✅ 自动生成的密钥都不是占位值
+❌ /var/folders/sn/18dsy4bx4nzb0y2gx65k315h0000gn/T/init-prod-env-mek2r4gb/.env.prod 还有 5 项未填：
+  ✗ PLATFORM_DOMAIN（对外域名（Caddy 自动签证书用））
+  ✗ PUBLIC_BASE_URL（对外基址（写给 GitLab/飞书的回调地址））
+  ✗ OIDC_ISSUER（SSO issuer（AUTH_MODE=oidc））
+  ✗ GITLAB_TOKEN（GitLab 访问令牌）
+  ✗ QWEN_API_KEY（通义千问 Key（或换成你们在用的模型 Key））
+✅ 未填齐时被拦下（exit 1）
+✅ /var/folders/sn/18dsy4bx4nzb0y2gx65k315h0000gn/T/init-prod-env-mek2r4gb/.env.prod 必填项齐全（治理开关另由 check_deployment_readiness.py 判定）
+✅ 填齐后放行（exit 0）
+自检通过 ✅
+
+--- stderr ---
+

@@ -1,0 +1,8 @@
+$ bash test-campaign/probes.sh reject-archive
+exit: 2
+duration_ms: 264.8
+--- stdout ---
+INVALID: run did not expose an approval_id to decide on
+
+--- stderr ---
+

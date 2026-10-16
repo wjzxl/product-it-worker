@@ -1,0 +1,71 @@
+{
+  "suite": "审批台（人做决策的界面）",
+  "base_url": "http://127.0.0.1:18001",
+  "started_at": "2026-10-08T15:08:47+0800",
+  "finished_at": "2026-10-08T15:08:50+0800",
+  "headless": true,
+  "environment": {
+    "platform": "macOS-26.7-x86_64-i386-64bit",
+    "python": "3.9.6",
+    "chrome": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "chrome_version": "Google Chrome 154.0.8037.98"
+  },
+  "blocked_reason": null,
+  "tests": [
+    {
+      "id": "UI-301",
+      "title": "审批台加载：静态外壳可见、无控制台报错",
+      "layer": "e2e",
+      "priority": "P0",
+      "verdict": "FAIL",
+      "expected": "全部步骤通过且页面无控制台错误",
+      "actual": "断言失败：the page logged errors | 实际观测：[\"[error] Failed to load resource: the server responded with a status of 401 (Unauthorized)\", \"[error] Failed to load resource: the server responded with a status of 404 (Not Found)\"]",
+      "duration_ms": 362.6,
+      "steps": [
+        "goto: http://127.0.0.1:18001/",
+        "wait_for: header h1",
+        "assert_text: found '平台审批台'",
+        "assert_visible: #list",
+        "assert_visible: #detail",
+        "assert_no_console_errors: the page logged errors"
+      ],
+      "evidence": [
+        {
+          "kind": "screenshot",
+          "path": "screenshots/UI-301-FAIL-150849.png",
+          "detail": "UI-301 界面截图"
+        },
+        {
+          "kind": "log",
+          "path": "logs/UI-301.log",
+          "detail": "逐步操作与页面控制台"
+        }
+      ],
+      "tags": [],
+      "executed_at": "2026-10-08T15:08:49+0800",
+      "severity": "MAJOR",
+      "repro": "python3 browser_test.py --suite <suite.json> --only UI-301\n或按 logs/UI-301.log 中的步骤在浏览器手工重放",
+      "notes": "首个失败步骤 #6 assert_no_console_errors: the page logged errors"
+    }
+  ],
+  "visual": {
+    "baseline_dir": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008/baselines",
+    "baselines_available": 2,
+    "update_requested": false,
+    "tally": {},
+    "results": []
+  },
+  "accessibility": {
+    "snapshots": 0,
+    "summary": []
+  },
+  "change_checks": {
+    "count": 0,
+    "confirmed": 0,
+    "results": []
+  },
+  "tracing": {
+    "enabled": false,
+    "traces": []
+  }
+}

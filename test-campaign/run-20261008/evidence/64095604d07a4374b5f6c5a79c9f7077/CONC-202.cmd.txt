@@ -1,0 +1,11 @@
+$ STRESS_ROUNDS=6 STRESS_N=30 bash probes-concurrency.sh task-race-stress
+exit: 1
+duration_ms: 127.7
+--- stdout ---
+
+--- stderr ---
+Traceback (most recent call last):
+  File "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/./race_stress.py", line 34, in <module>
+    HUMAN_TOKEN = os.getenv("AUTH_STATIC_TOKEN", "pst-sut-personal-token")
+NameError: name 'os' is not defined
+

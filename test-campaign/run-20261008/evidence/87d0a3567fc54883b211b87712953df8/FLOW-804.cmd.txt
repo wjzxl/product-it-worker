@@ -1,0 +1,9 @@
+$ python3 flows/run_flow.py --domain platform
+exit: 0
+duration_ms: 435.9
+--- stdout ---
+RESULT: PASS 平台域：提案 → G7 审批单 apv_782c1144675d；未获批应用被拒（HTTP 409）
+（耗时 0.3s）
+
+--- stderr ---
+

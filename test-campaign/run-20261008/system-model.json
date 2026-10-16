@@ -1,0 +1,640 @@
+{
+ "schema_version": "1.0",
+ "note": "第 2 次完整战役的 recon。特征/流程来自 openapi.json 实际路由（evidence/routes.json）、设计文档与历史战役报告；标 inferred 的为代码推断。",
+ "system": {
+  "name": "产品研发智能化平台（AI SOP 生产线）",
+  "target": "http://127.0.0.1:18001（7 服务：18001–18007）",
+  "revision": "643e610",
+  "entry_points": [
+   "platform/services/*/app/main.py",
+   "test-campaign/start-sut.sh（一次性环境）",
+   "platform/docker-compose.yml + docker-compose.prod.yml"
+  ],
+  "language": "Python 3.9（FastAPI + SQLAlchemy 2 + LangGraph）",
+  "storage": "PostgreSQL（平台库 pst_sut/平台库；Qdrant 向量；sqlite 兜底）",
+  "derived_from": [
+   {
+    "source": "evidence/routes.json（7 服务 openapi.json 实测 80 条路由）",
+    "gave": "特征入口"
+   },
+   {
+    "source": "test-campaign/test-report/test-report.md（第 1 次战役，24 卡）",
+    "gave": "回归卡与历史缺陷"
+   },
+   {
+    "source": "test-campaign/verify-report.md（3 轮专项复验）",
+    "gave": "已修复项与未覆盖维度"
+   },
+   {
+    "source": "21/22 号文档（治理档位、上线前最小路径）",
+    "gave": "部署与治理要求"
+   }
+  ],
+  "could_not_determine": [
+   "真实 LLM 输出质量与提示注入抵抗力（SUT 用确定性兜底 LLM，未接真实模型）",
+   "飞书真实推送与卡片回调（无企业应用凭证，仅验签路径可测）",
+   "GitLab 出站 API 的真实行为（无仓库令牌）",
+   "多副本下的并发语义（行锁/唯一键只在单实例 PG 上验证）"
+  ]
+ },
+ "features": [
+  {
+   "id": "F-health",
+   "name": "健康与治理姿态",
+   "priority": "P0",
+   "risk": "所有服务 /health 暴露档位/合规/checkpointer；探针与看门狗依赖它",
+   "entry_points": [
+    "GET /health ×7"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-authz",
+   "name": "服务间鉴权",
+   "priority": "P0",
+   "risk": "令牌中间件 + 显式豁免；缺失即所有写接口裸奔（历史缺陷根因）",
+   "entry_points": [
+    "X-Service-Token",
+    "SERVICE_AUTH_EXEMPT"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-gate",
+   "name": "人审闸门 G1–G7",
+   "priority": "P0",
+   "risk": "平台的核心承诺：AI 执行、人在闸门决策；被绕过则产品价值归零",
+   "entry_points": [
+    "POST /approvals",
+    "POST /approvals/{id}/decision",
+    "POST /callbacks/im/card"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-decision-verify",
+   "name": "决策依据核验",
+   "priority": "P0",
+   "risk": "恢复人审挂起必须出示真实决策，否则闸门形同虚设",
+   "entry_points": [
+    "POST /runs/{tid}/resume"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-enggate",
+   "name": "工程闸门 E1–E3",
+   "priority": "P0",
+   "risk": "规则即代码；mode 必须服务端权威、留痕强制",
+   "entry_points": [
+    "POST /eng-gates/{code}/check"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-taskfsm",
+   "name": "任务状态机与租户隔离",
+   "priority": "P0",
+   "risk": "多产品线共用平台的前提是租户隔离不可破",
+   "entry_points": [
+    "POST /tasks",
+    "POST /tasks/{id}/transition"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-event",
+   "name": "平台事件接入",
+   "priority": "P1",
+   "risk": "事件驱动状态联动；幂等与歧义处理决定数据一致性",
+   "entry_points": [
+    "POST /events"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-tools",
+   "name": "工具注册表与执行期鉴权",
+   "priority": "P0",
+   "risk": "AI 能改外部状态，权限边界必须由服务端判定",
+   "entry_points": [
+    "POST /tools/invoke"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-runtime",
+   "name": "Agent 运行与归档",
+   "priority": "P0",
+   "risk": "运行状态与成本是度量体系的唯一来源",
+   "entry_points": [
+    "POST /runs",
+    "GET /runs/{tid}/archive"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-evidence",
+   "name": "证据库",
+   "priority": "P1",
+   "risk": "验收结论要能复验（sha256），否则证据只是附件",
+   "entry_points": [
+    "POST /evidence",
+    "GET /evidence/verify"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-provenance",
+   "name": "需求来源链反查",
+   "priority": "P1",
+   "risk": "争论口径时能回查当初是谁在哪句话提的",
+   "entry_points": [
+    "GET /requirements/{ref}/provenance"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-mining",
+   "name": "流程挖掘与 SOP 自进化",
+   "priority": "P1",
+   "risk": "瓶颈→提案→G7→应用；错误应用会改掉流程配置",
+   "entry_points": [
+    "POST /mining/proposals",
+    "POST /mining/proposals/apply"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-ui-console",
+   "name": "审批台（人做决策的界面）",
+   "priority": "P0",
+   "risk": "审批人看到的就是它；静默空列表会让决策停摆",
+   "entry_points": [
+    "GET / (18001)",
+    "app.js/app.css"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-ui-dashboard",
+   "name": "驾驶舱（监督与介入）",
+   "priority": "P0",
+   "risk": "试点期唯一的全局视图；读不出等于没有视图",
+   "entry_points": [
+    "GET / (18005)"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-alert-ingest",
+   "name": "告警接入",
+   "priority": "P1",
+   "risk": "真实告警→运维任务→自动拉起 SOP；无验签则可被凭空触发",
+   "entry_points": [
+    "POST /alerts/prometheus"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-gitlab",
+   "name": "GitLab 双向集成",
+   "priority": "P1",
+   "risk": "入站 webhook 验签 + 出站 API；仓库写入权限在平台手里",
+   "entry_points": [
+    "POST /webhooks/gitlab",
+    "POST /gitlab/*"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-kb",
+   "name": "知识库入库与检索",
+   "priority": "P1",
+   "risk": "RAG 是运维域诊断的依据；来源必须可追溯",
+   "entry_points": [
+    "POST /documents",
+    "POST /search"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-migration",
+   "name": "数据库迁移与备份",
+   "priority": "P0",
+   "risk": "上线硬前提：空库可建、模型与迁移零漂移、可回滚、可恢复",
+   "entry_points": [
+    "alembic upgrade head",
+    "backup_restore.py"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-watchdog",
+   "name": "平台自监控与告警",
+   "priority": "P1",
+   "risk": "平台自己挂了要有人知道（试点期最尴尬的失败）",
+   "entry_points": [
+    "watch_health.py"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  },
+  {
+   "id": "F-deploy",
+   "name": "部署就绪与配置生成",
+   "priority": "P0",
+   "risk": "带着宽松开关上生产＝修复等于没修",
+   "entry_points": [
+    "check_deployment_readiness.py",
+    "init_prod_env.py"
+   ],
+   "source": "route table (openapi.json) + 设计文档 + 历史战役报告"
+  }
+ ],
+ "flows": [
+  {
+   "id": "FLOW-prod",
+   "name": "产品域：需求 → 澄清 → PRD → G1 人审",
+   "priority": "P0",
+   "actors": [
+    "AI 产品岗",
+    "人类审批人"
+   ],
+   "steps": [
+    "POST /runs（产品域）",
+    "生成 PRD 并创建 G1 审批",
+    "人在审批台批准/退回",
+    "POST /runs/{tid}/resume"
+   ],
+   "invariant": "每次 PRD 都有对应的人审决策；退回后版本递增而不是覆盖",
+   "failure_modes": [
+    "自述批准绕过闸门",
+    "归档丢失否决"
+   ]
+  },
+  {
+   "id": "FLOW-dev",
+   "name": "研发域：issue → 方案 → G2 → 编码 → MR → G3",
+   "priority": "P1",
+   "actors": [
+    "AI 研发岗",
+    "人类审批人",
+    "GitLab"
+   ],
+   "steps": [
+    "事件建任务",
+    "方案 + G2",
+    "编码（沙箱）",
+    "MR + G3"
+   ],
+   "invariant": "代码变更必须经过 G3 才合并",
+   "failure_modes": [
+    "跳过 G2/G3",
+    "沙箱内逃逸"
+   ]
+  },
+  {
+   "id": "FLOW-test",
+   "name": "测试域：独立用例 → 报告 → G4 发布决策",
+   "priority": "P1",
+   "actors": [
+    "AI 测试岗",
+    "人类审批人"
+   ],
+   "steps": [
+    "独立生成用例",
+    "执行并出报告",
+    "G4 决策"
+   ],
+   "invariant": "发布决策有人审留痕",
+   "failure_modes": [
+    "用例与研发同源（失去独立性）"
+   ]
+  },
+  {
+   "id": "FLOW-ops",
+   "name": "运维域：告警 → 任务 → RAG 诊断 → G5 → 执行 → G6 复盘",
+   "priority": "P0",
+   "actors": [
+    "Alertmanager",
+    "AI 运维岗",
+    "人类审批人"
+   ],
+   "steps": [
+    "POST /alerts/prometheus",
+    "自动触发 ops SOP",
+    "RAG 检索 Runbook",
+    "G5 变更审批",
+    "执行（受控）",
+    "G6 复盘"
+   ],
+   "invariant": "无验签不得建任务；变更执行必须有人审依据",
+   "failure_modes": [
+    "匿名告警拉栈",
+    "未审批执行变更"
+   ]
+  },
+  {
+   "id": "FLOW-platform",
+   "name": "平台域：挖掘 → 提案 → G7 → 应用 → 知识入库",
+   "priority": "P1",
+   "actors": [
+    "AI 平台岗",
+    "人类审批人"
+   ],
+   "steps": [
+    "挖掘瓶颈",
+    "生成提案",
+    "G7 审批",
+    "apply 改配置"
+   ],
+   "invariant": "未获批的提案不得改动 SOP 配置",
+   "failure_modes": [
+    "未批先应用",
+    "配置被改坏无回滚"
+   ]
+  },
+  {
+   "id": "FLOW-approve-ui",
+   "name": "人在审批台的决策（UI 端到端）",
+   "priority": "P0",
+   "actors": [
+    "人类审批人"
+   ],
+   "steps": [
+    "打开审批台",
+    "看到待审列表",
+    "查看三要素",
+    "批准/退回/拒绝",
+    "留痕可查"
+   ],
+   "invariant": "审批人看到的就是数据库里的真实待办；不得静默显示空",
+   "failure_modes": [
+    "静默空列表",
+    "渲染注入执行"
+   ]
+  }
+ ],
+ "actors": [
+  {
+   "actor": "AI 岗位（product/dev/tester/ops/platform agent）",
+   "can": [
+    "起草产物",
+    "创建审批单",
+    "调用受限工具"
+   ],
+   "cannot": [
+    "批准自己的产出",
+    "无引用执行写类工具"
+   ],
+   "tested_by": [
+    "SEC-104",
+    "SEC-105",
+    "REG-007"
+   ]
+  },
+  {
+   "actor": "人类审批人（approver/admin）",
+   "can": [
+    "批准/退回/否决",
+    "触发全局超时扫描"
+   ],
+   "cannot": [
+    "绕过租户边界"
+   ],
+   "tested_by": [
+    "UI-302",
+    "UI-303",
+    "SEC-104"
+   ]
+  },
+  {
+   "actor": "服务账号（服务间调用）",
+   "can": [
+    "携带 X-Service-Token 调用"
+   ],
+   "cannot": [
+    "无令牌访问任何业务接口"
+   ],
+   "tested_by": [
+    "SEC-101",
+    "SEC-102",
+    "SEC-103"
+   ]
+  },
+  {
+   "actor": "入站 webhook（GitLab / Alertmanager / 飞书）",
+   "can": [
+    "凭签名投递事件"
+   ],
+   "cannot": [
+    "无签名投递"
+   ],
+   "tested_by": [
+    "SEC-106",
+    "SEC-109",
+    "INT-801"
+   ]
+  },
+  {
+   "actor": "直连攻击者（能到达服务端口）",
+   "can": [],
+   "cannot": [
+    "伪造入口身份头获得访问"
+   ],
+   "tested_by": [
+    "SEC-108"
+   ]
+  }
+ ],
+ "entities": [
+  {
+   "name": "ApprovalRequest",
+   "states": [
+    "pending",
+    "approved",
+    "rejected",
+    "revised"
+   ],
+   "note": "决策唯一键 (request_id, version)；行锁串行化"
+  },
+  {
+   "name": "Task",
+   "states": [
+    "pending",
+    "running",
+    "waiting_approval",
+    "approved",
+    "rejected",
+    "done",
+    "failed"
+   ],
+   "note": "waiting_approval 出发的流转必须带决策依据"
+  },
+  {
+   "name": "GateCheck",
+   "states": [],
+   "note": "E1–E3 判定留痕，mode 由服务端决定"
+  },
+  {
+   "name": "EvidenceArtifact",
+   "states": [],
+   "note": "sha256 可复验"
+  },
+  {
+   "name": "AgentRun",
+   "states": [
+    "running",
+    "waiting",
+    "done",
+    "rejected",
+    "failed"
+   ],
+   "note": "归档是度量体系唯一来源"
+  }
+ ],
+ "constraints": [
+  {
+   "entity": "ApprovalRequest",
+   "constraint": "一个提交版本只能有一条决策",
+   "enforced_where": "DB 唯一键 + 行锁",
+   "verified_by": "CONC-201"
+  },
+  {
+   "entity": "Task",
+   "constraint": "external_ref 在同一租户内唯一",
+   "enforced_where": "DB 复合唯一键",
+   "verified_by": "REG-010"
+  },
+  {
+   "entity": "ApprovalRequest",
+   "constraint": "决策必须属于 options 声明的动作",
+   "enforced_where": "应用层",
+   "verified_by": "REG-004"
+  }
+ ],
+ "integrations": [
+  {
+   "name": "PostgreSQL",
+   "direction": "both",
+   "failure_behaviour": "服务起不来/写入失败（fail-closed）"
+  },
+  {
+   "name": "Qdrant",
+   "direction": "out",
+   "failure_behaviour": "知识库降级为内存桩并在 /health 报 degraded"
+  },
+  {
+   "name": "LiteLLM",
+   "direction": "out",
+   "failure_behaviour": "本次未接（SUT 用兜底 LLM）"
+  },
+  {
+   "name": "GitLab",
+   "direction": "both",
+   "failure_behaviour": "入站验签失败 401；出站无令牌 502"
+  },
+  {
+   "name": "Alertmanager",
+   "direction": "in",
+   "failure_behaviour": "无密钥 401/503（fail-closed）"
+  },
+  {
+   "name": "飞书 IM",
+   "direction": "both",
+   "failure_behaviour": "无签名密钥 503（卡片不可用）"
+  }
+ ],
+ "jobs": [
+  {
+   "name": "超时扫描 sweeper",
+   "trigger": "POST /admin/sweep 或 SWEEP_INTERVAL_SECONDS",
+   "tested_by": [
+    "REG-006",
+    "CONC-203"
+   ]
+  },
+  {
+   "name": "看门狗 watchdog",
+   "trigger": "容器循环 60s",
+   "tested_by": [
+    "OPS-501",
+    "OPS-502"
+   ]
+  }
+ ],
+ "non_functional": [
+  {
+   "attribute": "并发正确性",
+   "expectation": "30 并发下同一单据恰好一次成功",
+   "source": "历史缺陷（CONC-001/002）",
+   "tested_by": [
+    "CONC-201",
+    "CONC-202"
+   ]
+  },
+  {
+   "attribute": "鉴权",
+   "expectation": "无凭据不得触达业务接口；伪造身份头不得生效",
+   "source": "21 号文档",
+   "tested_by": [
+    "SEC-101",
+    "SEC-102",
+    "SEC-108"
+   ]
+  },
+  {
+   "attribute": "可用性",
+   "expectation": "7 服务 /health 全绿且姿态可见",
+   "source": "运维手册",
+   "tested_by": [
+    "OPS-502",
+    "OPS-503"
+   ]
+  },
+  {
+   "attribute": "可恢复性",
+   "expectation": "备份可恢复且行数一致、迁移可回滚",
+   "source": "22 号文档",
+   "tested_by": [
+    "DATA-401",
+    "DATA-403"
+   ]
+  },
+  {
+   "attribute": "界面正确性",
+   "expectation": "审批台在令牌模式下不得静默空列表；不得渲染注入",
+   "source": "本次战役新增维度",
+   "tested_by": [
+    "UI-301",
+    "UI-302",
+    "UI-304"
+   ]
+  }
+ ],
+ "declared_gaps": [
+  {
+   "description": "性能基线（吞吐/p95）与 soak 稳定性未在本轮采集（时间预算）",
+   "impact": "无法回答容量与长稳问题；第 6 步上线前仍需补",
+   "feature_ids": [
+    "F-health"
+   ]
+  },
+  {
+   "description": "真实模型质量、提示注入、飞书真实推送、GitLab 出站行为未覆盖",
+   "impact": "这些维度上的缺陷本轮不可能被发现",
+   "feature_ids": [
+    "F-mining",
+    "F-gitlab"
+   ]
+  },
+  {
+   "description": "多副本/水平扩展语义未验证",
+   "impact": "扩容后并发正确性结论不适用",
+   "feature_ids": [
+    "F-gate",
+    "F-taskfsm"
+   ]
+  }
+ ]
+}

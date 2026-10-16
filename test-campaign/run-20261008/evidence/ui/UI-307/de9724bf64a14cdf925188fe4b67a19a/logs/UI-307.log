@@ -1,0 +1,15 @@
+# UI-307 视觉比对负向控制：注入真实样式缺陷必须被发现
+started 2026-10-16T10:48:03+0800
+
+step 1 goto ok  [http://127.0.0.1:18001/]
+step 2 wait_for ok  [.panel]
+step 3 change_baseline ok  [变更前截图：change-probe/UI-307/console-negative-control.png]
+step 4 eval ok  ["injected"]
+step 5 wait_ms ok  [Nonems]
+step 6 assert_visual_changed ok  [[DIFF] console-negative-control: 1086151 of 1296000 pixels differ (83.808% > 0.200% allowed) (1086151 px, 1 处区域)]
+
+## console
+[error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[error] Failed to load resource: the server responded with a status of 404 (Not Found)
+
+screenshot: screenshots/UI-307-104811.png

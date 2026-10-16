@@ -1,0 +1,451 @@
+{
+ "approval-gateway": {
+  "title": "平台人审网关 approval-gateway",
+  "version": "0.1.0",
+  "route_count": 23,
+  "routes": [
+   {
+    "method": "POST",
+    "path": "/admin/sweep",
+    "summary": "Admin Sweep"
+   },
+   {
+    "method": "GET",
+    "path": "/approvals",
+    "summary": "List Approvals"
+   },
+   {
+    "method": "POST",
+    "path": "/approvals",
+    "summary": "Create Approval"
+   },
+   {
+    "method": "GET",
+    "path": "/approvals/{approval_id}",
+    "summary": "Get Approval"
+   },
+   {
+    "method": "POST",
+    "path": "/approvals/{approval_id}/decision",
+    "summary": "Decide"
+   },
+   {
+    "method": "POST",
+    "path": "/approvals/{approval_id}/resubmit",
+    "summary": "Resubmit"
+   },
+   {
+    "method": "GET",
+    "path": "/auth/info",
+    "summary": "Auth Info"
+   },
+   {
+    "method": "POST",
+    "path": "/callbacks/im/card",
+    "summary": "Im Card Callback"
+   },
+   {
+    "method": "GET",
+    "path": "/eng-gates",
+    "summary": "Eng Gates List"
+   },
+   {
+    "method": "GET",
+    "path": "/eng-gates/checks",
+    "summary": "Eng Gate History"
+   },
+   {
+    "method": "POST",
+    "path": "/eng-gates/checks/{check_id}/feedback",
+    "summary": "Gate Check Feedback"
+   },
+   {
+    "method": "GET",
+    "path": "/eng-gates/feedback/stats",
+    "summary": "Gate Feedback Stats"
+   },
+   {
+    "method": "POST",
+    "path": "/eng-gates/{code}/check",
+    "summary": "Eng Gate Check"
+   },
+   {
+    "method": "GET",
+    "path": "/evidence",
+    "summary": "List Evidence"
+   },
+   {
+    "method": "POST",
+    "path": "/evidence",
+    "summary": "Upload Evidence"
+   },
+   {
+    "method": "GET",
+    "path": "/evidence/verify",
+    "summary": "Verify Evidence"
+   },
+   {
+    "method": "GET",
+    "path": "/evidence/{artifact_id}",
+    "summary": "Evidence Meta"
+   },
+   {
+    "method": "GET",
+    "path": "/evidence/{artifact_id}/content",
+    "summary": "Evidence Content"
+   },
+   {
+    "method": "GET",
+    "path": "/health",
+    "summary": "Health"
+   },
+   {
+    "method": "GET",
+    "path": "/requirements/{task_ref}/provenance",
+    "summary": "Requirement Provenance"
+   },
+   {
+    "method": "GET",
+    "path": "/trust",
+    "summary": "Trust All"
+   },
+   {
+    "method": "GET",
+    "path": "/trust/overview",
+    "summary": "Trust Overview"
+   },
+   {
+    "method": "GET",
+    "path": "/trust/{gate_type}",
+    "summary": "Trust One"
+   }
+  ]
+ },
+ "agent-runtime": {
+  "title": "agent-runtime",
+  "version": "0.3.0",
+  "route_count": 13,
+  "routes": [
+   {
+    "method": "GET",
+    "path": "/health",
+    "summary": "Health"
+   },
+   {
+    "method": "GET",
+    "path": "/prompts",
+    "summary": "Prompts Info"
+   },
+   {
+    "method": "GET",
+    "path": "/roles",
+    "summary": "Roles Info"
+   },
+   {
+    "method": "GET",
+    "path": "/rules-pack",
+    "summary": "Rules Pack Info"
+   },
+   {
+    "method": "GET",
+    "path": "/runs",
+    "summary": "List Runs"
+   },
+   {
+    "method": "POST",
+    "path": "/runs",
+    "summary": "Start Run"
+   },
+   {
+    "method": "GET",
+    "path": "/runs/{thread_id}/archive",
+    "summary": "Run Archive"
+   },
+   {
+    "method": "POST",
+    "path": "/runs/{thread_id}/resume",
+    "summary": "Resume Run"
+   },
+   {
+    "method": "GET",
+    "path": "/runs/{thread_id}/state",
+    "summary": "Run State"
+   },
+   {
+    "method": "POST",
+    "path": "/runs/{thread_id}/wake",
+    "summary": "Wake Run"
+   },
+   {
+    "method": "GET",
+    "path": "/tools",
+    "summary": "Tools Info"
+   },
+   {
+    "method": "GET",
+    "path": "/tools/audit",
+    "summary": "Tools Audit"
+   },
+   {
+    "method": "POST",
+    "path": "/tools/invoke",
+    "summary": "Invoke Tool"
+   }
+  ]
+ },
+ "knowledge-base": {
+  "title": "knowledge-base",
+  "version": "0.1.0",
+  "route_count": 3,
+  "routes": [
+   {
+    "method": "POST",
+    "path": "/documents",
+    "summary": "Ingest"
+   },
+   {
+    "method": "GET",
+    "path": "/health",
+    "summary": "Health"
+   },
+   {
+    "method": "POST",
+    "path": "/search",
+    "summary": "Search"
+   }
+  ]
+ },
+ "task-center": {
+  "title": "task-center",
+  "version": "0.1.0",
+  "route_count": 8,
+  "routes": [
+   {
+    "method": "POST",
+    "path": "/alerts/prometheus",
+    "summary": "Prometheus Alerts"
+   },
+   {
+    "method": "POST",
+    "path": "/events",
+    "summary": "Ingest Event"
+   },
+   {
+    "method": "GET",
+    "path": "/health",
+    "summary": "Health"
+   },
+   {
+    "method": "GET",
+    "path": "/tasks",
+    "summary": "List Tasks"
+   },
+   {
+    "method": "POST",
+    "path": "/tasks",
+    "summary": "Create Task"
+   },
+   {
+    "method": "GET",
+    "path": "/tasks/{task_id}",
+    "summary": "Get Task"
+   },
+   {
+    "method": "POST",
+    "path": "/tasks/{task_id}/events",
+    "summary": "Append Timeline"
+   },
+   {
+    "method": "POST",
+    "path": "/tasks/{task_id}/transition",
+    "summary": "Transition"
+   }
+  ]
+ },
+ "metrics-dashboard": {
+  "title": "metrics-dashboard",
+  "version": "0.1.0",
+  "route_count": 6,
+  "routes": [
+   {
+    "method": "GET",
+    "path": "/",
+    "summary": "Dashboard"
+   },
+   {
+    "method": "GET",
+    "path": "/console",
+    "summary": "Decision Console"
+   },
+   {
+    "method": "POST",
+    "path": "/console/decide",
+    "summary": "Console Decide"
+   },
+   {
+    "method": "POST",
+    "path": "/console/feedback",
+    "summary": "Console Feedback"
+   },
+   {
+    "method": "GET",
+    "path": "/health",
+    "summary": "Health"
+   },
+   {
+    "method": "GET",
+    "path": "/metrics",
+    "summary": "Metrics"
+   }
+  ]
+ },
+ "gitlab-bridge": {
+  "title": "gitlab-bridge",
+  "version": "0.1.0",
+  "route_count": 16,
+  "routes": [
+   {
+    "method": "POST",
+    "path": "/gitlab/hooks",
+    "summary": "Register Hook"
+   },
+   {
+    "method": "GET",
+    "path": "/gitlab/hooks/{project_id}",
+    "summary": "List Hooks"
+   },
+   {
+    "method": "DELETE",
+    "path": "/gitlab/hooks/{project_id}/{hook_id}",
+    "summary": "Delete Hook"
+   },
+   {
+    "method": "POST",
+    "path": "/gitlab/issues",
+    "summary": "Create Issue"
+   },
+   {
+    "method": "GET",
+    "path": "/gitlab/issues/{project_id}/{iid}",
+    "summary": "Get Issue"
+   },
+   {
+    "method": "POST",
+    "path": "/gitlab/issues/{project_id}/{iid}/close",
+    "summary": "Close Issue"
+   },
+   {
+    "method": "POST",
+    "path": "/gitlab/mrs",
+    "summary": "Create Mr"
+   },
+   {
+    "method": "POST",
+    "path": "/gitlab/mrs/notes",
+    "summary": "Comment Mr"
+   },
+   {
+    "method": "GET",
+    "path": "/gitlab/mrs/{project_id}/{mr_iid}",
+    "summary": "Get Mr"
+   },
+   {
+    "method": "POST",
+    "path": "/gitlab/mrs/{project_id}/{mr_iid}/merge",
+    "summary": "Merge Mr"
+   },
+   {
+    "method": "POST",
+    "path": "/gitlab/pipelines/trigger",
+    "summary": "Trigger Pipeline"
+   },
+   {
+    "method": "GET",
+    "path": "/gitlab/pipelines/{project_id}",
+    "summary": "List Pipelines"
+   },
+   {
+    "method": "GET",
+    "path": "/gitlab/pipelines/{project_id}/{pipeline_id}",
+    "summary": "Get Pipeline"
+   },
+   {
+    "method": "GET",
+    "path": "/gitlab/pipelines/{project_id}/{pipeline_id}/jobs",
+    "summary": "Get Pipeline Jobs"
+   },
+   {
+    "method": "GET",
+    "path": "/health",
+    "summary": "Health"
+   },
+   {
+    "method": "POST",
+    "path": "/webhooks/gitlab",
+    "summary": "Gitlab Webhook"
+   }
+  ]
+ },
+ "process-mining": {
+  "title": "process-mining",
+  "version": "0.1.0",
+  "route_count": 11,
+  "routes": [
+   {
+    "method": "GET",
+    "path": "/health",
+    "summary": "Health"
+   },
+   {
+    "method": "GET",
+    "path": "/mining/alpha",
+    "summary": "Alpha View"
+   },
+   {
+    "method": "GET",
+    "path": "/mining/applied",
+    "summary": "Applied History"
+   },
+   {
+    "method": "GET",
+    "path": "/mining/conformance",
+    "summary": "Conformance View"
+   },
+   {
+    "method": "GET",
+    "path": "/mining/dfg",
+    "summary": "Dfg View"
+   },
+   {
+    "method": "GET",
+    "path": "/mining/event-log",
+    "summary": "Event Log"
+   },
+   {
+    "method": "GET",
+    "path": "/mining/heuristic",
+    "summary": "Heuristic View"
+   },
+   {
+    "method": "POST",
+    "path": "/mining/proposals",
+    "summary": "Make Proposals"
+   },
+   {
+    "method": "POST",
+    "path": "/mining/proposals/apply",
+    "summary": "Apply Proposal"
+   },
+   {
+    "method": "POST",
+    "path": "/mining/proposals/submit",
+    "summary": "Submit Proposal"
+   },
+   {
+    "method": "GET",
+    "path": "/mining/report",
+    "summary": "Mining Report"
+   }
+  ]
+ }
+}

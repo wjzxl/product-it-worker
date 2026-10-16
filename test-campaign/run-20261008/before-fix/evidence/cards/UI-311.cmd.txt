@@ -1,0 +1,13 @@
+$ python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/dashboard-suite.json --out-dir evidence/ui --only UI-311 --baselines baselines
+exit: 0
+duration_ms: 1934.4
+--- stdout ---
+套件      : 运营驾驶舱（决策台）  (http://127.0.0.1:18015)
+  UI-311     PASS   经入口代理后驾驶舱可读，并渲染待决策队列与 KPI
+
+结果      : {'PASS': 1}
+截图      : 1 张 -> evidence/ui/screenshots
+报告      : evidence/ui/browser-report.json
+
+--- stderr ---
+

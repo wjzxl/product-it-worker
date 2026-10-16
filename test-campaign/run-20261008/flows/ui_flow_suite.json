@@ -1,0 +1,61 @@
+{
+ "suite": "审批台决策闭环",
+ "base_url": "http://127.0.0.1:18001",
+ "tests": [
+  {
+   "id": "FLOW-UI",
+   "title": "审批人在界面上批准一条待审单据",
+   "priority": "P0",
+   "screenshot": "always",
+   "steps": [
+    {
+     "action": "goto",
+     "url": "/"
+    },
+    {
+     "action": "fill",
+     "selector": "#access-token",
+     "value": "pst-sut-personal-token"
+    },
+    {
+     "action": "click",
+     "selector": "#auth-form button[type=submit]"
+    },
+    {
+     "action": "wait_for",
+     "selector": ".row",
+     "timeout": 10
+    },
+    {
+     "action": "eval",
+     "js": "[].slice.call(document.querySelectorAll('.row')).filter(function(r){return r.textContent.indexOf('UI 夹具')>=0;})[0].click(); 'clicked'"
+    },
+    {
+     "action": "wait_for",
+     "selector": "button[data-action=approve]",
+     "timeout": 10
+    },
+    {
+     "action": "eval",
+     "js": "window.prompt = function(){return '自动化决策人';}; 'stubbed'"
+    },
+    {
+     "action": "click",
+     "selector": "button[data-action=approve]"
+    },
+    {
+     "action": "wait_ms",
+     "value": 1500
+    },
+    {
+     "action": "assert_no_text",
+     "value": "操作失败"
+    },
+    {
+     "action": "assert_text",
+     "value": "决策已提交"
+    }
+   ]
+  }
+ ]
+}

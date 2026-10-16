@@ -1,0 +1,8 @@
+$ bash probes-authz.sh with-token
+exit: 2
+duration_ms: 75.2
+--- stdout ---
+INVALID: 带令牌创建审批失败（服务是否在 token 模式？）
+
+--- stderr ---
+

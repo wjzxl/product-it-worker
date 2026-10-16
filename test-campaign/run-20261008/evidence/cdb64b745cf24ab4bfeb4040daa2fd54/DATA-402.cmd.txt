@@ -1,0 +1,11 @@
+$ python3 flows/schema_compare.py
+exit: 0
+duration_ms: 4626.7
+--- stdout ---
+  迁移建表 15 张：['agent_runs', 'approval_decisions', 'approval_requests', 'deliveries', 'delivery_contract_versions', 'delivery_project_versions', 'delivery_projects', 'event_inbox', 'evidence_artifacts', 'gate_checks', 'project_audit', 'project_members', 'task_events', 'tasks', 'trust_state']
+  模型建表 15 张：['agent_runs', 'approval_decisions', 'approval_requests', 'deliveries', 'delivery_contract_versions', 'delivery_project_versions', 'delivery_projects', 'event_inbox', 'evidence_artifacts', 'gate_checks', 'project_audit', 'project_members', 'task_events', 'tasks', 'trust_state']
+RESULT: PASS 迁移与模型一致（15 张表）
+  注意：运行时库 pst_sut 缺少 ['agent_runs']（agent-runtime 的 RUNS_DB_URL 指向别处时会出现；度量从平台库读会看到 0 次运行）
+
+--- stderr ---
+

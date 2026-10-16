@@ -1,0 +1,9 @@
+$ bash probes-concurrency.sh decide-vs-sweep
+exit: 1
+duration_ms: 656.9
+--- stdout ---
+decisions_inserted=0 final_status=pending
+FINDING: decide+sweep produced 0 decisions for one approval
+
+--- stderr ---
+

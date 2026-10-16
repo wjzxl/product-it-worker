@@ -1,0 +1,9 @@
+$ python3 flows/run_flow.py --domain ui
+exit: 1
+duration_ms: 12520.1
+--- stdout ---
+RESULT: FAIL 审批台决策闭环未完成：{'FLOW-UI': 'BLOCKED'}
+（耗时 12.3s）
+
+--- stderr ---
+

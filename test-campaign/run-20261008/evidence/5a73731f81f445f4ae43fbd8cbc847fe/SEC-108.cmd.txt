@@ -1,0 +1,8 @@
+$ curl -s -o /dev/null -w 'status=%{http_code}\n' -H 'X-Platform-User: attacker' http://127.0.0.1:18005/
+exit: 0
+duration_ms: 25.8
+--- stdout ---
+status=401
+
+--- stderr ---
+

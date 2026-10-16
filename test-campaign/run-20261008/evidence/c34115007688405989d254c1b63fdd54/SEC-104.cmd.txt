@@ -1,0 +1,8 @@
+$ bash probes-authz.sh resume-bypass
+exit: 0
+duration_ms: 196.5
+--- stdout ---
+RESULT: PASS 无据/伪造决策均被拒（409），闸门保持在原地
+
+--- stderr ---
+

@@ -1,0 +1,9 @@
+$ python3 flows/run_flow.py --domain ui
+exit: 0
+duration_ms: 2665.4
+--- stdout ---
+RESULT: PASS 审批人在界面上完成决策（截图见 evidence/ui-flow）
+（耗时 2.5s）
+
+--- stderr ---
+

@@ -1,0 +1,9 @@
+$ bash test-campaign/probes.sh task-fsm-illegal
+exit: 0
+duration_ms: 105.8
+--- stdout ---
+pending -> done http=409
+RESULT: PASS illegal transition rejected with 409
+
+--- stderr ---
+

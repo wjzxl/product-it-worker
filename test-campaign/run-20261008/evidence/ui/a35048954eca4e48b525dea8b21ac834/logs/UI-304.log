@@ -1,0 +1,21 @@
+# UI-304 XSS 载荷只作为文本出现：不生成元素、不执行脚本
+started 2026-10-16T10:38:51+0800
+
+step 1 goto ok  [http://127.0.0.1:18001/]
+step 2 fill ok  [#access-token = <redacted>
+step 3 click ok  [#auth-form button[type=submit]]
+step 4 wait_for ok  [.row]
+step 5 assert_js ok  [js -> True]
+step 6 assert_js ok  [js -> True]
+step 7 assert_js ok  [js -> True]
+step 8 click ok  [.row]
+step 9 wait_for ok  [#detail .field]
+step 10 assert_js ok  [js -> True]
+step 11 assert_js ok  [js -> True]
+step 12 assert_no_console_errors FAILED: the page logged errors
+
+## console
+[error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[error] Failed to load resource: the server responded with a status of 404 (Not Found)
+
+screenshot: screenshots/UI-304-FAIL-103852.png

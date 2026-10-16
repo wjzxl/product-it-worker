@@ -1,0 +1,187 @@
+{
+  "generated_at": "2026-10-08 15:15:34+0800",
+  "advisory": "BLOCKED",
+  "advisory_reasons": [
+    "G1 failed: 所有 P0 卡通过 (actual 82.50% >= threshold 100.00%)",
+    "G2 failed: 无未关闭的 BLOCKER/CRITICAL 缺陷 (actual 2 <= threshold 0)",
+    "G3 failed: 整体通过率 ≥ 85% (actual 84.06% >= threshold 85.00%)"
+  ],
+  "metrics": {
+    "total_cards": 69,
+    "executed_cards": 69,
+    "gap_cards": 0,
+    "passed": 58,
+    "failed": 11,
+    "verdict_counts": {
+      "PASS": 58,
+      "FAIL": 11
+    },
+    "priority_counts": {
+      "P0": {
+        "total": 40,
+        "pass": 33,
+        "fail": 7,
+        "gap": 0
+      },
+      "P1": {
+        "total": 27,
+        "pass": 23,
+        "fail": 4,
+        "gap": 0
+      },
+      "P2": {
+        "total": 2,
+        "pass": 2,
+        "fail": 0,
+        "gap": 0
+      }
+    },
+    "layer_counts": {
+      "api": {
+        "total": 19,
+        "pass": 19,
+        "fail": 0,
+        "gap": 0
+      },
+      "security": {
+        "total": 9,
+        "pass": 8,
+        "fail": 1,
+        "gap": 0
+      },
+      "concurrency": {
+        "total": 5,
+        "pass": 5,
+        "fail": 0,
+        "gap": 0
+      },
+      "e2e": {
+        "total": 18,
+        "pass": 9,
+        "fail": 9,
+        "gap": 0
+      },
+      "data": {
+        "total": 5,
+        "pass": 4,
+        "fail": 1,
+        "gap": 0
+      },
+      "ops": {
+        "total": 4,
+        "pass": 4,
+        "fail": 0,
+        "gap": 0
+      },
+      "deploy": {
+        "total": 4,
+        "pass": 4,
+        "fail": 0,
+        "gap": 0
+      },
+      "integration": {
+        "total": 5,
+        "pass": 5,
+        "fail": 0,
+        "gap": 0
+      }
+    },
+    "execution_rate": 1.0,
+    "overall_pass_rate": 0.8405797101449275,
+    "p0_pass_rate": 0.825,
+    "p1_pass_rate": 0.8518518518518519,
+    "defect_count": 7,
+    "severity_counts": {
+      "CRITICAL": 2,
+      "MAJOR": 2,
+      "MINOR": 3
+    },
+    "open_by_severity": {
+      "CRITICAL": 2,
+      "MAJOR": 2,
+      "MINOR": 3
+    },
+    "open_blocker_count": 0,
+    "open_critical_count": 2,
+    "open_major_count": 2,
+    "open_blocker_critical_count": 2,
+    "requirement_count": 22,
+    "requirements_covered": 22,
+    "requirements_verified": 21,
+    "coverage_rate": 1.0,
+    "uncovered_requirements": [
+      {
+        "id": "REQ-022",
+        "title": "外部身份头不得被直连客户端伪造",
+        "priority": "P0",
+        "reason": "mapped cards did not pass",
+        "card_ids": [
+          "SEC-108"
+        ]
+      }
+    ],
+    "performance_runs": 1,
+    "performance_failures": 0,
+    "worst_p95_ms": 18.685,
+    "p95_latency_ms": 18.685,
+    "max_error_rate": 0.0,
+    "error_rate": 0.0,
+    "experiment_count": 0,
+    "significant_experiments": 0,
+    "srm_suspect_experiments": 0,
+    "flaky_cards": 0,
+    "blocked_cards": 0
+  },
+  "gates": [
+    {
+      "id": "G1",
+      "description": "所有 P0 卡通过",
+      "metric": "p0_pass_rate",
+      "comparator": "gte",
+      "threshold": 1.0,
+      "actual": 0.825,
+      "status": "FAIL",
+      "detail": "actual 82.50% >= threshold 100.00%"
+    },
+    {
+      "id": "G2",
+      "description": "无未关闭的 BLOCKER/CRITICAL 缺陷",
+      "metric": "open_blocker_critical_count",
+      "comparator": "lte",
+      "threshold": 0,
+      "actual": 2,
+      "status": "FAIL",
+      "detail": "actual 2 <= threshold 0"
+    },
+    {
+      "id": "G3",
+      "description": "整体通过率 ≥ 85%",
+      "metric": "overall_pass_rate",
+      "comparator": "gte",
+      "threshold": 0.85,
+      "actual": 0.8405797101449275,
+      "status": "FAIL",
+      "detail": "actual 84.06% >= threshold 85.00%"
+    },
+    {
+      "id": "G4",
+      "description": "执行率 100%（不得有未执行卡）",
+      "metric": "execution_rate",
+      "comparator": "gte",
+      "threshold": 1.0,
+      "actual": 1.0,
+      "status": "PASS",
+      "detail": "actual 1 >= threshold 1"
+    },
+    {
+      "id": "G5",
+      "description": "UI 卡全部通过（有界面的系统不得只测 API）",
+      "metric": "layer_pass_rate:ui",
+      "comparator": "gte",
+      "threshold": 1.0,
+      "actual": null,
+      "status": "NOT_EVALUATED",
+      "detail": "metric not computable from the result bundle"
+    }
+  ]
+}

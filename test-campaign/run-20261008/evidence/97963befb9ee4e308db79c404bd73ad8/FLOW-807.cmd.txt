@@ -1,0 +1,9 @@
+$ python3 flows/run_flow.py --domain dev
+exit: 0
+duration_ms: 319.4
+--- stdout ---
+RESULT: PASS 研发域：挂起 gate_g2 → 人审决策被接受（后续编码/MR 需 GitLab 凭证，本环境未覆盖）
+（耗时 0.2s）
+
+--- stderr ---
+

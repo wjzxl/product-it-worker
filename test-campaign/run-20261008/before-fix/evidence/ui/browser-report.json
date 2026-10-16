@@ -1,0 +1,135 @@
+{
+  "suite": "审批台（人做决策的界面）",
+  "base_url": "http://127.0.0.1:18001",
+  "started_at": "2026-10-08T15:12:22+0800",
+  "finished_at": "2026-10-08T15:12:28+0800",
+  "headless": true,
+  "environment": {
+    "platform": "macOS-26.7-x86_64-i386-64bit",
+    "python": "3.9.6",
+    "chrome": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "chrome_version": "Google Chrome 154.0.8037.98"
+  },
+  "blocked_reason": null,
+  "tests": [
+    {
+      "id": "UI-306",
+      "title": "视觉基线：审批台外壳（列表为动态区，已遮蔽）",
+      "layer": "e2e",
+      "priority": "P1",
+      "verdict": "PASS",
+      "expected": "全部步骤通过且页面无控制台错误",
+      "actual": "4 个步骤全部通过",
+      "duration_ms": 4547.5,
+      "steps": [
+        "goto: http://127.0.0.1:18001/",
+        "wait_for: .panel",
+        "wait_ms: Nonems",
+        "visual: [NEW_BASELINE] console-shell: no baseline existed; this run created one"
+      ],
+      "evidence": [
+        {
+          "kind": "screenshot",
+          "path": "screenshots/UI-306-151228.png",
+          "detail": "UI-306 界面截图"
+        },
+        {
+          "kind": "log",
+          "path": "logs/UI-306.log",
+          "detail": "逐步操作与页面控制台"
+        }
+      ],
+      "tags": [],
+      "executed_at": "2026-10-08T15:12:28+0800",
+      "visual": [
+        {
+          "name": "console-shell",
+          "current": "evidence/ui/screenshots/visual-console-shell.png",
+          "baseline": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008/baselines/console-shell.png",
+          "pixel_threshold": 0.02,
+          "max_diff_ratio": 0.03,
+          "full_page": true,
+          "masks": [
+            [
+              213,
+              131,
+              480,
+              86
+            ],
+            [
+              747,
+              131,
+              480,
+              82
+            ]
+          ],
+          "checked_at": "2026-10-08T15:12:24+0800",
+          "verdict": "NEW_BASELINE",
+          "passed": true,
+          "baseline_created": true,
+          "reason": "no baseline existed; this run created one",
+          "size": [
+            1440,
+            900
+          ],
+          "test": "UI-306"
+        }
+      ]
+    }
+  ],
+  "visual": {
+    "baseline_dir": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008/baselines",
+    "baselines_available": 3,
+    "update_requested": false,
+    "tally": {
+      "NEW_BASELINE": 1
+    },
+    "results": [
+      {
+        "name": "console-shell",
+        "current": "evidence/ui/screenshots/visual-console-shell.png",
+        "baseline": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008/baselines/console-shell.png",
+        "pixel_threshold": 0.02,
+        "max_diff_ratio": 0.03,
+        "full_page": true,
+        "masks": [
+          [
+            213,
+            131,
+            480,
+            86
+          ],
+          [
+            747,
+            131,
+            480,
+            82
+          ]
+        ],
+        "checked_at": "2026-10-08T15:12:24+0800",
+        "verdict": "NEW_BASELINE",
+        "passed": true,
+        "baseline_created": true,
+        "reason": "no baseline existed; this run created one",
+        "size": [
+          1440,
+          900
+        ],
+        "test": "UI-306"
+      }
+    ]
+  },
+  "accessibility": {
+    "snapshots": 0,
+    "summary": []
+  },
+  "change_checks": {
+    "count": 0,
+    "confirmed": 0,
+    "results": []
+  },
+  "tracing": {
+    "enabled": false,
+    "traces": []
+  }
+}

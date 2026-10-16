@@ -1,0 +1,13 @@
+$ platform/services/approval-gateway/.venv/bin/python platform/scripts/check_migrations.py --selftest
+exit: 0
+duration_ms: 3987.4
+--- stdout ---
+✅ 空库 upgrade head 成功 — INFO  [alembic.runtime.migration] Running upgrade 20261010_delivery -> 20261010_project_auth, 项目成员权限与同事务审计；既有项目由平台管理员明确分配负责人。
+✅ 建出的表非空 — 15 张：['agent_runs', 'approval_decisions', 'approval_requests', 'deliveries']…
+✅ 模型与迁移无漂移（改了模型必须补迁移） — 0 处差异：[]
+✅ 自检：故意制造的差异被精确发现（且只有这一处） — [('add_table', Table('drift_probe', MetaData(), Column('id', Integer(), table=<drift_probe>, primary_key=True, nullable=False), schema=None))]
+✅ downgrade base 可干净回滚
+迁移体检通过 ✅
+
+--- stderr ---
+

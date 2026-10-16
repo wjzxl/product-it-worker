@@ -1,0 +1,9 @@
+$ python3 flows/run_flow.py --domain platform
+exit: 1
+duration_ms: 258.9
+--- stdout ---
+RESULT: FAIL 提交 G7 审批失败 HTTP 502: {'detail': "创建 G7 审批失败: Client error '401 Unauthorized' for url 'http://127.0.0.1:18001/approvals'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401"}
+（耗时 0.1s）
+
+--- stderr ---
+

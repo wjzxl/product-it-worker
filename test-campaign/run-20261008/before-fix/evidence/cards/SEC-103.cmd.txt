@@ -1,0 +1,8 @@
+$ bash probes-authz.sh with-token
+exit: 0
+duration_ms: 123.2
+--- stdout ---
+RESULT: PASS 带服务令牌的审批与决策链路正常（approval=apv_bbbbee472236）
+
+--- stderr ---
+

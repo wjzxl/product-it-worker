@@ -1,0 +1,11 @@
+# UI-311 经入口代理后驾驶舱可读，并渲染待决策队列与 KPI
+started 2026-10-16T11:07:48+0800
+
+step 1 goto ok  [http://127.0.0.1:18015/]
+step 2 wait_for_text ok  [待决策队列]
+step 3 assert_text ok  [found '平台度量面板']
+step 4 assert_text ok  [found '误拦率']
+step 5 assert_visible ok  [table]
+step 6 assert_no_console_errors ok  [no console errors]
+
+screenshot: screenshots/UI-311-110748.png

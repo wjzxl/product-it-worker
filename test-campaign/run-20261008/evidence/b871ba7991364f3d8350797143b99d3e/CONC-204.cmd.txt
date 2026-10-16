@@ -1,0 +1,9 @@
+$ bash probes-concurrency.sh im-vs-decide
+exit: 0
+duration_ms: 491.8
+--- stdout ---
+decisions_inserted=1
+RESULT: PASS IM callback and web decision are mutually exclusive
+
+--- stderr ---
+

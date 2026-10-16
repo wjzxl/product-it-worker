@@ -12,14 +12,17 @@ GW=${GW:-http://127.0.0.1:18001}
 TC=${TC:-http://127.0.0.1:18004}
 RT=${RT:-http://127.0.0.1:18002}
 TOKEN=${SERVICE_AUTH_TOKEN:-pst-sut-token}
+HUMAN_TOKEN=${AUTH_STATIC_TOKEN:-pst-sut-personal-token}
 D=/tmp/pst-sut
 mkdir -p "$D"
 J() { python3 -c "import sys,json;d=json.load(sys.stdin);print(d$1)" 2>/dev/null; }
 
 # 带服务令牌的请求头（SERVICE_AUTH_MODE=token 时必需；未开启时多带也无害）
-AUTH=(-H "X-Service-Token: $TOKEN")
+AUTH=(-H "X-Service-Token: $TOKEN")                      # 服务身份：建单/查询
+AUTHH=(-H "Authorization: Bearer $HUMAN_TOKEN")      # 人类身份：决策/管理（不可与服务令牌同带）
 
 psql_sut() { docker exec platform-pg psql -U platform -d pst_sut -tAc "$1" 2>/dev/null; }
+sweep() { curl -s -o /dev/null -X POST "$GW/admin/sweep" "${AUTHH[@]}"; }
 
 approval_body() { # $1=ref $2=level $3=deadline_iso
   printf '{"type":"GATE_REQUIREMENT_REVIEW","stage":"probe","requester":"campaign","task_ref":"%s","context_snapshot":{"artifact_ref":"%s","diff_summary":"probe","evidence":["http://evidence/1"],"risk":{"score":20,"level":"%s","factors":["probe"]}},"deadline":"%s","escalation_policy":{"remind_after_hours":1,"escalate_to":"lead","timeout_action":"reject"}}' \
@@ -37,13 +40,22 @@ mk_approval() { # $1=ref $2=deadline
 # ---------------------------------------------------------------------------
 # CONC-001：同一审批单被并发决策 —— 只能有一次成功，且只能落一条决策
 probe_decide_race() {
-  local id before after ok cnt
+  local id before after ok cnt base
+  # 基线校验：先在同一条链路上做一次单线程决策。若鉴权/契约已变，
+  # 并发段会拿到一排 401，而"0 成功"会被误读成竞态结论——那是假发现。
+  local bid base
+  bid=$(mk_approval "CONC-001-base" "$(future)")
+  [ -z "$bid" ] && { echo "INVALID: could not create approval"; return 2; }
+  base=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$GW/approvals/$bid/decision" "${AUTHH[@]}" \
+    -H 'Content-Type: application/json' -d '{"decision":"approve","decided_by":"baseline","comment":"baseline"}')
+  [ "$base" = "200" ] || { echo "INVALID: 基线决策未成功（HTTP ${base}）——并发探针前提不成立"; return 2; }
+
   id=$(mk_approval "CONC-001" "$(future)")
   [ -z "$id" ] && { echo "INVALID: could not create approval"; return 2; }
   before=$(psql_sut "select count(*) from approval_decisions where request_id='$id'")
 
   for i in $(seq 1 8); do
-    curl -s -o "$D/race-$i.json" -w '%{http_code}' -X POST "$GW/approvals/$id/decision" "${AUTH[@]}" \
+    curl -s -o "$D/race-$i.json" -w '%{http_code}' -X POST "$GW/approvals/$id/decision" "${AUTHH[@]}" \
       -H 'Content-Type: application/json' \
       -d '{"decision":"approve","decided_by":"racer-'$i'","comment":"concurrent"}' > "$D/race-$i.code" &
   done
@@ -64,14 +76,23 @@ probe_decide_race() {
 # ---------------------------------------------------------------------------
 # CONC-002：人工决策与超时扫描同时发生 —— 不得产生两条决策
 probe_decide_vs_sweep() {
-  local id before after cnt status
+  local id before after cnt status base
   id=$(mk_approval "CONC-002" "$(past)")
   [ -z "$id" ] && { echo "INVALID: could not create approval"; return 2; }
+  # 基线：扫描器对一张过期单必须能独立处置出恰好一条决策
+  local bid bbefore bafter
+  bid=$(mk_approval "CONC-002-base" "$(past)")
+  [ -z "${bid}" ] && { echo "INVALID: could not create approval"; return 2; }
+  bbefore=$(psql_sut "select count(*) from approval_decisions where request_id='${bid}'")
+  sweep
+  bafter=$(psql_sut "select count(*) from approval_decisions where request_id='${bid}'")
+  [ "$((bafter - bbefore))" = "1" ] || { echo "INVALID: 扫描器基线未产生唯一决策（${bbefore}→${bafter}）"; return 2; }
+  id=$(mk_approval "CONC-002" "$(past)")
   before=$(psql_sut "select count(*) from approval_decisions where request_id='$id'")
 
-  curl -s -o /dev/null -X POST "$GW/approvals/$id/decision" "${AUTH[@]}" -H 'Content-Type: application/json' \
+  curl -s -o /dev/null -X POST "$GW/approvals/$id/decision" "${AUTHH[@]}" -H 'Content-Type: application/json' \
     -d '{"decision":"approve","decided_by":"human","comment":"race with sweep"}' &
-  curl -s -o /dev/null -X POST "$GW/admin/sweep" "${AUTH[@]}" &
+  sweep &
   wait
 
   after=$(psql_sut "select count(*) from approval_decisions where request_id='$id'")
@@ -105,7 +126,7 @@ print(hashlib.sha256(('$ts'+'$nonce'+key+'$body').encode()).hexdigest())")
   curl -s -o /dev/null -X POST "$GW/callbacks/im/card" \
     -H "X-Lark-Request-Timestamp: $ts" -H "X-Lark-Request-Nonce: $nonce" \
     -H "X-Lark-Signature: $sig" -H 'Content-Type: application/json' -d "$body" &
-  curl -s -o /dev/null -X POST "$GW/approvals/$id/decision" "${AUTH[@]}" -H 'Content-Type: application/json' \
+  curl -s -o /dev/null -X POST "$GW/approvals/$id/decision" "${AUTHH[@]}" -H 'Content-Type: application/json' \
     -d '{"decision":"approve","decided_by":"web","comment":"race"}' &
   wait
 
@@ -121,12 +142,17 @@ print(hashlib.sha256(('$ts'+'$nonce'+key+'$body').encode()).hexdigest())")
 # ---------------------------------------------------------------------------
 # CONC-004：同一验收项并发上传证据 —— 全部成功且不丢件
 probe_evidence_race() {
-  local before after cnt fails=0
+  local before after cnt fails=0 probe_code
   echo "race artifact" > "$D/evd-race.txt"
+  local probe_code
+  probe_code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$GW/evidence" "${AUTHH[@]}" \
+    -H 'X-Tenant: default' -F "file=@$D/evd-race.txt" -F 'task_ref=CONC-004-probe' \
+    -F 'acceptance_item=A1' -F 'kind=log' -F 'note=probe')
+  [ "$probe_code" = "201" ] || { echo "INVALID: 单次证据上传未成功（HTTP ${probe_code}）——并发探针前提不成立"; return 2; }
   before=$(psql_sut "select count(*) from evidence_artifacts where task_ref='CONC-004'")
 
   for i in $(seq 1 6); do
-    ( code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$GW/evidence" "${AUTH[@]}" \
+    ( code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$GW/evidence" "${AUTHH[@]}" \
         -H 'X-Tenant: default' -F "file=@$D/evd-race.txt" -F 'task_ref=CONC-004' \
         -F 'acceptance_item=A1' -F 'kind=log' -F "note=race-$i"); echo "$code" > "$D/evd-race-$i.code" ) &
   done

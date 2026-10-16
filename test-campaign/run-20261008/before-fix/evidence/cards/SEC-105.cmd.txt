@@ -1,0 +1,8 @@
+$ bash probes-authz.sh tools-selfdeclared
+exit: 0
+duration_ms: 208.8
+--- stdout ---
+RESULT: PASS 自述岗位/自述免人审均被拒（ungated_not_allowed / role_not_trusted）
+
+--- stderr ---
+

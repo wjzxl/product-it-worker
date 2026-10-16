@@ -1,0 +1,10 @@
+$ bash test-campaign/probes.sh heuristic
+exit: 0
+duration_ms: 77.6
+--- stdout ---
+dependencies: [{'from': 'B', 'to': 'A', 'dependency': 0.833, 'observations': 5}]
+self_fitness: 1.0
+RESULT: PASS heuristic directions are correct and self-conformance is 1.0
+
+--- stderr ---
+

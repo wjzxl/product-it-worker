@@ -1,0 +1,8 @@
+$ python3 flows/prov_check.py
+exit: 0
+duration_ms: 172.6
+--- stdout ---
+RESULT: PASS 来源链可反查：1 条，quote/confirmed_by 原样可回查
+
+--- stderr ---
+

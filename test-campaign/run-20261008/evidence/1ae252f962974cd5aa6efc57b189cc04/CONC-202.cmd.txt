@@ -1,0 +1,14 @@
+$ STRESS_ROUNDS=6 STRESS_N=30 bash probes-concurrency.sh task-race-stress
+exit: 0
+duration_ms: 4753.1
+--- stdout ---
+  round 0: 并发=30 HTTP200=1 新增流转事件=1 OK
+  round 1: 并发=30 HTTP200=1 新增流转事件=1 OK
+  round 2: 并发=30 HTTP200=1 新增流转事件=1 OK
+  round 3: 并发=30 HTTP200=1 新增流转事件=1 OK
+  round 4: 并发=30 HTTP200=1 新增流转事件=1 OK
+  round 5: 并发=30 HTTP200=1 新增流转事件=1 OK
+RESULT: PASS 任务流转在 6 轮 × 30 并发下均恰好成功一次
+
+--- stderr ---
+

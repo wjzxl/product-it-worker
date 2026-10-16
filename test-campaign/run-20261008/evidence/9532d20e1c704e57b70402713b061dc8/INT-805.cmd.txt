@@ -1,0 +1,8 @@
+$ curl -s -o /dev/null -w 'status=%{http_code}\n' -X POST http://127.0.0.1:18005/console/decide -H 'Content-Type: application/json' -d '{"approval_id":"apv_x","decision":"approve","comment":"probe","decided_by":"probe"}'
+exit: 0
+duration_ms: 22.1
+--- stdout ---
+status=401
+
+--- stderr ---
+

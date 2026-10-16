@@ -1,0 +1,16 @@
+$ python3 platform/scripts/watch_health.py --selftest
+exit: 0
+duration_ms: 670.0
+--- stdout ---
+  → 已发飞书告警：成功
+✅ 健康服务判为 ok — ✅ probe：正常
+✅ 降级判为 warning — ⚠️ probe：服务自报 status=degraded
+✅ 生产档位但治理开关不严 → critical — ❌ probe：生产/预发档位下治理开关不严：['ENG_GATES_MODE=warn']
+✅ 服务不可达 → critical — ❌ probe：HTTP 503
+✅ 同一故障只通知一次 — 首次 1 条 / 再次 0 条
+✅ 恢复会被识别并通知一次 — 1 条恢复通知
+✅ webhook 通知可送达 — [{'msg_type': 'text', 'content': {'text': '自检消息'}}]
+自检通过 ✅
+
+--- stderr ---
+

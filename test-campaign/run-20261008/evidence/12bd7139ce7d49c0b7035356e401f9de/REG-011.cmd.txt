@@ -1,0 +1,9 @@
+$ bash test-campaign/probes.sh reject-archive
+exit: 0
+duration_ms: 1222.6
+--- stdout ---
+run=run_edd3b2b2f4d03b17d7978fccc6600ec9 approval=apv_17c76d2b6283 resume_status=rejected archive_status=rejected
+RESULT: PASS archive status records the rejection
+
+--- stderr ---
+

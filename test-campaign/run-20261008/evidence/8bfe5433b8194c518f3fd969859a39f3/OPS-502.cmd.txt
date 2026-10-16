@@ -1,0 +1,15 @@
+$ WATCH_TARGETS='approval-gateway=http://127.0.0.1:18001,agent-runtime=http://127.0.0.1:18002,knowledge-base=http://127.0.0.1:18003,task-center=http://127.0.0.1:18004,metrics-dashboard=http://127.0.0.1:18005,gitlab-bridge=http://127.0.0.1:18006,process-mining=http://127.0.0.1:18007' WATCH_STATE_FILE=/tmp/wh-camp.json python3 platform/scripts/watch_health.py --once
+exit: 0
+duration_ms: 212.8
+--- stdout ---
+[2026-10-16T10:57:52+0800] 平台健康：ok
+✅ agent-runtime：dev 档位（宽松）：1 项未开
+✅ approval-gateway：dev 档位（宽松）：1 项未开
+✅ gitlab-bridge：dev 档位（宽松）：1 项未开
+✅ knowledge-base：dev 档位（宽松）：1 项未开
+✅ metrics-dashboard：dev 档位（宽松）：1 项未开
+✅ process-mining：dev 档位（宽松）：1 项未开
+✅ task-center：dev 档位（宽松）：1 项未开
+
+--- stderr ---
+

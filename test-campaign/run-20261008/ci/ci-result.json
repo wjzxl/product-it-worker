@@ -1,0 +1,814 @@
+{
+  "verdicts": {
+    "PASS": 70,
+    "FAIL": 1
+  },
+  "classified": [
+    {
+      "id": "REG-001",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "IM 回调必须验签（BUG-001）",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "REG-002",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "跨租户读取被拒（BUG-002 同源）",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "REG-003",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "resubmit 遵守租户边界（BUG-002）",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "REG-004",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "闸门模式不可被调用方覆盖（BUG-003）",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "REG-005",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "每次闸门判定都留痕（BUG-014）",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "REG-006",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "超时处置取服务端信任等级（BUG-004）",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "REG-007",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "等待审批不得被无据流转（BUG-005）",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "REG-008",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "非法流转 409（FSM-002）",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "REG-009",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "任务详情租户隔离（BUG-006）",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "REG-010",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "重复外部引用不 500（BUG-015）",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "REG-011",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "被否决的运行归档可见（BUG-012）",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "REG-012",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "等待人审不得被 /wake 吞掉（BUG-007）",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "REG-013",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "启发式挖掘方向正确（BUG-008）",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "REG-014",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "α 挖掘自洽（BUG-009）",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "REG-015",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "DFG 一致性检出异常（BUG-010）",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "REG-016",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "LLM 畸形输出回退规则（BUG-011）",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "REG-017",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "证据上传与哈希复验（EVD）",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "REG-018",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "健康如实报告持久化形态（WP7）",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "SEC-101",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "写接口鉴权覆盖率为 100%（清点）",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "SEC-102",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "无令牌的读写请求被拒，健康检查豁免",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "SEC-103",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "带令牌的审批与决策链路仍可用",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "SEC-104",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "自述决策不得恢复人审挂起",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "SEC-105",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "工具调用不接受请求体自述岗位/免人审",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "SEC-106",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "告警 webhook 验签（无凭据/错密钥拒绝）",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "SEC-107",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "令牌模式下审批台静态资源可达、业务接口仍需令牌",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "SEC-108",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "直连服务伪造入口身份头必须无效",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "SEC-109",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "GitLab webhook 未签名被拒、正确签名放行",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "CONC-201",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "30 并发决策：恰好一个成功、一条决策",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "CONC-202",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "30 并发流转：恰好一个成功、一条时间线",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "CONC-203",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "人工决策与超时扫描并发：不双决策",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "CONC-204",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "IM 回调与 Web 决策并发：互斥",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "CONC-205",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "并发上传证据不丢件",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "UI-301",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "审批台加载：静态外壳可见、无控制台报错",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "UI-302",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "待审列表必须显示真实待办（不得静默空）",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "UI-303",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "详情渲染三要素与动作按钮",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "UI-304",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "XSS 载荷只作为文本出现，不生成元素、不执行",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "UI-305",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "审批台可访问性：按钮有可访问名",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "UI-306",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "视觉基线比对（审批台首屏）",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "UI-309",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "在界面上完成一次决策（浏览器端到端）",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "UI-308",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "无令牌时必须显示鉴权错误，不得伪装成空审批队列",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "UI-307",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "视觉比对负向控制：注入样式缺陷必须被发现",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "UI-311",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "驾驶舱经入口代理可读并渲染队列",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "UI-312",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "驾驶舱队列渲染真实事项",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "UI-313",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "驾驶舱可访问性树可用",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "UI-314",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "视觉基线比对（驾驶舱首屏）",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "DATA-401",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "迁移：空库可建 + 模型零漂移 + 可回滚",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "DATA-402",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "迁移与模型建表结果一致（零漂移）",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "DATA-405",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "运行归档与平台库同库（度量才看得到运行）",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "DATA-403",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "备份可恢复（恢复演练）",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "DATA-404",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "证据哈希复验：篡改可被发现",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "OPS-501",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "看门狗判级/去重/通知自检",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "OPS-502",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "看门狗对 7 服务判定为健康",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "OPS-503",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "7 个服务都暴露治理姿态",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "OPS-504",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "生产档位缺凭据必须拒绝启动",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "DEP-601",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "上线体检：prod 模板必须可上线",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "DEP-602",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "生产配置生成器自检",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "DEP-603",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "生产编排可解析（叠加式）",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "DEP-604",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "鉴权模块 7 份副本无漂移",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "INT-801",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "告警 → 建任务 → 自动拉起运维 SOP",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "INT-802",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "事件投递：approval.decided → task-center /events",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "INT-803",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "受管知识：项目授权下可入库与检索",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "INT-804",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "流程挖掘提案 → G7 审批单创建",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "INT-805",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "驾驶舱决策代理透传身份（不绕过审计）",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "FLOW-801",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "产品域端到端：需求→PRD→G1 人审→否决→归档",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "FLOW-807",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "研发域端到端：issue→方案→G2 人审决策",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "FLOW-802",
+      "verdict": "FAIL",
+      "kind": "new_failure",
+      "title": "测试域端到端：用例→执行→G4 人审",
+      "severity": "MAJOR",
+      "previous": ""
+    },
+    {
+      "id": "FLOW-803",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "运维域端到端：告警→SOP→G5 人审决策被接受",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "FLOW-804",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "平台域端到端：挖掘→提案→G7 审批；未批不得应用",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "FLOW-805",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "决策闭环（浏览器）：审批人在界面上完成一次决策",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "FLOW-806",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "运维域契约：task_ref 与告警 id 不一致时不得死锁",
+      "severity": "",
+      "previous": ""
+    },
+    {
+      "id": "PROV-901",
+      "verdict": "PASS",
+      "kind": "passing",
+      "title": "需求来源链可反查（谁在哪句话提的）",
+      "severity": "",
+      "previous": ""
+    }
+  ],
+  "regressions": [],
+  "still_failing": [],
+  "new_failures": [
+    {
+      "id": "FLOW-802",
+      "verdict": "FAIL",
+      "kind": "new_failure",
+      "title": "测试域端到端：用例→执行→G4 人审",
+      "severity": "MAJOR",
+      "previous": ""
+    }
+  ],
+  "unreliable": [],
+  "blocked": [],
+  "fixed": [],
+  "total": 71,
+  "previous_run_cards": 0,
+  "metrics": {
+    "total_cards": 71,
+    "executed_cards": 71,
+    "gap_cards": 0,
+    "passed": 70,
+    "failed": 1,
+    "verdict_counts": {
+      "PASS": 70,
+      "FAIL": 1
+    },
+    "priority_counts": {
+      "P0": {
+        "total": 42,
+        "pass": 42,
+        "fail": 0,
+        "gap": 0
+      },
+      "P1": {
+        "total": 27,
+        "pass": 26,
+        "fail": 1,
+        "gap": 0
+      },
+      "P2": {
+        "total": 2,
+        "pass": 2,
+        "fail": 0,
+        "gap": 0
+      }
+    },
+    "layer_counts": {
+      "api": {
+        "total": 19,
+        "pass": 19,
+        "fail": 0,
+        "gap": 0
+      },
+      "security": {
+        "total": 9,
+        "pass": 9,
+        "fail": 0,
+        "gap": 0
+      },
+      "stability": {
+        "total": 5,
+        "pass": 5,
+        "fail": 0,
+        "gap": 0
+      },
+      "e2e": {
+        "total": 13,
+        "pass": 13,
+        "fail": 0,
+        "gap": 0
+      },
+      "data": {
+        "total": 5,
+        "pass": 5,
+        "fail": 0,
+        "gap": 0
+      },
+      "other": {
+        "total": 8,
+        "pass": 8,
+        "fail": 0,
+        "gap": 0
+      },
+      "integration": {
+        "total": 5,
+        "pass": 5,
+        "fail": 0,
+        "gap": 0
+      },
+      "flow": {
+        "total": 7,
+        "pass": 6,
+        "fail": 1,
+        "gap": 0
+      }
+    },
+    "execution_rate": 1.0,
+    "overall_pass_rate": 0.9859154929577465,
+    "p0_pass_rate": 1.0,
+    "p1_pass_rate": 0.9629629629629629,
+    "defect_count": 10,
+    "severity_counts": {
+      "CRITICAL": 2,
+      "MAJOR": 3,
+      "MINOR": 5
+    },
+    "open_by_severity": {
+      "MINOR": 3,
+      "MAJOR": 1
+    },
+    "open_blocker_count": 0,
+    "open_critical_count": 0,
+    "open_major_count": 1,
+    "open_blocker_critical_count": 0,
+    "requirement_count": 22,
+    "requirements_covered": 22,
+    "requirements_verified": 22,
+    "coverage_rate": 1.0,
+    "verified_coverage_rate": 1.0,
+    "p0_p1_verified_coverage_rate": 1.0,
+    "severe_failed_cards": 0,
+    "untriaged_cards": 0,
+    "suspected_cards": 0,
+    "uncovered_requirements": [],
+    "performance_runs": 2,
+    "performance_failures": 1,
+    "worst_p95_ms": 623.888,
+    "p95_latency_ms": 623.888,
+    "max_error_rate": 0.0,
+    "error_rate": 0.0,
+    "experiment_count": 0,
+    "significant_experiments": 0,
+    "srm_suspect_experiments": 0,
+    "flaky_cards": 0,
+    "blocked_cards": 0
+  },
+  "gates": [
+    {
+      "id": "G1",
+      "description": "所有 P0 卡通过",
+      "metric": "p0_pass_rate",
+      "comparator": "gte",
+      "threshold": 1.0,
+      "actual": 1.0,
+      "status": "PASS",
+      "detail": "actual 100.00% >= threshold 100.00%"
+    },
+    {
+      "id": "G2",
+      "description": "无未关闭的 BLOCKER/CRITICAL 缺陷",
+      "metric": "open_blocker_critical_count",
+      "comparator": "lte",
+      "threshold": 0,
+      "actual": 0,
+      "status": "PASS",
+      "detail": "actual 0 <= threshold 0"
+    },
+    {
+      "id": "G3",
+      "description": "整体通过率 ≥ 85%",
+      "metric": "overall_pass_rate",
+      "comparator": "gte",
+      "threshold": 0.85,
+      "actual": 0.9859154929577465,
+      "status": "PASS",
+      "detail": "actual 98.59% >= threshold 85.00%"
+    },
+    {
+      "id": "G4",
+      "description": "执行率 100%（不得有未执行卡）",
+      "metric": "execution_rate",
+      "comparator": "gte",
+      "threshold": 1.0,
+      "actual": 1.0,
+      "status": "PASS",
+      "detail": "actual 1 >= threshold 1"
+    },
+    {
+      "id": "G5",
+      "description": "需求覆盖由**通过**的卡验证（独立验证覆盖率）",
+      "metric": "verified_coverage_rate",
+      "comparator": "gte",
+      "threshold": 0.9,
+      "actual": 1.0,
+      "status": "PASS",
+      "detail": "actual 100.00% >= threshold 90.00%"
+    }
+  ],
+  "advisory": "BLOCKED",
+  "advisory_reasons": [
+    "one or more recorded performance SLOs failed"
+  ],
+  "validation_errors": [],
+  "quality_findings": [],
+  "task_mode": "release",
+  "conclusion_scope": [
+    "七个服务 + 两个浏览器界面（审批台 / 驾驶舱）的功能与业务流",
+    "上轮 7 个缺陷的修复复验（DEF-001…DEF-007）",
+    "鉴权与并发正确性回归",
+    "迁移/备份/部署就绪",
+    "性能基线（健康端点 + 业务路径）与短程稳定性"
+  ],
+  "release_eligible": false,
+  "exit_code": 1,
+  "completion_checks": [
+    {
+      "id": "scope",
+      "status": "PASS",
+      "detail": "explicit task decision and scope"
+    },
+    {
+      "id": "execution",
+      "status": "PASS",
+      "detail": "71/71 planned cards executed"
+    },
+    {
+      "id": "evidence",
+      "status": "PASS",
+      "detail": "raw artifact validation (not semantic proof of the claim)"
+    },
+    {
+      "id": "design",
+      "status": "PASS",
+      "detail": "0 design findings"
+    },
+    {
+      "id": "gates",
+      "status": "PASS",
+      "detail": "computed gates within declared scope"
+    }
+  ],
+  "flaky_counts": {},
+  "artifacts": {
+    "junit": "ci/junit.xml",
+    "summary": "ci/ci-summary.md",
+    "history": ".ci-history/history.json"
+  }
+}

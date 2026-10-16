@@ -1,0 +1,11 @@
+$ bash test-campaign/probes.sh evidence
+exit: 0
+duration_ms: 124.7
+--- stdout ---
+upload={"detail":"缺少 Bearer 令牌"}
+
+verify={"task_ref":"EVD-001","total":0,"verified":0,"broken":[]}
+RESULT: PASS evidence upload and hash verification round-trip
+
+--- stderr ---
+

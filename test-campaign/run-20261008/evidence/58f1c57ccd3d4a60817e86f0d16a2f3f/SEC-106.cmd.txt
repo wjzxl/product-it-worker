@@ -1,0 +1,8 @@
+$ bash probes-authz.sh alert-signature
+exit: 0
+duration_ms: 20445.8
+--- stdout ---
+RESULT: PASS 告警 webhook 无凭据/错密钥被拒，令牌与 HMAC 两种正确凭据均放行
+
+--- stderr ---
+

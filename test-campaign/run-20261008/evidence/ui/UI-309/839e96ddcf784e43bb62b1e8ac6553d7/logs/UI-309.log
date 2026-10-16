@@ -1,0 +1,20 @@
+# UI-309 在界面上完成一次决策（浏览器端到端）
+started 2026-10-16T10:52:29+0800
+
+step 1 goto ok  [http://127.0.0.1:18001/]
+step 2 fill ok  [#access-token = <redacted>
+step 3 click ok  [#auth-form button[type=submit]]
+step 4 wait_for ok  [.row]
+step 5 click ok  [.row]
+step 6 wait_for ok  [button[data-action=approve]]
+step 7 eval ok  ["stubbed"]
+step 8 click ok  [button[data-action=approve]]
+step 9 wait_ms ok  [Nonems]
+step 10 assert_text ok  [found '审批已处理']
+
+## console
+[error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[error] Failed to load resource: the server responded with a status of 404 (Not Found)
+[error] Failed to load resource: the server responded with a status of 409 (Conflict)
+
+screenshot: screenshots/UI-309-105230.png

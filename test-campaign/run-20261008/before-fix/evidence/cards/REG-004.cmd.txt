@@ -1,0 +1,9 @@
+$ bash test-campaign/probes.sh gate-mode
+exit: 0
+duration_ms: 262.4
+--- stdout ---
+with mode=block the gate blocked=True; caller-supplied mode=off blocked=True
+RESULT: PASS rule mode is not caller-overridable
+
+--- stderr ---
+

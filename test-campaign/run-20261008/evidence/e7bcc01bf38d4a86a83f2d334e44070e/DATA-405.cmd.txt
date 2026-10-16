@@ -1,0 +1,9 @@
+$ python3 flows/runs_db_check.py
+exit: 0
+duration_ms: 383.5
+--- stdout ---
+  平台库 agent_runs 行数 = 5；agent-runtime API 可见运行数 = 5
+RESULT: PASS 运行归档与平台库一致（5 行）
+
+--- stderr ---
+

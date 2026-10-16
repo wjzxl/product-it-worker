@@ -1,0 +1,9 @@
+$ bash test-campaign/probes.sh gate-persist
+exit: 1
+duration_ms: 196.8
+--- stdout ---
+audit rows before=0 after_a_persist_false_check=0
+FINDING: persist=false suppressed the audit record for a gate check
+
+--- stderr ---
+

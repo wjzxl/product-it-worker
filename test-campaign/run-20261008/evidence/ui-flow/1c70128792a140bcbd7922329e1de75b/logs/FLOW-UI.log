@@ -1,0 +1,13 @@
+# FLOW-UI 审批人在界面上批准一条待审单据
+started 2026-10-16T10:58:15+0800
+
+step 1 goto ok  [http://127.0.0.1:18001/]
+step 2 fill ok  [#access-token = <redacted>
+step 3 click ok  [#auth-form button[type=submit]]
+step 4 wait_for ok  [.row]
+
+## console
+[error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[error] Failed to load resource: the server responded with a status of 404 (Not Found)
+
+screenshot: screenshots/FLOW-UI-FAIL-105836.png

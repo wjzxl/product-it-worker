@@ -1,0 +1,11 @@
+$ bash test-campaign/probes.sh alpha
+exit: 0
+duration_ms: 72.3
+--- stdout ---
+xor3: places=4 fitness=1.0
+par3: places=6 fitness=1.0
+loop: places=5 fitness=1.0
+RESULT: PASS alpha self-conformance is consistent
+
+--- stderr ---
+

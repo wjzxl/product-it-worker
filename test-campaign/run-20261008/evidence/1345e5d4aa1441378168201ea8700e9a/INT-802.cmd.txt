@@ -1,0 +1,8 @@
+$ T=apv_evt_$(date +%s); curl -s -m 10 -X POST http://127.0.0.1:18004/events -H 'Content-Type: application/json' -H 'X-Service-Token: <redacted>' -d "{\"event_id\":\"$T\",\"event_type\":\"approval.decided\",\"source\":\"probe\",\"trace_id\":\"$T\",\"payload\":{\"approval_id\":\"a\",\"task_ref\":\"$T\",\"decision\":\"approve\"}}" >/dev/null; curl -s -m 10 -X POST http://127.0.0.1:18004/events -H 'Content-Type: application/json' -H 'X-Service-Token: <redacted>' -d "{\"event_id\":\"$T\",\"event_type\":\"approval.decided\",\"source\":\"probe\",\"trace_id\":\"$T\",\"payload\":{\"approval_id\":\"a\",\"task_ref\":\"$T\",\"decision\":\"approve\"}}" | grep -q duplicate_skipped && echo 'RESULT: PASS 幂等去重生效'
+exit: 0
+duration_ms: 62.4
+--- stdout ---
+RESULT: PASS 幂等去重生效
+
+--- stderr ---
+

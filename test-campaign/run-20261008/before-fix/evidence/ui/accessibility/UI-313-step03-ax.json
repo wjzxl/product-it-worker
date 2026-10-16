@@ -1,0 +1,547 @@
+{
+  "test": "UI-313",
+  "step": 3,
+  "url": "http://127.0.0.1:18015/",
+  "captured_at": "2026-10-08T15:10:09+0800",
+  "nodes": [
+    {
+      "role": "RootWebArea",
+      "name": "平台度量面板 · Phase 2",
+      "backend_id": 92,
+      "focusable": true
+    },
+    {
+      "role": "heading",
+      "name": "平台度量面板 · 四域 + 平台域指标",
+      "backend_id": 100,
+      "level": 1
+    },
+    {
+      "role": "heading",
+      "name": "待决策队列（驾驶舱）",
+      "backend_id": 117,
+      "level": 2
+    },
+    {
+      "role": "table",
+      "name": "",
+      "backend_id": 118
+    },
+    {
+      "role": "heading",
+      "name": "Gate 决策（G1–G7，含平台域 G7 流程改进闸门）",
+      "backend_id": 149,
+      "level": 2
+    },
+    {
+      "role": "table",
+      "name": "",
+      "backend_id": 150
+    },
+    {
+      "role": "heading",
+      "name": "任务（按域）",
+      "backend_id": 162,
+      "level": 2
+    },
+    {
+      "role": "table",
+      "name": "",
+      "backend_id": 163
+    },
+    {
+      "role": "heading",
+      "name": "审批决策 / 状态",
+      "backend_id": 169,
+      "level": 2
+    },
+    {
+      "role": "table",
+      "name": "",
+      "backend_id": 170
+    },
+    {
+      "role": "heading",
+      "name": "LLM 成本（LiteLLM 计量）",
+      "backend_id": 178,
+      "level": 2
+    },
+    {
+      "role": "table",
+      "name": "",
+      "backend_id": 179
+    },
+    {
+      "role": "row",
+      "name": "",
+      "backend_id": 120
+    },
+    {
+      "role": "row",
+      "name": "",
+      "backend_id": 127
+    },
+    {
+      "role": "row",
+      "name": "",
+      "backend_id": 137
+    },
+    {
+      "role": "row",
+      "name": "",
+      "backend_id": 152
+    },
+    {
+      "role": "row",
+      "name": "",
+      "backend_id": 157
+    },
+    {
+      "role": "row",
+      "name": "",
+      "backend_id": 165
+    },
+    {
+      "role": "row",
+      "name": "",
+      "backend_id": 172
+    },
+    {
+      "role": "row",
+      "name": "",
+      "backend_id": 175
+    },
+    {
+      "role": "row",
+      "name": "",
+      "backend_id": 181
+    },
+    {
+      "role": "row",
+      "name": "",
+      "backend_id": 186
+    },
+    {
+      "role": "row",
+      "name": "",
+      "backend_id": 191
+    },
+    {
+      "role": "row",
+      "name": "",
+      "backend_id": 196
+    },
+    {
+      "role": "row",
+      "name": "",
+      "backend_id": 201
+    },
+    {
+      "role": "row",
+      "name": "",
+      "backend_id": 206
+    },
+    {
+      "role": "row",
+      "name": "",
+      "backend_id": 211
+    },
+    {
+      "role": "row",
+      "name": "",
+      "backend_id": 216
+    },
+    {
+      "role": "row",
+      "name": "",
+      "backend_id": 221
+    },
+    {
+      "role": "columnheader",
+      "name": "类型",
+      "backend_id": 121
+    },
+    {
+      "role": "columnheader",
+      "name": "事项",
+      "backend_id": 122
+    },
+    {
+      "role": "columnheader",
+      "name": "做了什么/缺口",
+      "backend_id": 123
+    },
+    {
+      "role": "columnheader",
+      "name": "为什么卡住",
+      "backend_id": 124
+    },
+    {
+      "role": "columnheader",
+      "name": "任务",
+      "backend_id": 125
+    },
+    {
+      "role": "columnheader",
+      "name": "动作",
+      "backend_id": 126
+    },
+    {
+      "role": "cell",
+      "name": "approval",
+      "backend_id": 128
+    },
+    {
+      "role": "cell",
+      "name": "GATE_REQUIREMENT_REVIEW｜注入载荷 <img src=x onerror=alert('xss')>",
+      "backend_id": 129
+    },
+    {
+      "role": "cell",
+      "name": "需求原文含脚本 <script>alert('xss-script')</script> 与图片 <img src=x",
+      "backend_id": 130
+    },
+    {
+      "role": "cell",
+      "name": "等待人审决策",
+      "backend_id": 131
+    },
+    {
+      "role": "cell",
+      "name": "camp1008-ui-xss",
+      "backend_id": 132
+    },
+    {
+      "role": "cell",
+      "name": "批准 否决 退回",
+      "backend_id": 133
+    },
+    {
+      "role": "cell",
+      "name": "approval",
+      "backend_id": 138
+    },
+    {
+      "role": "cell",
+      "name": "GATE_REQUIREMENT_REVIEW｜产品域 G1（UI 夹具）",
+      "backend_id": 139
+    },
+    {
+      "role": "cell",
+      "name": "起草 PRD v1：报表导出支持按日期筛选",
+      "backend_id": 140
+    },
+    {
+      "role": "cell",
+      "name": "等待人审决策",
+      "backend_id": 141
+    },
+    {
+      "role": "cell",
+      "name": "camp1008-ui-normal",
+      "backend_id": 142
+    },
+    {
+      "role": "cell",
+      "name": "批准 否决 退回",
+      "backend_id": 143
+    },
+    {
+      "role": "columnheader",
+      "name": "Gate",
+      "backend_id": 153
+    },
+    {
+      "role": "columnheader",
+      "name": "域",
+      "backend_id": 154
+    },
+    {
+      "role": "columnheader",
+      "name": "审批数",
+      "backend_id": 155
+    },
+    {
+      "role": "columnheader",
+      "name": "平均决策(s)",
+      "backend_id": 156
+    },
+    {
+      "role": "cell",
+      "name": "G1 需求评审",
+      "backend_id": 158
+    },
+    {
+      "role": "cell",
+      "name": "产品域",
+      "backend_id": 159
+    },
+    {
+      "role": "cell",
+      "name": "2",
+      "backend_id": 160
+    },
+    {
+      "role": "cell",
+      "name": "-",
+      "backend_id": 161
+    },
+    {
+      "role": "columnheader",
+      "name": "域",
+      "backend_id": 166
+    },
+    {
+      "role": "columnheader",
+      "name": "任务数",
+      "backend_id": 167
+    },
+    {
+      "role": "columnheader",
+      "name": "完成",
+      "backend_id": 168
+    },
+    {
+      "role": "columnheader",
+      "name": "决策分布",
+      "backend_id": 173
+    },
+    {
+      "role": "columnheader",
+      "name": "状态分布",
+      "backend_id": 174
+    },
+    {
+      "role": "cell",
+      "name": "-",
+      "backend_id": 176
+    },
+    {
+      "role": "cell",
+      "name": "pending: 2",
+      "backend_id": 177
+    },
+    {
+      "role": "columnheader",
+      "name": "模型",
+      "backend_id": 182
+    },
+    {
+      "role": "columnheader",
+      "name": "调用数",
+      "backend_id": 183
+    },
+    {
+      "role": "columnheader",
+      "name": "花费($)",
+      "backend_id": 184
+    },
+    {
+      "role": "columnheader",
+      "name": "tokens",
+      "backend_id": 185
+    },
+    {
+      "role": "cell",
+      "name": "deepseek/deepseek-chat",
+      "backend_id": 187
+    },
+    {
+      "role": "cell",
+      "name": "212",
+      "backend_id": 188
+    },
+    {
+      "role": "cell",
+      "name": "0.5447",
+      "backend_id": 189
+    },
+    {
+      "role": "cell",
+      "name": "571112",
+      "backend_id": 190
+    },
+    {
+      "role": "cell",
+      "name": "openai/qwen-max",
+      "backend_id": 192
+    },
+    {
+      "role": "cell",
+      "name": "71",
+      "backend_id": 193
+    },
+    {
+      "role": "cell",
+      "name": "0.0292",
+      "backend_id": 194
+    },
+    {
+      "role": "cell",
+      "name": "82189",
+      "backend_id": 195
+    },
+    {
+      "role": "cell",
+      "name": "openai/qwen-plus",
+      "backend_id": 197
+    },
+    {
+      "role": "cell",
+      "name": "39",
+      "backend_id": 198
+    },
+    {
+      "role": "cell",
+      "name": "0.0081",
+      "backend_id": 199
+    },
+    {
+      "role": "cell",
+      "name": "28954",
+      "backend_id": 200
+    },
+    {
+      "role": "cell",
+      "name": "openai/text-embedding-v3",
+      "backend_id": 202
+    },
+    {
+      "role": "cell",
+      "name": "30",
+      "backend_id": 203
+    },
+    {
+      "role": "cell",
+      "name": "0.0000",
+      "backend_id": 204
+    },
+    {
+      "role": "cell",
+      "name": "3181",
+      "backend_id": 205
+    },
+    {
+      "role": "cell",
+      "name": "deepseek-chat",
+      "backend_id": 207
+    },
+    {
+      "role": "cell",
+      "name": "1",
+      "backend_id": 208
+    },
+    {
+      "role": "cell",
+      "name": "0.0000",
+      "backend_id": 209
+    },
+    {
+      "role": "cell",
+      "name": "0",
+      "backend_id": 210
+    },
+    {
+      "role": "cell",
+      "name": "qwen-embed",
+      "backend_id": 212
+    },
+    {
+      "role": "cell",
+      "name": "1",
+      "backend_id": 213
+    },
+    {
+      "role": "cell",
+      "name": "0.0000",
+      "backend_id": 214
+    },
+    {
+      "role": "cell",
+      "name": "0",
+      "backend_id": 215
+    },
+    {
+      "role": "cell",
+      "name": "qwen-plus",
+      "backend_id": 217
+    },
+    {
+      "role": "cell",
+      "name": "1",
+      "backend_id": 218
+    },
+    {
+      "role": "cell",
+      "name": "0.0000",
+      "backend_id": 219
+    },
+    {
+      "role": "cell",
+      "name": "0",
+      "backend_id": 220
+    },
+    {
+      "role": "cell",
+      "name": "openai/mock-gpt",
+      "backend_id": 222
+    },
+    {
+      "role": "cell",
+      "name": "2",
+      "backend_id": 223
+    },
+    {
+      "role": "cell",
+      "name": "0.0000",
+      "backend_id": 224
+    },
+    {
+      "role": "cell",
+      "name": "101",
+      "backend_id": 225
+    },
+    {
+      "role": "button",
+      "name": "批准",
+      "backend_id": 134,
+      "focusable": true,
+      "invalid": "false"
+    },
+    {
+      "role": "button",
+      "name": "否决",
+      "backend_id": 135,
+      "focusable": true,
+      "invalid": "false"
+    },
+    {
+      "role": "button",
+      "name": "退回",
+      "backend_id": 136,
+      "focusable": true,
+      "invalid": "false"
+    },
+    {
+      "role": "button",
+      "name": "批准",
+      "backend_id": 144,
+      "focusable": true,
+      "invalid": "false"
+    },
+    {
+      "role": "button",
+      "name": "否决",
+      "backend_id": 145,
+      "focusable": true,
+      "invalid": "false"
+    },
+    {
+      "role": "button",
+      "name": "退回",
+      "backend_id": 146,
+      "focusable": true,
+      "invalid": "false"
+    }
+  ]
+}

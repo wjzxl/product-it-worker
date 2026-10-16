@@ -1,0 +1,15 @@
+$ bash probes-authz.sh no-token
+exit: 0
+duration_ms: 172.6
+--- stdout ---
+  POST /approvals                 → 401（期望 401）
+  POST /tasks                     → 401（期望 401）
+  POST /runs                      → 401（期望 401）
+  POST /tools/invoke              → 401（期望 401）
+  POST /admin/sweep               → 401（期望 401）
+  GET  /approvals（读也受保护）   → 401（期望 401）
+  GET  /health（默认豁免）        → 200（期望 200）
+RESULT: PASS 无令牌的读写请求被拒，健康检查豁免生效
+
+--- stderr ---
+

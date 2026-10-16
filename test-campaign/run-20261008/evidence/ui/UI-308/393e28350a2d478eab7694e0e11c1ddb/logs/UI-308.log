@@ -1,0 +1,15 @@
+# UI-308 无令牌时必须显示鉴权错误，不得伪装成空审批队列
+started 2026-10-16T10:48:01+0800
+
+step 1 goto ok  [http://127.0.0.1:18001/]
+step 2 wait_for ok  [#request-error:not([hidden])]
+step 3 assert_visible ok  [#request-error]
+step 4 assert_js ok  [js -> True]
+step 5 assert_no_text ok  [absent '暂无待审批事项']
+step 6 assert_text ok  [found '审批列表加载失败']
+
+## console
+[error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[error] Failed to load resource: the server responded with a status of 404 (Not Found)
+
+screenshot: screenshots/UI-308-104801.png

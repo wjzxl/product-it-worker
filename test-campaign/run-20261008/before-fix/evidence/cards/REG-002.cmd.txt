@@ -1,0 +1,9 @@
+$ bash test-campaign/probes.sh cross-tenant-read
+exit: 0
+duration_ms: 189.9
+--- stdout ---
+created=apv_3f1f945f0c30 as tenantA; read as tenantB http=404
+RESULT: PASS cross-tenant read rejected
+
+--- stderr ---
+

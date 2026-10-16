@@ -1,0 +1,10 @@
+# UI-304 XSS 载荷只作为文本出现：不生成元素、不执行脚本
+started 2026-10-08T15:09:16+0800
+
+step 1 goto ok  [http://127.0.0.1:18001/]
+
+## console
+[error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[error] Failed to load resource: the server responded with a status of 404 (Not Found)
+
+screenshot: screenshots/UI-304-FAIL-150926.png

@@ -1,0 +1,9 @@
+$ bash probes-concurrency.sh evidence-race
+exit: 0
+duration_ms: 352.6
+--- stdout ---
+uploads=6 failed=0 rows_inserted=6
+RESULT: PASS concurrent evidence uploads all persisted
+
+--- stderr ---
+

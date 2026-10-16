@@ -1,0 +1,11 @@
+$ python3 scripts/check_deployment_readiness.py --env-file .env.prod.example
+exit: 0
+duration_ms: 110.1
+--- stdout ---
+已从 .env.prod.example 加载 46 个变量（已存在的环境变量优先）
+部署档位 PLATFORM_ENV=prod
+
+✅ 上线就绪：治理开关均为严格档位，凭据齐全。
+
+--- stderr ---
+

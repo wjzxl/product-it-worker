@@ -1,0 +1,9 @@
+$ python3 flows/run_flow.py --domain test
+exit: 1
+duration_ms: 2202.9
+--- stdout ---
+RESULT: FAIL 启动测试域运行失败 HTTP 500: {'detail': 'Internal Server Error'}
+（耗时 2.1s）
+
+--- stderr ---
+

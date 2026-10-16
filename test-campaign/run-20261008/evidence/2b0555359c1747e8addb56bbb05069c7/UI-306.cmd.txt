@@ -1,0 +1,30 @@
+$ python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui --only UI-306 --baselines baselines
+exit: 1
+duration_ms: 9830.6
+--- stdout ---
+套件      : 审批台（人做决策的界面）  (http://127.0.0.1:18001)
+  UI-306     FAIL   视觉基线：审批台外壳（列表为动态区，已遮蔽）
+             ! 断言失败：视觉回归：108815 of 1296000 pixels differ (8.396% > 3.000% allowed) | 实际观测：{"name": "console-shell", "current": "evidence/ui/ba6552077fd94da193c6239b4
+  UI-301     NONE   审批台加载：静态外壳可见、登录后可列出待办且无控制台报错
+             ! not selected
+  UI-302     NONE   待审列表渲染出已存在的审批单（数据链路可用）
+             ! not selected
+  UI-303     NONE   点击审批单后详情渲染三要素（做了什么/依据/风险自评）
+             ! not selected
+  UI-304     NONE   XSS 载荷只作为文本出现：不生成元素、不执行脚本
+             ! not selected
+  UI-305     NONE   审批台可访问性：按钮有可访问名（屏幕阅读器可用）
+             ! not selected
+  UI-307     NONE   视觉比对负向控制：注入真实样式缺陷必须被发现
+             ! not selected
+  UI-308     NONE   无令牌时必须显示鉴权错误，不得伪装成空审批队列
+             ! not selected
+
+结果      : {'FAIL': 1, 'NOT_EXECUTED': 7}
+截图      : 1 张 -> evidence/ui/screenshots
+视觉回归  : {'DIFF': 1} (基线 3 张于 /Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008/baselines)
+             ! [DIFF] console-shell: 108815 of 1296000 pixels differ (8.396% > 3.000% allowed) (108815 px, 3 处区域) [已屏蔽 3 个动态区域]
+报告      : evidence/ui/browser-report.json
+
+--- stderr ---
+

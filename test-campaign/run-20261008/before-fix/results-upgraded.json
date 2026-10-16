@@ -1,0 +1,2898 @@
+{
+ "schema_version": "1.0",
+ "campaign": {
+  "id": "camp-pst-20261008",
+  "name": "产品研发智能化平台 · 发布判定复测（第 2 次完整战役）",
+  "target": "http://127.0.0.1:18001",
+  "commit": "643e610",
+  "environment": "local-disposable (PG pst_sut + qdrant + 7 services)",
+  "run_marker": "camp1008",
+  "objective": "回答：当前 revision 是否可以从 NO_RELEASE 改为可发布；新增 UI 与性能两个此前未覆盖的维度。",
+  "out_of_scope": [
+   "真实 LLM 质量与提示注入（SUT 使用确定性兜底 LLM，模型质量未测）",
+   "真实飞书推送（无企业应用凭证）",
+   "真实 GitLab MR 全生命周期（无仓库令牌）",
+   "公网 Caddy + 企业 SSO 入口（本机无域名/证书/IdP）",
+   "多副本水平扩展（单实例环境）",
+   "浏览器兼容性矩阵（仅 Chrome 系）"
+  ],
+  "executed_by": "DSH deepseek-flash + full-system-testing skill",
+  "started_at": "2026-10-08T14:57:10+0800",
+  "finished_at": "2026-10-08T15:14:05+0800"
+ },
+ "quality_gates": [
+  {
+   "id": "G1",
+   "description": "所有 P0 卡通过",
+   "metric": "p0_pass_rate",
+   "comparator": "gte",
+   "threshold": 1.0
+  },
+  {
+   "id": "G2",
+   "description": "无未关闭的 BLOCKER/CRITICAL 缺陷",
+   "metric": "open_blocker_critical_count",
+   "comparator": "lte",
+   "threshold": 0
+  },
+  {
+   "id": "G3",
+   "description": "整体通过率 ≥ 85%",
+   "metric": "overall_pass_rate",
+   "comparator": "gte",
+   "threshold": 0.85
+  },
+  {
+   "id": "G4",
+   "description": "执行率 100%（不得有未执行卡）",
+   "metric": "execution_rate",
+   "comparator": "gte",
+   "threshold": 1.0
+  },
+  {
+   "id": "G5",
+   "description": "需求覆盖由**通过**的卡验证（独立验证覆盖率）",
+   "metric": "verified_coverage_rate",
+   "comparator": "gte",
+   "threshold": 0.9
+  }
+ ],
+ "cards": [
+  {
+   "id": "REG-001",
+   "title": "IM 回调必须验签（BUG-001）",
+   "layer": "api",
+   "priority": "P0",
+   "verdict": "PASS",
+   "expected": "im-callback 探针输出 RESULT: PASS",
+   "actual": "exit 0; stdout: callback_http=503 status_after=pending (no signature, no auth, tenant header absent) RESULT: PASS IM callback cannot decide a gate without authentication ",
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "requirement_ids": [
+    "REQ-004"
+   ],
+   "feature_ids": [
+    "F-gate"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/REG-001.cmd.txt",
+     "command": "bash test-campaign/probes.sh im-callback",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 241.967,
+   "executed_at": "2026-10-08T14:57:11+0800",
+   "input": "bash test-campaign/probes.sh im-callback",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "im-callback 探针输出 RESULT: PASS"
+   },
+   "repro": "bash test-campaign/probes.sh im-callback"
+  },
+  {
+   "id": "REG-002",
+   "title": "跨租户读取被拒（BUG-002 同源）",
+   "layer": "api",
+   "priority": "P0",
+   "verdict": "PASS",
+   "expected": "cross-tenant-read 探针输出 RESULT: PASS",
+   "actual": "exit 0; stdout: created=apv_3f1f945f0c30 as tenantA; read as tenantB http=404 RESULT: PASS cross-tenant read rejected ",
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "requirement_ids": [
+    "REQ-007"
+   ],
+   "feature_ids": [
+    "F-taskfsm"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/REG-002.cmd.txt",
+     "command": "bash test-campaign/probes.sh cross-tenant-read",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 189.917,
+   "executed_at": "2026-10-08T14:57:11+0800",
+   "input": "bash test-campaign/probes.sh cross-tenant-read",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "cross-tenant-read 探针输出 RESULT: PASS"
+   },
+   "repro": "bash test-campaign/probes.sh cross-tenant-read"
+  },
+  {
+   "id": "REG-003",
+   "title": "resubmit 遵守租户边界（BUG-002）",
+   "layer": "api",
+   "priority": "P1",
+   "verdict": "PASS",
+   "expected": "resubmit-tenant 探针输出 RESULT: PASS",
+   "actual": "exit 0; stdout: before=revised resubmit_as_tenantB_http=404 after=revised RESULT: PASS resubmit honours tenant scope ",
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "requirement_ids": [
+    "REQ-007"
+   ],
+   "feature_ids": [
+    "F-gate"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/REG-003.cmd.txt",
+     "command": "bash test-campaign/probes.sh resubmit-tenant",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 366.702,
+   "executed_at": "2026-10-08T14:57:11+0800",
+   "input": "bash test-campaign/probes.sh resubmit-tenant",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "resubmit-tenant 探针输出 RESULT: PASS"
+   },
+   "repro": "bash test-campaign/probes.sh resubmit-tenant"
+  },
+  {
+   "id": "REG-004",
+   "title": "闸门模式不可被调用方覆盖（BUG-003）",
+   "layer": "api",
+   "priority": "P0",
+   "verdict": "PASS",
+   "expected": "gate-mode 探针输出 RESULT: PASS",
+   "actual": "exit 0; stdout: with mode=block the gate blocked=True; caller-supplied mode=off blocked=True RESULT: PASS rule mode is not caller-overridable ",
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "requirement_ids": [
+    "REQ-005"
+   ],
+   "feature_ids": [
+    "F-enggate"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/REG-004.cmd.txt",
+     "command": "bash test-campaign/probes.sh gate-mode",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 262.42,
+   "executed_at": "2026-10-08T14:57:12+0800",
+   "input": "bash test-campaign/probes.sh gate-mode",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "gate-mode 探针输出 RESULT: PASS"
+   },
+   "repro": "bash test-campaign/probes.sh gate-mode"
+  },
+  {
+   "id": "REG-005",
+   "title": "每次闸门判定都留痕（BUG-014）",
+   "layer": "api",
+   "priority": "P0",
+   "verdict": "PASS",
+   "expected": "gate-persist 探针输出 RESULT: PASS",
+   "actual": "exit 0; stdout: audit rows before=0 after_a_persist_false_check=1 RESULT: PASS every gate check is persisted ",
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "requirement_ids": [
+    "REQ-005"
+   ],
+   "feature_ids": [
+    "F-enggate"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/REG-005.cmd.txt",
+     "command": "bash test-campaign/probes.sh gate-persist",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 295.555,
+   "executed_at": "2026-10-08T14:57:12+0800",
+   "input": "bash test-campaign/probes.sh gate-persist",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "gate-persist 探针输出 RESULT: PASS"
+   },
+   "repro": "bash test-campaign/probes.sh gate-persist"
+  },
+  {
+   "id": "REG-006",
+   "title": "超时处置取服务端信任等级（BUG-004）",
+   "layer": "api",
+   "priority": "P0",
+   "verdict": "PASS",
+   "expected": "timeout-auto 探针输出 RESULT: PASS",
+   "actual": "exit 0; stdout: overdue approval with caller-declared level=L1: status after sweep=rejected RESULT: PASS timeout did not auto-approve on a self-declared level ",
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "requirement_ids": [
+    "REQ-004"
+   ],
+   "feature_ids": [
+    "F-gate"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/REG-006.cmd.txt",
+     "command": "bash test-campaign/probes.sh timeout-auto",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 258.711,
+   "executed_at": "2026-10-08T14:57:12+0800",
+   "input": "bash test-campaign/probes.sh timeout-auto",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "timeout-auto 探针输出 RESULT: PASS"
+   },
+   "repro": "bash test-campaign/probes.sh timeout-auto"
+  },
+  {
+   "id": "REG-007",
+   "title": "等待审批不得被无据流转（BUG-005）",
+   "layer": "api",
+   "priority": "P0",
+   "verdict": "PASS",
+   "expected": "task-fsm 探针输出 RESULT: PASS",
+   "actual": "exit 0; stdout: before=waiting_approval transition_http=409 after=waiting_approval RESULT: PASS approval wait cannot be bypassed ",
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "requirement_ids": [
+    "REQ-006"
+   ],
+   "feature_ids": [
+    "F-taskfsm"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/REG-007.cmd.txt",
+     "command": "bash test-campaign/probes.sh task-fsm",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 492.694,
+   "executed_at": "2026-10-08T14:57:13+0800",
+   "input": "bash test-campaign/probes.sh task-fsm",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "task-fsm 探针输出 RESULT: PASS"
+   },
+   "repro": "bash test-campaign/probes.sh task-fsm"
+  },
+  {
+   "id": "REG-008",
+   "title": "非法流转 409（FSM-002）",
+   "layer": "api",
+   "priority": "P1",
+   "verdict": "PASS",
+   "expected": "task-fsm-illegal 探针输出 RESULT: PASS",
+   "actual": "exit 0; stdout: pending -> done http=409 RESULT: PASS illegal transition rejected with 409 ",
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "requirement_ids": [
+    "REQ-006"
+   ],
+   "feature_ids": [
+    "F-taskfsm"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/REG-008.cmd.txt",
+     "command": "bash test-campaign/probes.sh task-fsm-illegal",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 105.768,
+   "executed_at": "2026-10-08T14:57:13+0800",
+   "input": "bash test-campaign/probes.sh task-fsm-illegal",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "task-fsm-illegal 探针输出 RESULT: PASS"
+   },
+   "repro": "bash test-campaign/probes.sh task-fsm-illegal"
+  },
+  {
+   "id": "REG-009",
+   "title": "任务详情租户隔离（BUG-006）",
+   "layer": "api",
+   "priority": "P0",
+   "verdict": "PASS",
+   "expected": "task-tenant 探针输出 RESULT: PASS",
+   "actual": "exit 0; stdout: task=tsk_1eb8e6669c2b created; tenantB read http=404 tenantB transition http=404 RESULT: PASS task detail is tenant-scoped ",
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "requirement_ids": [
+    "REQ-007"
+   ],
+   "feature_ids": [
+    "F-taskfsm"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/REG-009.cmd.txt",
+     "command": "bash test-campaign/probes.sh task-tenant",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 127.847,
+   "executed_at": "2026-10-08T14:57:13+0800",
+   "input": "bash test-campaign/probes.sh task-tenant",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "task-tenant 探针输出 RESULT: PASS"
+   },
+   "repro": "bash test-campaign/probes.sh task-tenant"
+  },
+  {
+   "id": "REG-010",
+   "title": "重复外部引用不 500（BUG-015）",
+   "layer": "api",
+   "priority": "P1",
+   "verdict": "PASS",
+   "expected": "task-dup-ref 探针输出 RESULT: PASS",
+   "actual": "exit 0; stdout: second create with empty external_ref http=201 RESULT: PASS duplicate external_ref handled without a 500 ",
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "requirement_ids": [
+    "REQ-007"
+   ],
+   "feature_ids": [
+    "F-taskfsm"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/REG-010.cmd.txt",
+     "command": "bash test-campaign/probes.sh task-dup-ref",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 95.404,
+   "executed_at": "2026-10-08T14:57:13+0800",
+   "input": "bash test-campaign/probes.sh task-dup-ref",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "task-dup-ref 探针输出 RESULT: PASS"
+   },
+   "repro": "bash test-campaign/probes.sh task-dup-ref"
+  },
+  {
+   "id": "REG-011",
+   "title": "被否决的运行归档可见（BUG-012）",
+   "layer": "api",
+   "priority": "P0",
+   "verdict": "PASS",
+   "expected": "reject-archive 探针输出 RESULT: PASS",
+   "actual": "exit 0; stdout: run=RT-001 approval=apv_40f02afea5c7 resume_status=rejected archive_status=rejected RESULT: PASS archive status records the rejection ",
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "requirement_ids": [
+    "REQ-010"
+   ],
+   "feature_ids": [
+    "F-runtime"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/REG-011.cmd.txt",
+     "command": "bash test-campaign/probes.sh reject-archive",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 346.027,
+   "executed_at": "2026-10-08T14:57:13+0800",
+   "input": "bash test-campaign/probes.sh reject-archive",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "reject-archive 探针输出 RESULT: PASS"
+   },
+   "repro": "bash test-campaign/probes.sh reject-archive"
+  },
+  {
+   "id": "REG-012",
+   "title": "等待人审不得被 /wake 吞掉（BUG-007）",
+   "layer": "api",
+   "priority": "P0",
+   "verdict": "PASS",
+   "expected": "wake-guard 探针输出 RESULT: PASS",
+   "actual": "exit 0; stdout: before=gate_g1 wake_http=409 after=gate_g1 RESULT: PASS wake respected the approval wait ",
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "requirement_ids": [
+    "REQ-004"
+   ],
+   "feature_ids": [
+    "F-runtime"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/REG-012.cmd.txt",
+     "command": "bash test-campaign/probes.sh wake-guard",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 249.731,
+   "executed_at": "2026-10-08T14:57:14+0800",
+   "input": "bash test-campaign/probes.sh wake-guard",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "wake-guard 探针输出 RESULT: PASS"
+   },
+   "repro": "bash test-campaign/probes.sh wake-guard"
+  },
+  {
+   "id": "REG-013",
+   "title": "启发式挖掘方向正确（BUG-008）",
+   "layer": "api",
+   "priority": "P1",
+   "verdict": "PASS",
+   "expected": "heuristic 探针输出 RESULT: PASS",
+   "actual": "exit 0; stdout: dependencies: [{'from': 'B', 'to': 'A', 'dependency': 0.833, 'observations': 5}] self_fitness: 1.0 RESULT: PASS heuristic directions are correct and self-conformance is 1.0 ",
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "requirement_ids": [
+    "REQ-013"
+   ],
+   "feature_ids": [
+    "F-mining"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/REG-013.cmd.txt",
+     "command": "bash test-campaign/probes.sh heuristic",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 97.134,
+   "executed_at": "2026-10-08T14:57:14+0800",
+   "input": "bash test-campaign/probes.sh heuristic",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "heuristic 探针输出 RESULT: PASS"
+   },
+   "repro": "bash test-campaign/probes.sh heuristic"
+  },
+  {
+   "id": "REG-014",
+   "title": "α 挖掘自洽（BUG-009）",
+   "layer": "api",
+   "priority": "P1",
+   "verdict": "PASS",
+   "expected": "alpha 探针输出 RESULT: PASS",
+   "actual": "exit 0; stdout: xor3: places=4 fitness=1.0 par3: places=6 fitness=1.0 loop: places=5 fitness=1.0 RESULT: PASS alpha self-conformance is consistent ",
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "requirement_ids": [
+    "REQ-013"
+   ],
+   "feature_ids": [
+    "F-mining"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/REG-014.cmd.txt",
+     "command": "bash test-campaign/probes.sh alpha",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 81.255,
+   "executed_at": "2026-10-08T14:57:14+0800",
+   "input": "bash test-campaign/probes.sh alpha",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "alpha 探针输出 RESULT: PASS"
+   },
+   "repro": "bash test-campaign/probes.sh alpha"
+  },
+  {
+   "id": "REG-015",
+   "title": "DFG 一致性检出异常（BUG-010）",
+   "layer": "api",
+   "priority": "P1",
+   "verdict": "PASS",
+   "expected": "dfg-conformance 探针输出 RESULT: PASS",
+   "actual": "exit 0; stdout: min_support=1: fitness=0.75 deviations=1 RESULT: PASS dfg conformance detects the unique anomaly ",
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "requirement_ids": [
+    "REQ-013"
+   ],
+   "feature_ids": [
+    "F-mining"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/REG-015.cmd.txt",
+     "command": "bash test-campaign/probes.sh dfg-conformance",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 79.222,
+   "executed_at": "2026-10-08T14:57:14+0800",
+   "input": "bash test-campaign/probes.sh dfg-conformance",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "dfg-conformance 探针输出 RESULT: PASS"
+   },
+   "repro": "bash test-campaign/probes.sh dfg-conformance"
+  },
+  {
+   "id": "REG-016",
+   "title": "LLM 畸形输出回退规则（BUG-011）",
+   "layer": "api",
+   "priority": "P1",
+   "verdict": "PASS",
+   "expected": "llm-fallback 探针输出 RESULT: PASS",
+   "actual": "exit 0; stdout: non-JSON body: fell back to 1 rule-based proposal(s) no choices key: fell back to 1 rule-based proposal(s) RESULT: PASS malformed LLM responses fall back to rule-based proposals ; stderr: LLM 提案生成失败（ValueError: Expecting value: line 1 column 1 (char 0)），回退规则化提案 LLM 提案生成失败（KeyError: 'choices'），回退规则化提案 ",
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "requirement_ids": [
+    "REQ-013"
+   ],
+   "feature_ids": [
+    "F-mining"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/REG-016.cmd.txt",
+     "command": "bash test-campaign/probes.sh llm-fallback",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 245.819,
+   "executed_at": "2026-10-08T14:57:14+0800",
+   "input": "bash test-campaign/probes.sh llm-fallback",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "llm-fallback 探针输出 RESULT: PASS"
+   },
+   "repro": "bash test-campaign/probes.sh llm-fallback"
+  },
+  {
+   "id": "REG-017",
+   "title": "证据上传与哈希复验（EVD）",
+   "layer": "api",
+   "priority": "P1",
+   "verdict": "PASS",
+   "expected": "evidence 探针输出 RESULT: PASS",
+   "actual": "exit 0; stdout: upload={\"id\":\"evd_9174633bc893\",\"tenant\":\"default\",\"task_ref\":\"EVD-001\",\"acceptance_item\":\"A1\",\"kind\":\"log\",\"filename\":\"evd.txt\",\"sha256\":\"82b8530193cb9baf074c6f06aa5c8eeeca1c1bd6c5c4b320a9fe773a29...",
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "requirement_ids": [
+    "REQ-011"
+   ],
+   "feature_ids": [
+    "F-evidence"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/REG-017.cmd.txt",
+     "command": "bash test-campaign/probes.sh evidence",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 143.557,
+   "executed_at": "2026-10-08T14:57:14+0800",
+   "input": "bash test-campaign/probes.sh evidence",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "evidence 探针输出 RESULT: PASS"
+   },
+   "repro": "bash test-campaign/probes.sh evidence"
+  },
+  {
+   "id": "REG-018",
+   "title": "健康如实报告持久化形态（WP7）",
+   "layer": "api",
+   "priority": "P1",
+   "verdict": "PASS",
+   "expected": "health-checkpointer 探针输出 RESULT: PASS",
+   "actual": "exit 0; stdout: health reports checkpointer.configured=memory (instance was started with CHECKPOINTER=memory) RESULT: PASS health reports the configured checkpointer ",
+   "risk": "原战役缺陷复发则说明修复未生效",
+   "requirement_ids": [
+    "REQ-001"
+   ],
+   "feature_ids": [
+    "F-health"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/REG-018.cmd.txt",
+     "command": "bash test-campaign/probes.sh health-checkpointer",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 75.637,
+   "executed_at": "2026-10-08T14:57:14+0800",
+   "input": "bash test-campaign/probes.sh health-checkpointer",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "health-checkpointer 探针输出 RESULT: PASS"
+   },
+   "repro": "bash test-campaign/probes.sh health-checkpointer"
+  },
+  {
+   "id": "SEC-101",
+   "title": "写接口鉴权覆盖率为 100%（清点）",
+   "layer": "security",
+   "priority": "P0",
+   "verdict": "PASS",
+   "expected": "audit 输出“无鉴权 0 个”",
+   "actual": "exit 0; stdout: 服务                写接口  无鉴权写接口  读接口  覆盖方式 ------------------------------------------------------------------------------------ agent-runtime           4            0       9  中间件 +  approval-gateway...",
+   "risk": "有写接口无鉴权＝端口可达即有写权限",
+   "requirement_ids": [
+    "REQ-002"
+   ],
+   "feature_ids": [
+    "F-authz"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/SEC-101.cmd.txt",
+     "command": "python3 platform/scripts/audit_endpoint_auth.py --strict",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 666.898,
+   "executed_at": "2026-10-08T14:57:15+0800",
+   "input": "python3 platform/scripts/audit_endpoint_auth.py --strict",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "audit 输出“无鉴权 0 个”"
+   },
+   "repro": "python3 platform/scripts/audit_endpoint_auth.py --strict"
+  },
+  {
+   "id": "SEC-102",
+   "title": "无令牌的读写请求被拒，健康检查豁免",
+   "layer": "security",
+   "priority": "P0",
+   "verdict": "PASS",
+   "expected": "探针输出 RESULT: PASS",
+   "actual": "exit 0; stdout:   POST /approvals                 → 401（期望 401）   POST /tasks                     → 401（期望 401）   POST /runs                      → 401（期望 401）   POST /tools/invoke              → 401（期望 401）   POS...",
+   "risk": "鉴权未生效则所有治理开关形同虚设",
+   "requirement_ids": [
+    "REQ-002"
+   ],
+   "feature_ids": [
+    "F-authz"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/SEC-102.cmd.txt",
+     "command": "bash probes-authz.sh no-token",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 150.604,
+   "executed_at": "2026-10-08T14:57:15+0800",
+   "input": "bash probes-authz.sh no-token",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "探针输出 RESULT: PASS"
+   },
+   "repro": "bash probes-authz.sh no-token"
+  },
+  {
+   "id": "SEC-103",
+   "title": "带令牌的审批与决策链路仍可用",
+   "layer": "security",
+   "priority": "P0",
+   "verdict": "PASS",
+   "expected": "探针输出 RESULT: PASS",
+   "actual": "exit 0; stdout: RESULT: PASS 带服务令牌的审批与决策链路正常（approval=apv_bbbbee472236） ",
+   "risk": "鉴权把功能一起关掉＝不可上线",
+   "requirement_ids": [
+    "REQ-003"
+   ],
+   "feature_ids": [
+    "F-authz"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/SEC-103.cmd.txt",
+     "command": "bash probes-authz.sh with-token",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 123.246,
+   "executed_at": "2026-10-08T14:57:15+0800",
+   "input": "bash probes-authz.sh with-token",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "探针输出 RESULT: PASS"
+   },
+   "repro": "bash probes-authz.sh with-token"
+  },
+  {
+   "id": "SEC-104",
+   "title": "自述决策不得恢复人审挂起",
+   "layer": "security",
+   "priority": "P0",
+   "verdict": "PASS",
+   "expected": "探针输出 RESULT: PASS",
+   "actual": "exit 0; stdout: RESULT: PASS 无据/伪造决策均被拒（409），闸门保持在原地 ",
+   "risk": "闸门可被绕过则平台核心价值归零",
+   "requirement_ids": [
+    "REQ-004"
+   ],
+   "feature_ids": [
+    "F-decision-verify"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/SEC-104.cmd.txt",
+     "command": "bash probes-authz.sh resume-bypass",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 197.712,
+   "executed_at": "2026-10-08T14:57:15+0800",
+   "input": "bash probes-authz.sh resume-bypass",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "探针输出 RESULT: PASS"
+   },
+   "repro": "bash probes-authz.sh resume-bypass"
+  },
+  {
+   "id": "SEC-105",
+   "title": "工具调用不接受请求体自述岗位/免人审",
+   "layer": "security",
+   "priority": "P0",
+   "verdict": "PASS",
+   "expected": "探针输出 RESULT: PASS",
+   "actual": "exit 0; stdout: RESULT: PASS 自述岗位/自述免人审均被拒（ungated_not_allowed / role_not_trusted） ",
+   "risk": "自述权限＝没有权限边界",
+   "requirement_ids": [
+    "REQ-009"
+   ],
+   "feature_ids": [
+    "F-tools"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/SEC-105.cmd.txt",
+     "command": "bash probes-authz.sh tools-selfdeclared",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 208.794,
+   "executed_at": "2026-10-08T14:57:16+0800",
+   "input": "bash probes-authz.sh tools-selfdeclared",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "探针输出 RESULT: PASS"
+   },
+   "repro": "bash probes-authz.sh tools-selfdeclared"
+  },
+  {
+   "id": "SEC-106",
+   "title": "告警 webhook 验签（无凭据/错密钥拒绝）",
+   "layer": "security",
+   "priority": "P1",
+   "verdict": "PASS",
+   "expected": "探针输出 RESULT: PASS",
+   "actual": "exit 0; stdout: RESULT: PASS 告警 webhook 无凭据/错密钥被拒，令牌与 HMAC 两种正确凭据均放行 ",
+   "risk": "无验签则可被凭空拉起运维 SOP",
+   "requirement_ids": [
+    "REQ-016"
+   ],
+   "feature_ids": [
+    "F-alert-ingest"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/SEC-106.cmd.txt",
+     "command": "bash probes-authz.sh alert-signature",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 10217.506,
+   "executed_at": "2026-10-08T14:57:26+0800",
+   "input": "bash probes-authz.sh alert-signature",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "探针输出 RESULT: PASS"
+   },
+   "repro": "bash probes-authz.sh alert-signature"
+  },
+  {
+   "id": "SEC-107",
+   "title": "令牌模式下审批台静态资源可达、业务接口仍需令牌",
+   "layer": "security",
+   "priority": "P0",
+   "verdict": "PASS",
+   "expected": "index/app.js/app.css 均 200 且 /approvals 401",
+   "actual": "exit 0; stdout: =200 index.html=200 app.js=200 app.css=200  api=401 ",
+   "risk": "资源被鉴权挡住会让审批台白屏（历史缺陷）",
+   "requirement_ids": [
+    "REQ-014"
+   ],
+   "feature_ids": [
+    "F-ui-console",
+    "F-authz"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/SEC-107.cmd.txt",
+     "command": "for f in '' index.html app.js app.css; do curl -s -o /dev/null -w \"$f=%{http_code} \" http://127.0.0.1:18001/$f; done; echo; curl -s -o /dev/null -w 'api=%{http_code}\\n' http://127.0.0.1:18001/approvals",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 91.365,
+   "executed_at": "2026-10-08T14:57:26+0800",
+   "input": "for f in '' index.html app.js app.css; do curl -s -o /dev/null -w \"$f=%{http_code} \" http://127.0.0.1:18001/$f; done; echo; curl -s -o /dev/null -w 'api=%{http_code}\\n' http://127.0.0.1:18001/approvals",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "index/app.js/app.css 均 200 且 /approvals 401"
+   },
+   "repro": "for f in '' index.html app.js app.css; do curl -s -o /dev/null -w \"$f=%{http_code} \" http://127.0.0.1:18001/$f; done; echo; curl -s -o /dev/null -w 'api=%{http_code}\\n' http://127.0.0.1:18001/approvals"
+  },
+  {
+   "id": "SEC-108",
+   "title": "直连服务伪造入口身份头必须无效",
+   "layer": "security",
+   "priority": "P0",
+   "verdict": "FAIL",
+   "expected": "伪造 X-Platform-User 直连驾驶舱应得 401",
+   "actual": "exit 0; stdout: status=200 ",
+   "risk": "TRUST_PROXY_AUTH 只在入口剥离同名头时成立；直连伪造得逞说明缺少纵深防御",
+   "requirement_ids": [
+    "REQ-022"
+   ],
+   "feature_ids": [
+    "F-authz",
+    "F-ui-dashboard"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/SEC-108.cmd.txt",
+     "command": "curl -s -o /dev/null -w 'status=%{http_code}\\n' -H 'X-Platform-User: attacker' http://127.0.0.1:18005/",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 210.351,
+   "executed_at": "2026-10-08T14:57:26+0800",
+   "input": "curl -s -o /dev/null -w 'status=%{http_code}\\n' -H 'X-Platform-User: attacker' http://127.0.0.1:18005/",
+   "severity": "MAJOR",
+   "repro": "curl -s -o /dev/null -w 'status=%{http_code}\\n' -H 'X-Platform-User: attacker' http://127.0.0.1:18005/",
+   "notes": "Assertion failures: stdout: expected to contain 'status=401', got status=200 ",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "伪造 X-Platform-User 直连驾驶舱应得 401"
+   }
+  },
+  {
+   "id": "SEC-109",
+   "title": "GitLab webhook 未签名被拒、正确签名放行",
+   "layer": "security",
+   "priority": "P1",
+   "verdict": "PASS",
+   "expected": "无签名 401、带 X-Gitlab-Token 200",
+   "actual": "exit 0; stdout: no_sig=401 signed=200 ",
+   "risk": "伪造 webhook 可凭空建任务/改状态",
+   "requirement_ids": [
+    "REQ-017"
+   ],
+   "feature_ids": [
+    "F-gitlab"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/SEC-109.cmd.txt",
+     "command": "curl -s -o /dev/null -w 'no_sig=%{http_code} ' -X POST http://127.0.0.1:18006/webhooks/gitlab -H 'Content-Type: application/json' -d '{\"object_kind\":\"issue\"}'; curl -s -o /dev/null -w 'signed=%{http_code}\\n' -X POST http://127.0.0.1:18006/webhooks/gitlab -H 'Content-Type: application/json' -H 'X-Gitlab-Token: pst-sut-webhook' -d '{\"object_kind\":\"issue\",\"project\":{\"id\":1,\"path_with_namespace\":\"a/b\"},\"object_attributes\":{\"iid\":1,\"title\":\"t\",\"action\":\"open\",\"labels\":[]}}'",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 72.211,
+   "executed_at": "2026-10-08T14:57:26+0800",
+   "input": "curl -s -o /dev/null -w 'no_sig=%{http_code} ' -X POST http://127.0.0.1:18006/webhooks/gitlab -H 'Content-Type: application/json' -d '{\"object_kind\":\"issue\"}'; curl -s -o /dev/null -w 'signed=%{http_code}\\n' -X POST http://127.0.0.1:18006/webhooks/gitlab -H 'Content-Type: application/json' -H 'X-Gitlab-Token: pst-sut-webhook' -d '{\"object_kind\":\"issue\",\"project\":{\"id\":1,\"path_with_namespace\":\"a/b\"},\"object_attributes\":{\"iid\":1,\"title\":\"t\",\"action\":\"open\",\"labels\":[]}}'",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "无签名 401、带 X-Gitlab-Token 200"
+   },
+   "repro": "curl -s -o /dev/null -w 'no_sig=%{http_code} ' -X POST http://127.0.0.1:18006/webhooks/gitlab -H 'Content-Type: application/json' -d '{\"object_kind\":\"issue\"}'; curl -s -o /dev/null -w 'signed=%{http_code}\\n' -X POST http://127.0.0.1:18006/webhooks/gitlab -H 'Content-Type: application/json' -H 'X-Gitlab-Token: pst-sut-webhook' -d '{\"object_kind\":\"issue\",\"project\":{\"id\":1,\"path_with_namespace\":\"a/b\"},\"object_attributes\":{\"iid\":1,\"title\":\"t\",\"action\":\"open\",\"labels\":[]}}'"
+  },
+  {
+   "id": "CONC-201",
+   "title": "30 并发决策：恰好一个成功、一条决策",
+   "layer": "stability",
+   "priority": "P0",
+   "verdict": "PASS",
+   "expected": "命令输出 RESULT: PASS",
+   "actual": "exit 0; stdout:   round 0: 并发=30 HTTP200=1 新增决策行=1 OK 状态码分布={200: 1, 409: 29}   round 1: 并发=30 HTTP200=1 新增决策行=1 OK 状态码分布={200: 1, 409: 29}   round 2: 并发=30 HTTP200=1 新增决策行=1 OK 状态码分布={200: 1, 409: 29}   round 3: ...",
+   "risk": "并发重复决策会重复触发下游恢复与惩罚",
+   "requirement_ids": [
+    "REQ-008"
+   ],
+   "feature_ids": [
+    "F-gate"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/CONC-201.cmd.txt",
+     "command": "STRESS_ROUNDS=6 STRESS_N=30 bash probes-concurrency.sh decide-race-stress",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 2818.608,
+   "executed_at": "2026-10-08T14:57:29+0800",
+   "input": "STRESS_ROUNDS=6 STRESS_N=30 bash probes-concurrency.sh decide-race-stress",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "命令输出 RESULT: PASS"
+   },
+   "repro": "STRESS_ROUNDS=6 STRESS_N=30 bash probes-concurrency.sh decide-race-stress"
+  },
+  {
+   "id": "CONC-202",
+   "title": "30 并发流转：恰好一个成功、一条时间线",
+   "layer": "stability",
+   "priority": "P0",
+   "verdict": "PASS",
+   "expected": "命令输出 RESULT: PASS",
+   "actual": "exit 0; stdout:   round 0: 并发=30 HTTP200=1 新增流转事件=1 OK   round 1: 并发=30 HTTP200=1 新增流转事件=1 OK   round 2: 并发=30 HTTP200=1 新增流转事件=1 OK   round 3: 并发=30 HTTP200=1 新增流转事件=1 OK   round 4: 并发=30 HTTP200=1 新增流转事件=1 OK   ...",
+   "risk": "并发流转会写坏状态机与时间线",
+   "requirement_ids": [
+    "REQ-008"
+   ],
+   "feature_ids": [
+    "F-taskfsm"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/CONC-202.cmd.txt",
+     "command": "STRESS_ROUNDS=6 STRESS_N=30 bash probes-concurrency.sh task-race-stress",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 3728.002,
+   "executed_at": "2026-10-08T14:57:33+0800",
+   "input": "STRESS_ROUNDS=6 STRESS_N=30 bash probes-concurrency.sh task-race-stress",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "命令输出 RESULT: PASS"
+   },
+   "repro": "STRESS_ROUNDS=6 STRESS_N=30 bash probes-concurrency.sh task-race-stress"
+  },
+  {
+   "id": "CONC-203",
+   "title": "人工决策与超时扫描并发：不双决策",
+   "layer": "stability",
+   "priority": "P0",
+   "verdict": "PASS",
+   "expected": "探针输出 RESULT: PASS",
+   "actual": "exit 0; stdout: decisions_inserted=1 final_status=rejected RESULT: PASS decide and sweep do not double-decide ",
+   "risk": "双决策会让审批出现两个终态",
+   "requirement_ids": [
+    "REQ-008"
+   ],
+   "feature_ids": [
+    "F-gate"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/CONC-203.cmd.txt",
+     "command": "bash probes-concurrency.sh decide-vs-sweep",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 529.829,
+   "executed_at": "2026-10-08T14:57:33+0800",
+   "input": "bash probes-concurrency.sh decide-vs-sweep",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "探针输出 RESULT: PASS"
+   },
+   "repro": "bash probes-concurrency.sh decide-vs-sweep"
+  },
+  {
+   "id": "CONC-204",
+   "title": "IM 回调与 Web 决策并发：互斥",
+   "layer": "stability",
+   "priority": "P0",
+   "verdict": "PASS",
+   "expected": "探针输出 RESULT: PASS",
+   "actual": "exit 0; stdout: decisions_inserted=1 RESULT: PASS IM callback and web decision are mutually exclusive ",
+   "risk": "双通道同时决策会重复落库",
+   "requirement_ids": [
+    "REQ-008"
+   ],
+   "feature_ids": [
+    "F-gate"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/CONC-204.cmd.txt",
+     "command": "bash probes-concurrency.sh im-vs-decide",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 473.063,
+   "executed_at": "2026-10-08T14:57:34+0800",
+   "input": "bash probes-concurrency.sh im-vs-decide",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "探针输出 RESULT: PASS"
+   },
+   "repro": "bash probes-concurrency.sh im-vs-decide"
+  },
+  {
+   "id": "CONC-205",
+   "title": "并发上传证据不丢件",
+   "layer": "stability",
+   "priority": "P1",
+   "verdict": "PASS",
+   "expected": "探针输出 RESULT: PASS",
+   "actual": "exit 0; stdout: uploads=6 failed=0 rows_inserted=6 RESULT: PASS concurrent evidence uploads all persisted ",
+   "risk": "丢件等于验收证据不完整",
+   "requirement_ids": [
+    "REQ-011"
+   ],
+   "feature_ids": [
+    "F-evidence"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/CONC-205.cmd.txt",
+     "command": "bash probes-concurrency.sh evidence-race",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 352.585,
+   "executed_at": "2026-10-08T14:57:34+0800",
+   "input": "bash probes-concurrency.sh evidence-race",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "探针输出 RESULT: PASS"
+   },
+   "repro": "bash probes-concurrency.sh evidence-race"
+  },
+  {
+   "id": "UI-301",
+   "title": "审批台加载：静态外壳可见、无控制台报错",
+   "layer": "e2e",
+   "priority": "P0",
+   "verdict": "FAIL",
+   "expected": "步骤全通过且页面无控制台错误",
+   "actual": "exit 1; stdout: 套件      : 审批台（人做决策的界面）  (http://127.0.0.1:18001)   UI-301     FAIL   审批台加载：静态外壳可见、无控制台报错              ! 断言失败：the page logged errors | 实际观测：[\"[error] Failed to load resource: the server responded wi...",
+   "risk": "审批人看到的第一屏就是它",
+   "requirement_ids": [
+    "REQ-014"
+   ],
+   "feature_ids": [
+    "F-ui-console"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/UI-301.cmd.txt",
+     "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui --only UI-301 --baselines baselines",
+     "detail": "exit 1"
+    },
+    {
+     "kind": "command",
+     "path": "cards/UI-301.cmd.txt",
+     "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui/UI-301 --report-json evidence/ui/UI-301/report.json --only UI-301 --baselines baselines",
+     "detail": "exit 1"
+    }
+   ],
+   "duration_ms": 2499.649,
+   "executed_at": "2026-10-08T15:08:50+0800",
+   "input": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui/UI-301 --report-json evidence/ui/UI-301/report.json --only UI-301 --baselines baselines",
+   "severity": "MAJOR",
+   "repro": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui/UI-301 --report-json evidence/ui/UI-301/report.json --only UI-301 --baselines baselines",
+   "notes": "Assertion failures: exit code: expected [0], got 1",
+   "previous_verdict": "FAIL",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "步骤全通过且页面无控制台错误"
+   }
+  },
+  {
+   "id": "UI-302",
+   "title": "待审列表必须显示真实待办（不得静默空）",
+   "layer": "e2e",
+   "priority": "P0",
+   "verdict": "FAIL",
+   "expected": "列表渲染出至少一条待审单据",
+   "actual": "exit 0; stdout: 套件      : 审批台（人做决策的界面）  (http://127.0.0.1:18001)   UI-302     BLOCK  待审列表渲染出已存在的审批单（数据链路可用）              ! 浏览器驱动失败：element not found or not visible within 10s: .row  结果      : {'BLOCKED': 1} 截图    ...",
+   "risk": "静默空列表会让审批人以为无事可做，闸门停摆且无人察觉",
+   "requirement_ids": [
+    "REQ-014"
+   ],
+   "feature_ids": [
+    "F-ui-console"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/UI-302.cmd.txt",
+     "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui --only UI-302 --baselines baselines",
+     "detail": "exit 0"
+    },
+    {
+     "kind": "command",
+     "path": "cards/UI-302.cmd.txt",
+     "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui --only UI-302 --baselines baselines",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 12550.232,
+   "executed_at": "2026-10-08T15:09:02+0800",
+   "input": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui --only UI-302 --baselines baselines",
+   "previous_verdict": "PASS",
+   "severity": "MAJOR",
+   "repro": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui --only UI-302 --baselines baselines",
+   "notes": "Assertion failures: stdout: must not contain 'BLOCK'",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "列表渲染出至少一条待审单据"
+   }
+  },
+  {
+   "id": "UI-303",
+   "title": "详情渲染三要素与动作按钮",
+   "layer": "e2e",
+   "priority": "P0",
+   "verdict": "FAIL",
+   "expected": "详情出现①②③三要素与批准/拒绝按钮",
+   "actual": "exit 0; stdout: 套件      : 审批台（人做决策的界面）  (http://127.0.0.1:18001)   UI-303     BLOCK  点击审批单后详情渲染三要素（做了什么/依据/风险自评）              ! 浏览器驱动失败：element not found or not visible within 10s: .row  结果      : {'BLOCKED': 1} 截...",
+   "risk": "决策依据不完整＝人无法负责任地批准",
+   "requirement_ids": [
+    "REQ-014"
+   ],
+   "feature_ids": [
+    "F-ui-console"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/UI-303.cmd.txt",
+     "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui --only UI-303 --baselines baselines",
+     "detail": "exit 0"
+    },
+    {
+     "kind": "command",
+     "path": "cards/UI-303.cmd.txt",
+     "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui --only UI-303 --baselines baselines",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 12306.765,
+   "executed_at": "2026-10-08T15:09:15+0800",
+   "input": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui --only UI-303 --baselines baselines",
+   "previous_verdict": "PASS",
+   "severity": "MAJOR",
+   "repro": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui --only UI-303 --baselines baselines",
+   "notes": "Assertion failures: stdout: must not contain 'BLOCK'",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "详情出现①②③三要素与批准/拒绝按钮"
+   }
+  },
+  {
+   "id": "UI-304",
+   "title": "XSS 载荷只作为文本出现，不生成元素、不执行",
+   "layer": "e2e",
+   "priority": "P0",
+   "verdict": "FAIL",
+   "expected": "无 img/script 元素、无脚本执行、无控制台错误",
+   "actual": "exit 0; stdout: 套件      : 审批台（人做决策的界面）  (http://127.0.0.1:18001)   UI-304     BLOCK  XSS 载荷只作为文本出现：不生成元素、不执行脚本              ! 浏览器驱动失败：element not found or not visible within 10s: .row  结果      : {'BLOCKED': 1} 截图 ...",
+   "risk": "审批人权限最高，在他的浏览器里执行脚本＝最高危",
+   "requirement_ids": [
+    "REQ-014"
+   ],
+   "feature_ids": [
+    "F-ui-console"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/UI-304.cmd.txt",
+     "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui --only UI-304 --baselines baselines",
+     "detail": "exit 0"
+    },
+    {
+     "kind": "command",
+     "path": "cards/UI-304.cmd.txt",
+     "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui --only UI-304 --baselines baselines",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 11980.759,
+   "executed_at": "2026-10-08T15:09:27+0800",
+   "input": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui --only UI-304 --baselines baselines",
+   "previous_verdict": "PASS",
+   "severity": "MAJOR",
+   "repro": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui --only UI-304 --baselines baselines",
+   "notes": "Assertion failures: stdout: must not contain 'BLOCK'",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "无 img/script 元素、无脚本执行、无控制台错误"
+   }
+  },
+  {
+   "id": "UI-305",
+   "title": "审批台可访问性：按钮有可访问名",
+   "layer": "e2e",
+   "priority": "P1",
+   "verdict": "FAIL",
+   "expected": "accessibility tree 中存在名为“批准”“拒绝”的按钮",
+   "actual": "exit 0; stdout: 套件      : 审批台（人做决策的界面）  (http://127.0.0.1:18001)   UI-305     BLOCK  审批台可访问性：按钮有可访问名（屏幕阅读器可用）              ! 浏览器驱动失败：element not found or not visible within 10s: .row  结果      : {'BLOCKED': 1} 截图  ...",
+   "risk": "屏幕阅读器读不出动作按钮，等于部分人无法审批",
+   "requirement_ids": [
+    "REQ-014"
+   ],
+   "feature_ids": [
+    "F-ui-console"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/UI-305.cmd.txt",
+     "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui --only UI-305 --baselines baselines",
+     "detail": "exit 0"
+    },
+    {
+     "kind": "command",
+     "path": "cards/UI-305.cmd.txt",
+     "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui --only UI-305 --baselines baselines",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 12641.174,
+   "executed_at": "2026-10-08T15:09:39+0800",
+   "input": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui --only UI-305 --baselines baselines",
+   "previous_verdict": "PASS",
+   "severity": "MAJOR",
+   "repro": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui --only UI-305 --baselines baselines",
+   "notes": "Assertion failures: stdout: must not contain 'BLOCK'",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "accessibility tree 中存在名为“批准”“拒绝”的按钮"
+   }
+  },
+  {
+   "id": "UI-306",
+   "title": "视觉基线比对（审批台首屏）",
+   "layer": "e2e",
+   "priority": "P1",
+   "verdict": "PASS",
+   "expected": "与基线差异比例 ≤ 2%",
+   "actual": "exit 0; stdout: 套件      : 审批台（人做决策的界面）  (http://127.0.0.1:18001)   UI-306     PASS   视觉基线：审批台外壳（列表为动态区，已遮蔽）  结果      : {'PASS': 1} 截图      : 1 张 -> evidence/ui/screenshots 视觉回归  : {'NEW_BASELINE': 1} (基线 3 张于 /Use...",
+   "risk": "DOM 正确而屏幕坏掉是功能断言看不见的发布阻断项",
+   "requirement_ids": [
+    "REQ-014"
+   ],
+   "feature_ids": [
+    "F-ui-console"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/UI-306.cmd.txt",
+     "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui --only UI-306 --baselines baselines",
+     "detail": "exit 0"
+    },
+    {
+     "kind": "command",
+     "path": "cards/UI-306.cmd.txt",
+     "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui --only UI-306 --baselines baselines",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 6420.127,
+   "executed_at": "2026-10-08T15:12:28+0800",
+   "input": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui --only UI-306 --baselines baselines",
+   "previous_verdict": "FAIL",
+   "severity": "MAJOR",
+   "repro": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui --only UI-306 --baselines baselines",
+   "notes": "Assertion failures: stdout: must not contain 'BLOCK'",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "与基线差异比例 ≤ 2%"
+   }
+  },
+  {
+   "id": "UI-311",
+   "title": "驾驶舱经入口代理可读并渲染队列",
+   "layer": "e2e",
+   "priority": "P0",
+   "verdict": "PASS",
+   "expected": "页面出现待决策队列与误拦率文案",
+   "actual": "exit 0; stdout: 套件      : 运营驾驶舱（决策台）  (http://127.0.0.1:18015)   UI-311     PASS   经入口代理后驾驶舱可读，并渲染待决策队列与 KPI  结果      : {'PASS': 1} 截图      : 1 张 -> evidence/ui/screenshots 报告      : evidence/ui/browser-report.json ",
+   "risk": "试点期唯一全局视图；读不出等于没有视图",
+   "requirement_ids": [
+    "REQ-015"
+   ],
+   "feature_ids": [
+    "F-ui-dashboard"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/UI-311.cmd.txt",
+     "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/dashboard-suite.json --out-dir evidence/ui --only UI-311 --baselines baselines",
+     "detail": "exit 0"
+    },
+    {
+     "kind": "command",
+     "path": "cards/UI-311.cmd.txt",
+     "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/dashboard-suite.json --out-dir evidence/ui --only UI-311 --baselines baselines",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 1934.427,
+   "executed_at": "2026-10-08T15:10:06+0800",
+   "input": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/dashboard-suite.json --out-dir evidence/ui --only UI-311 --baselines baselines",
+   "previous_verdict": "PASS",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "页面出现待决策队列与误拦率文案"
+   },
+   "repro": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/dashboard-suite.json --out-dir evidence/ui --only UI-311 --baselines baselines"
+  },
+  {
+   "id": "UI-312",
+   "title": "驾驶舱队列渲染真实事项",
+   "layer": "e2e",
+   "priority": "P0",
+   "verdict": "PASS",
+   "expected": "表格存在且含 approval/gate_block/空态说明之一",
+   "actual": "exit 0; stdout: 套件      : 运营驾驶舱（决策台）  (http://127.0.0.1:18015)   UI-312     PASS   队列渲染出真实待决策事项（含深链动作按钮）  结果      : {'PASS': 1} 截图      : 1 张 -> evidence/ui/screenshots 报告      : evidence/ui/browser-report.json ",
+   "risk": "空队列会让人误判“系统没问题”",
+   "requirement_ids": [
+    "REQ-015"
+   ],
+   "feature_ids": [
+    "F-ui-dashboard"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/UI-312.cmd.txt",
+     "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/dashboard-suite.json --out-dir evidence/ui --only UI-312 --baselines baselines",
+     "detail": "exit 1"
+    },
+    {
+     "kind": "command",
+     "path": "cards/UI-312.cmd.txt",
+     "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/dashboard-suite.json --out-dir evidence/ui --only UI-312 --baselines baselines",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 1836.396,
+   "executed_at": "2026-10-08T15:10:08+0800",
+   "input": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/dashboard-suite.json --out-dir evidence/ui --only UI-312 --baselines baselines",
+   "severity": "MAJOR",
+   "repro": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/dashboard-suite.json --out-dir evidence/ui --only UI-312 --baselines baselines",
+   "notes": "Assertion failures: exit code: expected [0], got 1",
+   "previous_verdict": "PASS",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "表格存在且含 approval/gate_block/空态说明之一"
+   }
+  },
+  {
+   "id": "UI-313",
+   "title": "驾驶舱可访问性树可用",
+   "layer": "e2e",
+   "priority": "P2",
+   "verdict": "PASS",
+   "expected": "存在 role=table",
+   "actual": "exit 0; stdout: 套件      : 运营驾驶舱（决策台）  (http://127.0.0.1:18015)   UI-313     PASS   驾驶舱可访问性树可用（表格与标题可被读出）  结果      : {'PASS': 1} 截图      : 1 张 -> evidence/ui/screenshots 可访问性  : 1 份快照 -> evidence/ui/accessibility 报...",
+   "risk": "表格结构对辅助技术可读",
+   "requirement_ids": [
+    "REQ-015"
+   ],
+   "feature_ids": [
+    "F-ui-dashboard"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/UI-313.cmd.txt",
+     "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/dashboard-suite.json --out-dir evidence/ui --only UI-313 --baselines baselines",
+     "detail": "exit 0"
+    },
+    {
+     "kind": "command",
+     "path": "cards/UI-313.cmd.txt",
+     "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/dashboard-suite.json --out-dir evidence/ui --only UI-313 --baselines baselines",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 1768.883,
+   "executed_at": "2026-10-08T15:10:09+0800",
+   "input": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/dashboard-suite.json --out-dir evidence/ui --only UI-313 --baselines baselines",
+   "previous_verdict": "PASS",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "存在 role=table"
+   },
+   "repro": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/dashboard-suite.json --out-dir evidence/ui --only UI-313 --baselines baselines"
+  },
+  {
+   "id": "UI-314",
+   "title": "视觉基线比对（驾驶舱首屏）",
+   "layer": "e2e",
+   "priority": "P2",
+   "verdict": "PASS",
+   "expected": "与基线差异比例 ≤ 5%",
+   "actual": "exit 0; stdout: 套件      : 运营驾驶舱（决策台）  (http://127.0.0.1:18015)   UI-314     PASS   视觉基线：驾驶舱首屏与基线逐像素比对  结果      : {'PASS': 1} 截图      : 1 张 -> evidence/ui/screenshots 视觉回归  : {'MATCH': 1} (基线 2 张于 /Users/edy/Deskto...",
+   "risk": "样式回归的兜底",
+   "requirement_ids": [
+    "REQ-015"
+   ],
+   "feature_ids": [
+    "F-ui-dashboard"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/UI-314.cmd.txt",
+     "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/dashboard-suite.json --out-dir evidence/ui --only UI-314 --baselines baselines",
+     "detail": "exit 0"
+    },
+    {
+     "kind": "command",
+     "path": "cards/UI-314.cmd.txt",
+     "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/dashboard-suite.json --out-dir evidence/ui --only UI-314 --baselines baselines",
+     "detail": "exit 1"
+    }
+   ],
+   "duration_ms": 19763.014,
+   "executed_at": "2026-10-08T15:10:29+0800",
+   "input": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/dashboard-suite.json --out-dir evidence/ui --only UI-314 --baselines baselines",
+   "severity": "MINOR",
+   "repro": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/dashboard-suite.json --out-dir evidence/ui --only UI-314 --baselines baselines",
+   "notes": "Assertion failures: exit code: expected [0], got 1",
+   "previous_verdict": "FAIL",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "与基线差异比例 ≤ 5%"
+   }
+  },
+  {
+   "id": "DATA-401",
+   "title": "迁移：空库可建 + 模型零漂移 + 可回滚",
+   "layer": "data",
+   "priority": "P0",
+   "verdict": "PASS",
+   "expected": "命令输出“迁移体检通过”",
+   "actual": "exit 0; stdout: ✅ 空库 upgrade head 成功 — INFO  [alembic.runtime.migration] Running upgrade  -> 9c049b104c58, baseline: 平台库初始 schema（三个服务共享） ✅ 建出的表非空 — 9 张：['agent_runs', 'approval_decisions', 'approval_requests', 'e...",
+   "risk": "没有迁移路径＝改不动库、回不了滚",
+   "requirement_ids": [
+    "REQ-019"
+   ],
+   "feature_ids": [
+    "F-migration"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/DATA-401.cmd.txt",
+     "command": "services/approval-gateway/.venv/bin/python platform/scripts/check_migrations.py --selftest",
+     "detail": "exit 127"
+    },
+    {
+     "kind": "command",
+     "path": "cards/DATA-401.cmd.txt",
+     "command": "platform/services/approval-gateway/.venv/bin/python platform/scripts/check_migrations.py --selftest",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 2410.869,
+   "executed_at": "2026-10-08T15:06:24+0800",
+   "input": "platform/services/approval-gateway/.venv/bin/python platform/scripts/check_migrations.py --selftest",
+   "severity": "MAJOR",
+   "repro": "services/approval-gateway/.venv/bin/python platform/scripts/check_migrations.py --selftest",
+   "notes": "Assertion failures: exit code: expected [0], got 127; stdout: expected to contain '迁移体检通过', got ",
+   "previous_verdict": "FAIL",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "命令输出“迁移体检通过”"
+   }
+  },
+  {
+   "id": "DATA-402",
+   "title": "迁移与模型建表结果一致（零漂移）",
+   "layer": "data",
+   "priority": "P0",
+   "verdict": "PASS",
+   "expected": "命令输出“迁移与模型一致”",
+   "actual": "exit 0; stdout:   迁移建表 9 张：['agent_runs', 'approval_decisions', 'approval_requests', 'event_inbox', 'evidence_artifacts', 'gate_checks', 'task_events', 'tasks', 'trust_state']   模型建表 9 张：['agent_runs', 'approval_d...",
+   "risk": "迁移与模型漂移会让新环境与老环境 schema 不同",
+   "requirement_ids": [
+    "REQ-019"
+   ],
+   "feature_ids": [
+    "F-migration"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/DATA-402.cmd.txt",
+     "command": "docker exec platform-pg psql -U platform -d postgres -c 'DROP DATABASE IF EXISTS mig_cmp' >/dev/null; docker exec platform-pg psql -U platform -d postgres -c 'CREATE DATABASE mig_cmp' >/dev/null; cd platform && ALEMBIC_DATABASE_URL='postgresql+psycopg://platform:platform@127.0.0.1:5432/mig_cmp' services/approval-gateway/.venv/bin/python -m alembic upgrade head >/dev/null 2>&1; A=$(docker exec platform-pg psql -U platform -d mig_cmp -tAc \"select tablename from pg_tables where schemaname='public' and tablename<>'alembic_version' order by 1\" | tr '\\n' ' '); B=$(docker exec platform-pg psql -U platform -d pst_sut -tAc \"select tablename from pg_tables where schemaname='public' order by 1\" | tr '\\n' ' '); docker exec platform-pg psql -U platform -d postgres -c 'DROP DATABASE IF EXISTS mig_cmp' >/dev/null; echo \"alembic=[$A]\"; echo \"runtime=[$B]\"; [ \"$A\" = \"$B\" ] && echo 'RESULT: PASS 表清单一致'",
+     "detail": "exit 1"
+    },
+    {
+     "kind": "command",
+     "path": "cards/DATA-402.cmd.txt",
+     "command": "python3 flows/schema_compare.py",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 3296.77,
+   "executed_at": "2026-10-08T15:06:27+0800",
+   "input": "python3 flows/schema_compare.py",
+   "severity": "MAJOR",
+   "repro": "docker exec platform-pg psql -U platform -d postgres -c 'DROP DATABASE IF EXISTS mig_cmp' >/dev/null; docker exec platform-pg psql -U platform -d postgres -c 'CREATE DATABASE mig_cmp' >/dev/null; cd platform && ALEMBIC_DATABASE_URL='postgresql+psycopg://platform:platform@127.0.0.1:5432/mig_cmp' services/approval-gateway/.venv/bin/python -m alembic upgrade head >/dev/null 2>&1; A=$(docker exec platform-pg psql -U platform -d mig_cmp -tAc \"select tablename from pg_tables where schemaname='public' and tablename<>'alembic_version' order by 1\" | tr '\\n' ' '); B=$(docker exec platform-pg psql -U platform -d pst_sut -tAc \"select tablename from pg_tables where schemaname='public' order by 1\" | tr '\\n' ' '); docker exec platform-pg psql -U platform -d postgres -c 'DROP DATABASE IF EXISTS mig_cmp' >/dev/null; echo \"alembic=[$A]\"; echo \"runtime=[$B]\"; [ \"$A\" = \"$B\" ] && echo 'RESULT: PASS 表清单一致'",
+   "notes": "Assertion failures: exit code: expected [0], got 1; stdout: expected to contain 'RESULT: PASS', got alembic=[agent_runs approval_decisions approval_requests event_inbox evidence_artifacts gate_checks task_events tasks trust_state ] runtime=[approval_decisio...",
+   "previous_verdict": "FAIL",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "命令输出“迁移与模型一致”"
+   }
+  },
+  {
+   "id": "DATA-403",
+   "title": "备份可恢复（恢复演练）",
+   "layer": "data",
+   "priority": "P0",
+   "verdict": "PASS",
+   "expected": "命令输出“恢复演练通过”",
+   "actual": "exit 0; stdout: ① 备份（platform）→ /var/folders/sn/18dsy4bx4nzb0y2gx65k315h0000gn/T/pg-drill-hdlpux6c   已备份 platform → /var/folders/sn/18dsy4bx4nzb0y2gx65k315h0000gn/T/pg-drill-hdlpux6c/platform-20261008-065901.dump（...",
+   "risk": "审计留痕只存在 PG 里，没有可验证的恢复路径＝出事无法收敛",
+   "requirement_ids": [
+    "REQ-019"
+   ],
+   "feature_ids": [
+    "F-migration"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/DATA-403.cmd.txt",
+     "command": "python3 platform/scripts/backup_restore.py drill --dbs platform",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 5660.91,
+   "executed_at": "2026-10-08T14:59:05+0800",
+   "input": "python3 platform/scripts/backup_restore.py drill --dbs platform",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "命令输出“恢复演练通过”"
+   },
+   "repro": "python3 platform/scripts/backup_restore.py drill --dbs platform"
+  },
+  {
+   "id": "DATA-404",
+   "title": "证据哈希复验：篡改可被发现",
+   "layer": "data",
+   "priority": "P1",
+   "verdict": "PASS",
+   "expected": "篡改后 verify 报告 broken ≥ 1",
+   "actual": "exit 0; stdout: upload={\"id\":\"evd_f8c3c3e181ef\",\"tenant\":\"default\",\"task_ref\":\"EVD-001\",\"acceptance_item\":\"A1\",\"kind\":\"log\",\"filename\":\"evd.txt\",\"sha256\":\"82b8530193cb9baf074c6f06aa5c8eeeca1c1bd6c5c4b320a9fe773a29...",
+   "risk": "证据不能复验就只是附件",
+   "requirement_ids": [
+    "REQ-011"
+   ],
+   "feature_ids": [
+    "F-evidence"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/DATA-404.cmd.txt",
+     "command": "bash test-campaign/probes.sh evidence",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 159.238,
+   "executed_at": "2026-10-08T14:59:06+0800",
+   "input": "bash test-campaign/probes.sh evidence",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "篡改后 verify 报告 broken ≥ 1"
+   },
+   "repro": "bash test-campaign/probes.sh evidence"
+  },
+  {
+   "id": "OPS-501",
+   "title": "看门狗判级/去重/通知自检",
+   "layer": "other",
+   "priority": "P1",
+   "verdict": "PASS",
+   "expected": "命令输出“自检通过”",
+   "actual": "exit 0; stdout:   → 已发飞书告警：成功 ✅ 健康服务判为 ok — ✅ probe：正常 ✅ 降级判为 warning — ⚠️ probe：服务自报 status=degraded ✅ 生产档位但治理开关不严 → critical — ❌ probe：生产/预发档位下治理开关不严：['ENG_GATES_MODE=warn'] ✅ 服务不可达 → critical — ❌ probe：HTTP 503...",
+   "risk": "刷屏或漏报的告警等于没有告警",
+   "requirement_ids": [
+    "REQ-020"
+   ],
+   "feature_ids": [
+    "F-watchdog"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/OPS-501.cmd.txt",
+     "command": "python3 platform/scripts/watch_health.py --selftest",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 667.037,
+   "executed_at": "2026-10-08T14:59:06+0800",
+   "input": "python3 platform/scripts/watch_health.py --selftest",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "命令输出“自检通过”"
+   },
+   "repro": "python3 platform/scripts/watch_health.py --selftest"
+  },
+  {
+   "id": "OPS-502",
+   "title": "看门狗对 7 服务判定为健康",
+   "layer": "other",
+   "priority": "P1",
+   "verdict": "PASS",
+   "expected": "输出“平台健康：ok”",
+   "actual": "exit 0; stdout: [2026-10-08T14:59:07+0800] 平台健康：ok ✅ agent-runtime：dev 档位（宽松）：1 项未开 ✅ approval-gateway：dev 档位（宽松）：1 项未开 ✅ gitlab-bridge：dev 档位（宽松）：1 项未开 ✅ knowledge-base：dev 档位（宽松）：1 项未开 ✅ metrics-dashboard：dev 档位...",
+   "risk": "看门狗误报会让真故障被忽略",
+   "requirement_ids": [
+    "REQ-020"
+   ],
+   "feature_ids": [
+    "F-watchdog"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/OPS-502.cmd.txt",
+     "command": "WATCH_TARGETS='approval-gateway=http://127.0.0.1:18001,agent-runtime=http://127.0.0.1:18002,knowledge-base=http://127.0.0.1:18003,task-center=http://127.0.0.1:18004,metrics-dashboard=http://127.0.0.1:18005,gitlab-bridge=http://127.0.0.1:18006,process-mining=http://127.0.0.1:18007' WATCH_STATE_FILE=/tmp/wh-camp.json python3 platform/scripts/watch_health.py --once",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 415.411,
+   "executed_at": "2026-10-08T14:59:07+0800",
+   "input": "WATCH_TARGETS='approval-gateway=http://127.0.0.1:18001,agent-runtime=http://127.0.0.1:18002,knowledge-base=http://127.0.0.1:18003,task-center=http://127.0.0.1:18004,metrics-dashboard=http://127.0.0.1:18005,gitlab-bridge=http://127.0.0.1:18006,process-mining=http://127.0.0.1:18007' WATCH_STATE_FILE=/tmp/wh-camp.json python3 platform/scripts/watch_health.py --once",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "输出“平台健康：ok”"
+   },
+   "repro": "WATCH_TARGETS='approval-gateway=http://127.0.0.1:18001,agent-runtime=http://127.0.0.1:18002,knowledge-base=http://127.0.0.1:18003,task-center=http://127.0.0.1:18004,metrics-dashboard=http://127.0.0.1:18005,gitlab-bridge=http://127.0.0.1:18006,process-mining=http://127.0.0.1:18007' WATCH_STATE_FILE=/tmp/wh-camp.json python3 platform/scripts/watch_health.py --once"
+  },
+  {
+   "id": "OPS-503",
+   "title": "7 个服务都暴露治理姿态",
+   "layer": "other",
+   "priority": "P1",
+   "verdict": "PASS",
+   "expected": "7 个 /health 都含 security.compliant 字段",
+   "actual": "exit 0; stdout: approval-gateway compliant=False agent-runtime compliant=False knowledge-base compliant=False task-center compliant=False metrics-dashboard compliant=False gitlab-bridge compliant=False process-min...",
+   "risk": "宽松不可见＝没人会发现自己在裸奔",
+   "requirement_ids": [
+    "REQ-001",
+    "REQ-021"
+   ],
+   "feature_ids": [
+    "F-health",
+    "F-deploy"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/OPS-503.cmd.txt",
+     "command": "for p in 18001 18002 18003 18004 18005 18006 18007; do curl -s -m 5 -H 'X-Service-Token: pst-sut-token' http://127.0.0.1:$p/health | python3 -c 'import sys,json;d=json.load(sys.stdin);print(d[\"service\"],\"compliant=\"+str(d[\"security\"][\"compliant\"]))'; done",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 465.001,
+   "executed_at": "2026-10-08T14:59:07+0800",
+   "input": "for p in 18001 18002 18003 18004 18005 18006 18007; do curl -s -m 5 -H 'X-Service-Token: pst-sut-token' http://127.0.0.1:$p/health | python3 -c 'import sys,json;d=json.load(sys.stdin);print(d[\"service\"],\"compliant=\"+str(d[\"security\"][\"compliant\"]))'; done",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "7 个 /health 都含 security.compliant 字段"
+   },
+   "repro": "for p in 18001 18002 18003 18004 18005 18006 18007; do curl -s -m 5 -H 'X-Service-Token: pst-sut-token' http://127.0.0.1:$p/health | python3 -c 'import sys,json;d=json.load(sys.stdin);print(d[\"service\"],\"compliant=\"+str(d[\"security\"][\"compliant\"]))'; done"
+  },
+  {
+   "id": "OPS-504",
+   "title": "生产档位缺凭据必须拒绝启动",
+   "layer": "other",
+   "priority": "P0",
+   "verdict": "PASS",
+   "expected": "进程非 0 退出且日志含“拒绝启动”",
+   "actual": "exit 0; stdout: RESULT: PASS 已拒绝启动 ",
+   "risk": "带着“看起来有鉴权”的状态运行比起不来更危险",
+   "requirement_ids": [
+    "REQ-021"
+   ],
+   "feature_ids": [
+    "F-deploy"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/OPS-504.cmd.txt",
+     "command": "cd platform/services/task-center && PLATFORM_ENV=prod SERVICE_AUTH_MODE= SERVICE_AUTH_TOKEN= AUTH_STATIC_TOKEN= TRUST_PROXY_AUTH= .venv/bin/python -c 'import app.main' 2>&1 | grep -q '拒绝启动' && echo 'RESULT: PASS 已拒绝启动'",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 1098.087,
+   "executed_at": "2026-10-08T14:59:08+0800",
+   "input": "cd platform/services/task-center && PLATFORM_ENV=prod SERVICE_AUTH_MODE= SERVICE_AUTH_TOKEN= AUTH_STATIC_TOKEN= TRUST_PROXY_AUTH= .venv/bin/python -c 'import app.main' 2>&1 | grep -q '拒绝启动' && echo 'RESULT: PASS 已拒绝启动'",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "进程非 0 退出且日志含“拒绝启动”"
+   },
+   "repro": "cd platform/services/task-center && PLATFORM_ENV=prod SERVICE_AUTH_MODE= SERVICE_AUTH_TOKEN= AUTH_STATIC_TOKEN= TRUST_PROXY_AUTH= .venv/bin/python -c 'import app.main' 2>&1 | grep -q '拒绝启动' && echo 'RESULT: PASS 已拒绝启动'"
+  },
+  {
+   "id": "DEP-601",
+   "title": "上线体检：prod 模板必须可上线",
+   "layer": "other",
+   "priority": "P0",
+   "verdict": "PASS",
+   "expected": "命令输出“上线就绪”",
+   "actual": "exit 0; stdout: 已从 .env.prod.example 加载 43 个变量（已存在的环境变量优先） 部署档位 PLATFORM_ENV=prod  ✅ 上线就绪：治理开关均为严格档位，凭据齐全。 ",
+   "risk": "生产带着宽松开关上线＝修复等于没修",
+   "requirement_ids": [
+    "REQ-021"
+   ],
+   "feature_ids": [
+    "F-deploy"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/DEP-601.cmd.txt",
+     "command": "python3 platform/scripts/check_deployment_readiness.py --env-file .env.prod.example",
+     "detail": "exit 2"
+    },
+    {
+     "kind": "command",
+     "path": "cards/DEP-601.cmd.txt",
+     "command": "python3 scripts/check_deployment_readiness.py --env-file .env.prod.example",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 107.779,
+   "executed_at": "2026-10-08T15:06:28+0800",
+   "input": "python3 scripts/check_deployment_readiness.py --env-file .env.prod.example",
+   "severity": "MAJOR",
+   "repro": "python3 platform/scripts/check_deployment_readiness.py --env-file .env.prod.example",
+   "notes": "Assertion failures: exit code: expected [0], got 2; stdout: expected to contain '上线就绪', got ",
+   "previous_verdict": "FAIL",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "命令输出“上线就绪”"
+   }
+  },
+  {
+   "id": "DEP-602",
+   "title": "生产配置生成器自检",
+   "layer": "other",
+   "priority": "P1",
+   "verdict": "PASS",
+   "expected": "命令输出“自检通过”",
+   "actual": "exit 0; stdout: 已生成 /var/folders/sn/18dsy4bx4nzb0y2gx65k315h0000gn/T/init-prod-env-20qq0dtp/.env.prod（权限 600），自动生成 7 项：   · POSTGRES_PASSWORD（数据库口令（会同时替换下面三条 DSN 里的占位值））   · SERVICE_AUTH_TOKEN（服务间令牌）   · WEBHOOK_S...",
+   "risk": "密钥没生成/占位值没拦住都会导致生产裸奔",
+   "requirement_ids": [
+    "REQ-021"
+   ],
+   "feature_ids": [
+    "F-deploy"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/DEP-602.cmd.txt",
+     "command": "python3 platform/scripts/init_prod_env.py --selftest",
+     "detail": "exit 2"
+    },
+    {
+     "kind": "command",
+     "path": "cards/DEP-602.cmd.txt",
+     "command": "python3 scripts/init_prod_env.py --selftest",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 92.485,
+   "executed_at": "2026-10-08T15:06:28+0800",
+   "input": "python3 scripts/init_prod_env.py --selftest",
+   "severity": "MAJOR",
+   "repro": "python3 platform/scripts/init_prod_env.py --selftest",
+   "notes": "Assertion failures: exit code: expected [0], got 2; stdout: expected to contain '自检通过', got ",
+   "previous_verdict": "FAIL",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "命令输出“自检通过”"
+   }
+  },
+  {
+   "id": "DEP-603",
+   "title": "生产编排可解析（叠加式）",
+   "layer": "other",
+   "priority": "P0",
+   "verdict": "PASS",
+   "expected": "docker compose config 退出 0",
+   "actual": "exit 0; stdout: RESULT: PASS 编排可解析 ",
+   "risk": "编排文件写错会在部署当刻才暴露",
+   "requirement_ids": [
+    "REQ-021"
+   ],
+   "feature_ids": [
+    "F-deploy"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/DEP-603.cmd.txt",
+     "command": "cp .env.prod.example .env.prod && docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod config -q && echo 'RESULT: PASS 编排可解析'; rm -f .env.prod",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 177.046,
+   "executed_at": "2026-10-08T14:59:08+0800",
+   "input": "cp .env.prod.example .env.prod && docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod config -q && echo 'RESULT: PASS 编排可解析'; rm -f .env.prod",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "docker compose config 退出 0"
+   },
+   "repro": "cp .env.prod.example .env.prod && docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod config -q && echo 'RESULT: PASS 编排可解析'; rm -f .env.prod"
+  },
+  {
+   "id": "DEP-604",
+   "title": "鉴权模块 7 份副本无漂移",
+   "layer": "other",
+   "priority": "P1",
+   "verdict": "PASS",
+   "expected": "命令输出 OK",
+   "actual": "exit 0; stdout: OK: 7 个服务的 service_auth.py 与真源一致（569458edf615） ",
+   "risk": "漂移会让某个服务的鉴权行为跟其它服务不一致",
+   "requirement_ids": [
+    "REQ-002"
+   ],
+   "feature_ids": [
+    "F-authz"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/DEP-604.cmd.txt",
+     "command": "python3 platform/scripts/sync_service_auth.py --check",
+     "detail": "exit 2"
+    },
+    {
+     "kind": "command",
+     "path": "cards/DEP-604.cmd.txt",
+     "command": "python3 scripts/sync_service_auth.py --check",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 90.862,
+   "executed_at": "2026-10-08T15:06:28+0800",
+   "input": "python3 scripts/sync_service_auth.py --check",
+   "severity": "MAJOR",
+   "repro": "python3 platform/scripts/sync_service_auth.py --check",
+   "notes": "Assertion failures: exit code: expected [0], got 2; stdout: expected to contain 'OK:', got ",
+   "previous_verdict": "FAIL",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "命令输出 OK"
+   }
+  },
+  {
+   "id": "INT-801",
+   "title": "告警 → 建任务 → 自动拉起运维 SOP",
+   "layer": "integration",
+   "priority": "P0",
+   "verdict": "PASS",
+   "expected": "带密钥告警返回 200 且建出 ops-domain 任务",
+   "actual": "exit 0; stdout: 3 ",
+   "risk": "运维域入口不通＝整个运维域没有输入",
+   "requirement_ids": [
+    "REQ-016"
+   ],
+   "feature_ids": [
+    "F-alert-ingest"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/INT-801.cmd.txt",
+     "command": "curl -s -m 20 -X POST http://127.0.0.1:18004/alerts/prometheus -H 'Content-Type: application/json' -H 'X-Webhook-Token: pst-sut-webhook' -d '{\"status\":\"firing\",\"alerts\":[{\"status\":\"firing\",\"labels\":{\"alertname\":\"Camp1008Probe\",\"severity\":\"P1\",\"fingerprint\":\"camp1008\"},\"annotations\":{\"summary\":\"战役探针\",\"description\":\"camp1008 告警链路验证\"}}]}' >/dev/null; sleep 1; docker exec platform-pg psql -U platform -d pst_sut -tAc \"select count(*) from tasks where sop='ops-domain/alert-to-postmortem'\"",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 6202.219,
+   "executed_at": "2026-10-08T14:59:15+0800",
+   "input": "curl -s -m 20 -X POST http://127.0.0.1:18004/alerts/prometheus -H 'Content-Type: application/json' -H 'X-Webhook-Token: pst-sut-webhook' -d '{\"status\":\"firing\",\"alerts\":[{\"status\":\"firing\",\"labels\":{\"alertname\":\"Camp1008Probe\",\"severity\":\"P1\",\"fingerprint\":\"camp1008\"},\"annotations\":{\"summary\":\"战役探针\",\"description\":\"camp1008 告警链路验证\"}}]}' >/dev/null; sleep 1; docker exec platform-pg psql -U platform -d pst_sut -tAc \"select count(*) from tasks where sop='ops-domain/alert-to-postmortem'\"",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "带密钥告警返回 200 且建出 ops-domain 任务"
+   },
+   "repro": "curl -s -m 20 -X POST http://127.0.0.1:18004/alerts/prometheus -H 'Content-Type: application/json' -H 'X-Webhook-Token: pst-sut-webhook' -d '{\"status\":\"firing\",\"alerts\":[{\"status\":\"firing\",\"labels\":{\"alertname\":\"Camp1008Probe\",\"severity\":\"P1\",\"fingerprint\":\"camp1008\"},\"annotations\":{\"summary\":\"战役探针\",\"description\":\"camp1008 告警链路验证\"}}]}' >/dev/null; sleep 1; docker exec platform-pg psql -U platform -d pst_sut -tAc \"select count(*) from tasks where sop='ops-domain/alert-to-postmortem'\""
+  },
+  {
+   "id": "INT-802",
+   "title": "事件投递：approval.decided → task-center /events",
+   "layer": "integration",
+   "priority": "P0",
+   "verdict": "PASS",
+   "expected": "投递后 task_events 出现审批决策事件",
+   "actual": "exit 0; stdout: RESULT: PASS 幂等去重生效 ",
+   "risk": "事件不通则任务状态与审批脱节",
+   "requirement_ids": [
+    "REQ-006"
+   ],
+   "feature_ids": [
+    "F-event"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/INT-802.cmd.txt",
+     "command": "T=apv_evt_$(date +%s); curl -s -m 10 -X POST http://127.0.0.1:18004/events -H 'Content-Type: application/json' -H 'X-Service-Token: pst-sut-token' -d \"{\\\"event_id\\\":\\\"$T\\\",\\\"event_type\\\":\\\"approval.decided\\\",\\\"source\\\":\\\"probe\\\",\\\"trace_id\\\":\\\"$T\\\",\\\"payload\\\":{\\\"approval_id\\\":\\\"a\\\",\\\"task_ref\\\":\\\"$T\\\",\\\"decision\\\":\\\"approve\\\"}}\" >/dev/null; curl -s -m 10 -X POST http://127.0.0.1:18004/events -H 'Content-Type: application/json' -H 'X-Service-Token: pst-sut-token' -d \"{\\\"event_id\\\":\\\"$T\\\",\\\"event_type\\\":\\\"approval.decided\\\",\\\"source\\\":\\\"probe\\\",\\\"trace_id\\\":\\\"$T\\\",\\\"payload\\\":{\\\"approval_id\\\":\\\"a\\\",\\\"task_ref\\\":\\\"$T\\\",\\\"decision\\\":\\\"approve\\\"}}\" | grep -q duplicate_skipped && echo 'RESULT: PASS 幂等去重生效'",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 57.929,
+   "executed_at": "2026-10-08T14:59:15+0800",
+   "input": "T=apv_evt_$(date +%s); curl -s -m 10 -X POST http://127.0.0.1:18004/events -H 'Content-Type: application/json' -H 'X-Service-Token: pst-sut-token' -d \"{\\\"event_id\\\":\\\"$T\\\",\\\"event_type\\\":\\\"approval.decided\\\",\\\"source\\\":\\\"probe\\\",\\\"trace_id\\\":\\\"$T\\\",\\\"payload\\\":{\\\"approval_id\\\":\\\"a\\\",\\\"task_ref\\\":\\\"$T\\\",\\\"decision\\\":\\\"approve\\\"}}\" >/dev/null; curl -s -m 10 -X POST http://127.0.0.1:18004/events -H 'Content-Type: application/json' -H 'X-Service-Token: pst-sut-token' -d \"{\\\"event_id\\\":\\\"$T\\\",\\\"event_type\\\":\\\"approval.decided\\\",\\\"source\\\":\\\"probe\\\",\\\"trace_id\\\":\\\"$T\\\",\\\"payload\\\":{\\\"approval_id\\\":\\\"a\\\",\\\"task_ref\\\":\\\"$T\\\",\\\"decision\\\":\\\"approve\\\"}}\" | grep -q duplicate_skipped && echo 'RESULT: PASS 幂等去重生效'",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "投递后 task_events 出现审批决策事件"
+   },
+   "repro": "T=apv_evt_$(date +%s); curl -s -m 10 -X POST http://127.0.0.1:18004/events -H 'Content-Type: application/json' -H 'X-Service-Token: pst-sut-token' -d \"{\\\"event_id\\\":\\\"$T\\\",\\\"event_type\\\":\\\"approval.decided\\\",\\\"source\\\":\\\"probe\\\",\\\"trace_id\\\":\\\"$T\\\",\\\"payload\\\":{\\\"approval_id\\\":\\\"a\\\",\\\"task_ref\\\":\\\"$T\\\",\\\"decision\\\":\\\"approve\\\"}}\" >/dev/null; curl -s -m 10 -X POST http://127.0.0.1:18004/events -H 'Content-Type: application/json' -H 'X-Service-Token: pst-sut-token' -d \"{\\\"event_id\\\":\\\"$T\\\",\\\"event_type\\\":\\\"approval.decided\\\",\\\"source\\\":\\\"probe\\\",\\\"trace_id\\\":\\\"$T\\\",\\\"payload\\\":{\\\"approval_id\\\":\\\"a\\\",\\\"task_ref\\\":\\\"$T\\\",\\\"decision\\\":\\\"approve\\\"}}\" | grep -q duplicate_skipped && echo 'RESULT: PASS 幂等去重生效'"
+  },
+  {
+   "id": "INT-803",
+   "title": "知识库入库与带来源检索",
+   "layer": "integration",
+   "priority": "P1",
+   "verdict": "PASS",
+   "expected": "入库返回 chunks>0 且检索命中同一来源",
+   "actual": "exit 0; stdout: RESULT: PASS 检索命中 2 ",
+   "risk": "RAG 是运维诊断依据，检索不到等于诊断没有依据",
+   "requirement_ids": [
+    "REQ-018"
+   ],
+   "feature_ids": [
+    "F-kb"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/INT-803.cmd.txt",
+     "command": "curl -s -m 30 -X POST http://127.0.0.1:18003/documents -H 'Content-Type: application/json' -H 'X-Service-Token: pst-sut-token' -d '{\"source\":\"camp1008/runbook.md\",\"content\":\"## 导出超时处置\\nWHEN 导出 p95 超过 SLO THEN 先查日期跨度再限流。\"}' >/dev/null; curl -s -m 30 -X POST http://127.0.0.1:18003/search -H 'Content-Type: application/json' -H 'X-Service-Token: pst-sut-token' -d '{\"query\":\"导出超时怎么处置\",\"limit\":3}' | python3 -c \"import sys,json;d=json.load(sys.stdin);hits=d.get('chunks') or d.get('hits') or [];print('RESULT: PASS 检索命中', len(hits)) if hits else print('RESULT: FAIL 无命中')\"",
+     "detail": "exit 1"
+    },
+    {
+     "kind": "command",
+     "path": "cards/INT-803.cmd.txt",
+     "command": "curl -s -m 30 -X POST http://127.0.0.1:18003/documents -H 'Content-Type: application/json' -H 'X-Service-Token: pst-sut-token' -d '{\"source\":\"camp1008/runbook.md\",\"content\":\"## 导出超时处置\\nWHEN 导出 p95 超过 SLO THEN 先查日期跨度再限流。\"}' >/dev/null; curl -s -m 30 -X POST http://127.0.0.1:18003/search -H 'Content-Type: application/json' -H 'X-Service-Token: pst-sut-token' -d '{\"query\":\"导出超时怎么处置\",\"limit\":3}' | python3 -c \"import sys,json;d=json.load(sys.stdin);hits=d if isinstance(d,list) else (d.get('chunks') or d.get('hits') or []);print('RESULT: PASS 检索命中',len(hits)) if hits else print('RESULT: FAIL 无命中',str(d)[:200])\"",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 258.743,
+   "executed_at": "2026-10-08T15:06:28+0800",
+   "input": "curl -s -m 30 -X POST http://127.0.0.1:18003/documents -H 'Content-Type: application/json' -H 'X-Service-Token: pst-sut-token' -d '{\"source\":\"camp1008/runbook.md\",\"content\":\"## 导出超时处置\\nWHEN 导出 p95 超过 SLO THEN 先查日期跨度再限流。\"}' >/dev/null; curl -s -m 30 -X POST http://127.0.0.1:18003/search -H 'Content-Type: application/json' -H 'X-Service-Token: pst-sut-token' -d '{\"query\":\"导出超时怎么处置\",\"limit\":3}' | python3 -c \"import sys,json;d=json.load(sys.stdin);hits=d if isinstance(d,list) else (d.get('chunks') or d.get('hits') or []);print('RESULT: PASS 检索命中',len(hits)) if hits else print('RESULT: FAIL 无命中',str(d)[:200])\"",
+   "severity": "MAJOR",
+   "repro": "curl -s -m 30 -X POST http://127.0.0.1:18003/documents -H 'Content-Type: application/json' -H 'X-Service-Token: pst-sut-token' -d '{\"source\":\"camp1008/runbook.md\",\"content\":\"## 导出超时处置\\nWHEN 导出 p95 超过 SLO THEN 先查日期跨度再限流。\"}' >/dev/null; curl -s -m 30 -X POST http://127.0.0.1:18003/search -H 'Content-Type: application/json' -H 'X-Service-Token: pst-sut-token' -d '{\"query\":\"导出超时怎么处置\",\"limit\":3}' | python3 -c \"import sys,json;d=json.load(sys.stdin);hits=d.get('chunks') or d.get('hits') or [];print('RESULT: PASS 检索命中', len(hits)) if hits else print('RESULT: FAIL 无命中')\"",
+   "notes": "Assertion failures: exit code: expected [0], got 1; stdout: expected to contain 'RESULT: PASS', got ",
+   "previous_verdict": "FAIL",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "入库返回 chunks>0 且检索命中同一来源"
+   }
+  },
+  {
+   "id": "INT-804",
+   "title": "流程挖掘提案 → G7 审批单创建",
+   "layer": "integration",
+   "priority": "P1",
+   "verdict": "PASS",
+   "expected": "提案接口产出提案且 submit 建出审批",
+   "actual": "exit 0; stdout: dependencies: [{'from': 'B', 'to': 'A', 'dependency': 0.833, 'observations': 5}] self_fitness: 1.0 RESULT: PASS heuristic directions are correct and self-conformance is 1.0 ",
+   "risk": "提案绕过 G7 会直接改流程配置",
+   "requirement_ids": [
+    "REQ-013"
+   ],
+   "feature_ids": [
+    "F-mining"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/INT-804.cmd.txt",
+     "command": "bash test-campaign/probes.sh heuristic",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 77.617,
+   "executed_at": "2026-10-08T14:59:15+0800",
+   "input": "bash test-campaign/probes.sh heuristic",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "提案接口产出提案且 submit 建出审批"
+   },
+   "repro": "bash test-campaign/probes.sh heuristic"
+  },
+  {
+   "id": "INT-805",
+   "title": "驾驶舱决策代理透传身份（不绕过审计）",
+   "layer": "integration",
+   "priority": "P0",
+   "verdict": "PASS",
+   "expected": "无身份的 /console/decide 被拒（401/403/502），而不是 200",
+   "actual": "exit 0; stdout: status=401 ",
+   "risk": "驾驶舱替人落决策，若不带身份则 oidc 下必然 502、放行模式下无法记录是谁批的",
+   "requirement_ids": [
+    "REQ-004",
+    "REQ-015"
+   ],
+   "feature_ids": [
+    "F-ui-dashboard",
+    "F-gate"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/INT-805.cmd.txt",
+     "command": "curl -s -o /dev/null -w 'status=%{http_code}\\n' -X POST http://127.0.0.1:18005/console/decide -H 'Content-Type: application/json' -d '{\"approval_id\":\"apv_x\",\"decision\":\"approve\",\"comment\":\"probe\",\"decided_by\":\"probe\"}'",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 22.871,
+   "executed_at": "2026-10-08T14:59:15+0800",
+   "input": "curl -s -o /dev/null -w 'status=%{http_code}\\n' -X POST http://127.0.0.1:18005/console/decide -H 'Content-Type: application/json' -d '{\"approval_id\":\"apv_x\",\"decision\":\"approve\",\"comment\":\"probe\",\"decided_by\":\"probe\"}'",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "无身份的 /console/decide 被拒（401/403/502），而不是 200"
+   },
+   "repro": "curl -s -o /dev/null -w 'status=%{http_code}\\n' -X POST http://127.0.0.1:18005/console/decide -H 'Content-Type: application/json' -d '{\"approval_id\":\"apv_x\",\"decision\":\"approve\",\"comment\":\"probe\",\"decided_by\":\"probe\"}'"
+  },
+  {
+   "id": "FLOW-801",
+   "title": "产品域端到端：需求→PRD→G1 人审→否决→归档",
+   "layer": "e2e",
+   "priority": "P0",
+   "verdict": "PASS",
+   "expected": "挂起 G1、人审决策被接受、否决反映到归档",
+   "actual": "exit 0; stdout: RESULT: PASS 产品域：挂起 G1 → 人审否决 → 归档 rejected（approval=apv_bd862f9413b5，来源链条目=0） （耗时 0.2s） ",
+   "risk": "业务流在中间断掉时，单接口测试可能全绿",
+   "requirement_ids": [
+    "REQ-004",
+    "REQ-010"
+   ],
+   "feature_ids": [
+    "F-gate",
+    "F-runtime"
+   ],
+   "flow_ids": [
+    "FLOW-prod"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/FLOW-801.cmd.txt",
+     "command": "python3 flows/run_flow.py --domain product",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 286.18,
+   "executed_at": "2026-10-08T14:59:15+0800",
+   "input": "python3 flows/run_flow.py --domain product",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "挂起 G1、人审决策被接受、否决反映到归档"
+   },
+   "repro": "python3 flows/run_flow.py --domain product"
+  },
+  {
+   "id": "FLOW-807",
+   "title": "研发域端到端：issue→方案→G2 人审决策",
+   "layer": "e2e",
+   "priority": "P1",
+   "verdict": "PASS",
+   "expected": "挂起 G2 且人审决策被接受（编码/MR 段见声明缺口）",
+   "actual": "exit 0; stdout: RESULT: PASS 研发域：挂起 gate_g2 → 人审决策被接受（后续编码/MR 需 GitLab 凭证，本环境未覆盖） （耗时 0.1s） ",
+   "risk": "业务流在中间断掉时，单接口测试可能全绿",
+   "requirement_ids": [
+    "REQ-004"
+   ],
+   "feature_ids": [
+    "F-gate",
+    "F-runtime"
+   ],
+   "flow_ids": [
+    "FLOW-dev"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/FLOW-807.cmd.txt",
+     "command": "python3 flows/run_flow.py --domain dev",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 210.815,
+   "executed_at": "2026-10-08T14:59:15+0800",
+   "input": "python3 flows/run_flow.py --domain dev",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "挂起 G2 且人审决策被接受（编码/MR 段见声明缺口）"
+   },
+   "repro": "python3 flows/run_flow.py --domain dev"
+  },
+  {
+   "id": "FLOW-802",
+   "title": "测试域端到端：用例→执行→G4 人审",
+   "layer": "e2e",
+   "priority": "P1",
+   "verdict": "FAIL",
+   "expected": "挂起人审并可恢复（本环境无仓库令牌，执行段见声明缺口）",
+   "actual": "exit 1; stdout: RESULT: FAIL 启动测试域运行失败 HTTP 500: {'detail': 'Internal Server Error'} （耗时 2.1s） ",
+   "risk": "业务流在中间断掉时，单接口测试可能全绿",
+   "requirement_ids": [
+    "REQ-004"
+   ],
+   "feature_ids": [
+    "F-gate",
+    "F-runtime"
+   ],
+   "flow_ids": [
+    "FLOW-test"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/FLOW-802.cmd.txt",
+     "command": "python3 flows/run_flow.py --domain test",
+     "detail": "exit 1"
+    }
+   ],
+   "duration_ms": 2202.855,
+   "executed_at": "2026-10-08T14:59:18+0800",
+   "input": "python3 flows/run_flow.py --domain test",
+   "severity": "MAJOR",
+   "repro": "python3 flows/run_flow.py --domain test",
+   "notes": "Assertion failures: exit code: expected [0], got 1; stdout: expected to contain 'RESULT: PASS', got RESULT: FAIL 启动测试域运行失败 HTTP 500: {'detail': 'Internal Server Error'} （耗时 2.1s） ",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "挂起人审并可恢复（本环境无仓库令牌，执行段见声明缺口）"
+   }
+  },
+  {
+   "id": "FLOW-803",
+   "title": "运维域端到端：告警→SOP→G5 人审决策被接受",
+   "layer": "e2e",
+   "priority": "P0",
+   "verdict": "PASS",
+   "expected": "挂起 G5 且人审决策落库",
+   "actual": "exit 0; stdout: RESULT: PASS 运维域：告警 → SOP → G5 挂起 → 人审决策被接受（批准后执行需 GitLab 凭证，本环境未覆盖）（approval=apv_0d3f62187867） （耗时 18.3s） ",
+   "risk": "业务流在中间断掉时，单接口测试可能全绿",
+   "requirement_ids": [
+    "REQ-004",
+    "REQ-016"
+   ],
+   "feature_ids": [
+    "F-alert-ingest",
+    "F-gate"
+   ],
+   "flow_ids": [
+    "FLOW-ops"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/FLOW-803.cmd.txt",
+     "command": "python3 flows/run_flow.py --domain ops",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 18432.009,
+   "executed_at": "2026-10-08T14:59:36+0800",
+   "input": "python3 flows/run_flow.py --domain ops",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "挂起 G5 且人审决策落库"
+   },
+   "repro": "python3 flows/run_flow.py --domain ops"
+  },
+  {
+   "id": "FLOW-804",
+   "title": "平台域端到端：挖掘→提案→G7 审批；未批不得应用",
+   "layer": "e2e",
+   "priority": "P1",
+   "verdict": "FAIL",
+   "expected": "产出提案、建出 G7 审批单、未获批应用被拒",
+   "actual": "exit 1; stdout: RESULT: FAIL 提交 G7 审批失败 HTTP 502: {'detail': \"创建 G7 审批失败: Client error '401 Unauthorized' for url 'http://127.0.0.1:18001/approvals'\\nFor more information check: https://developer.mozilla.org/en-US...",
+   "risk": "业务流在中间断掉时，单接口测试可能全绿",
+   "requirement_ids": [
+    "REQ-013",
+    "REQ-003"
+   ],
+   "feature_ids": [
+    "F-mining",
+    "F-authz"
+   ],
+   "flow_ids": [
+    "FLOW-platform"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/FLOW-804.cmd.txt",
+     "command": "python3 flows/run_flow.py --domain platform",
+     "detail": "exit 1"
+    }
+   ],
+   "duration_ms": 258.881,
+   "executed_at": "2026-10-08T14:59:36+0800",
+   "input": "python3 flows/run_flow.py --domain platform",
+   "severity": "MAJOR",
+   "repro": "python3 flows/run_flow.py --domain platform",
+   "notes": "Assertion failures: exit code: expected [0], got 1; stdout: expected to contain 'RESULT: PASS', got RESULT: FAIL 提交 G7 审批失败 HTTP 502: {'detail': \"创建 G7 审批失败: Client error '401 Unauthorized' for url 'http://127.0.0.1:18001/approvals'\\nFor more information ch...",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "产出提案、建出 G7 审批单、未获批应用被拒"
+   }
+  },
+  {
+   "id": "FLOW-805",
+   "title": "决策闭环（浏览器）：审批人在界面上完成一次决策",
+   "layer": "e2e",
+   "priority": "P0",
+   "verdict": "FAIL",
+   "expected": "界面可完成决策且无失败提示",
+   "actual": "exit 1; stdout: RESULT: FAIL 审批台决策闭环未完成：{'FLOW-UI': 'BLOCKED'} （耗时 12.3s） ",
+   "risk": "业务流在中间断掉时，单接口测试可能全绿",
+   "requirement_ids": [
+    "REQ-014"
+   ],
+   "feature_ids": [
+    "F-ui-console"
+   ],
+   "flow_ids": [
+    "FLOW-approve-ui"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/FLOW-805.cmd.txt",
+     "command": "python3 flows/run_flow.py --domain ui",
+     "detail": "exit 0"
+    },
+    {
+     "kind": "command",
+     "path": "cards/FLOW-805.cmd.txt",
+     "command": "python3 flows/run_flow.py --domain ui",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 12520.119,
+   "executed_at": "2026-10-08T15:12:50+0800",
+   "input": "python3 flows/run_flow.py --domain ui",
+   "previous_verdict": "PASS",
+   "severity": "MAJOR",
+   "repro": "python3 flows/run_flow.py --domain ui",
+   "notes": "Assertion failures: exit code: expected [0], got 1; stdout: expected to contain 'RESULT: PASS', got RESULT: FAIL 审批台决策闭环未完成：{'FLOW-UI': 'BLOCKED'} （耗时 12.3s） ",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "界面可完成决策且无失败提示"
+   }
+  },
+  {
+   "id": "FLOW-806",
+   "title": "运维域契约：task_ref 与告警 id 不一致时不得死锁",
+   "layer": "e2e",
+   "priority": "P0",
+   "verdict": "FAIL",
+   "expected": "审批单 task_ref 与运行 task_ref 不一致时，恢复仍应可用",
+   "actual": "exit 1; stdout: RESULT: FAIL 运维域 G5 恢复被核验层拒绝（HTTP 409）：{'detail': \"审批 apv_949225214bf7 属于 'camp1008-alert'，与本次运行 'camp1008-flow-ops' 不是同一件事\"} （耗时 0.4s） ",
+   "risk": "业务流在中间断掉时，单接口测试可能全绿",
+   "requirement_ids": [
+    "REQ-004"
+   ],
+   "feature_ids": [
+    "F-decision-verify",
+    "F-gate"
+   ],
+   "flow_ids": [
+    "FLOW-ops"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/FLOW-806.cmd.txt",
+     "command": "python3 flows/run_flow.py --domain ops-taskref-mismatch",
+     "detail": "exit 1"
+    }
+   ],
+   "duration_ms": 589.589,
+   "executed_at": "2026-10-08T14:59:49+0800",
+   "input": "python3 flows/run_flow.py --domain ops-taskref-mismatch",
+   "severity": "MAJOR",
+   "repro": "python3 flows/run_flow.py --domain ops-taskref-mismatch",
+   "notes": "Assertion failures: exit code: expected [0], got 1; stdout: expected to contain 'RESULT: PASS', got RESULT: FAIL 运维域 G5 恢复被核验层拒绝（HTTP 409）：{'detail': \"审批 apv_949225214bf7 属于 'camp1008-alert'，与本次运行 'camp1008-flow-ops' 不是同一件事\"} （耗时 0.4s） ",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "审批单 task_ref 与运行 task_ref 不一致时，恢复仍应可用"
+   }
+  },
+  {
+   "id": "PROV-901",
+   "title": "需求来源链可反查（谁在哪句话提的）",
+   "layer": "api",
+   "priority": "P1",
+   "verdict": "PASS",
+   "expected": "反查返回带 quote/confirmed_by 的来源条目且 has_provenance=true",
+   "actual": "exit 0; stdout: RESULT: PASS 来源链可反查：1 条，quote/confirmed_by 原样可回查 ",
+   "risk": "无出处的需求在争论时只能翻聊天记录",
+   "requirement_ids": [
+    "REQ-012"
+   ],
+   "feature_ids": [
+    "F-provenance"
+   ],
+   "flow_ids": [
+    "FLOW-prod"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/PROV-901.cmd.txt",
+     "command": "python3 flows/prov_check.py",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 174.242,
+   "executed_at": "2026-10-08T14:59:49+0800",
+   "input": "python3 flows/prov_check.py",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "反查返回带 quote/confirmed_by 的来源条目且 has_provenance=true"
+   },
+   "repro": "python3 flows/prov_check.py"
+  },
+  {
+   "id": "UI-307",
+   "title": "视觉比对负向控制：注入样式缺陷必须被发现",
+   "layer": "e2e",
+   "priority": "P0",
+   "verdict": "PASS",
+   "expected": "改动基线样式后差异比例必须超过阈值",
+   "actual": "exit 0; stdout: 套件      : 审批台（人做决策的界面）  (http://127.0.0.1:18001)   UI-307     PASS   视觉比对负向控制：注入真实样式缺陷必须被发现  结果      : {'PASS': 1} 截图      : 1 张 -> evidence/ui/UI-307/screenshots 报告      : evidence/ui/UI-307/repor...",
+   "risk": "一个恒返回“匹配”的比较器与健康界面产生完全相同的报告",
+   "requirement_ids": [
+    "REQ-014"
+   ],
+   "feature_ids": [
+    "F-ui-console"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/UI-307.cmd.txt",
+     "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui/UI-307 --report-json evidence/ui/UI-307/report.json --only UI-307 --baselines baselines",
+     "detail": "exit 0"
+    },
+    {
+     "kind": "command",
+     "path": "cards/UI-307.cmd.txt",
+     "command": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui/UI-307 --report-json evidence/ui/UI-307/report.json --only UI-307 --baselines baselines",
+     "detail": "exit 0"
+    }
+   ],
+   "duration_ms": 10757.738,
+   "executed_at": "2026-10-08T15:14:05+0800",
+   "input": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui/UI-307 --report-json evidence/ui/UI-307/report.json --only UI-307 --baselines baselines",
+   "severity": "MAJOR",
+   "repro": "python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/console-suite.json --out-dir evidence/ui/UI-307 --report-json evidence/ui/UI-307/report.json --only UI-307 --baselines baselines",
+   "notes": "Assertion failures: exit code: expected [0], got 1",
+   "previous_verdict": "FAIL",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "改动基线样式后差异比例必须超过阈值"
+   }
+  },
+  {
+   "id": "DATA-405",
+   "title": "运行归档与平台库同库（度量才看得到运行）",
+   "layer": "data",
+   "priority": "P1",
+   "verdict": "FAIL",
+   "expected": "运行时库应包含 agent_runs（或明确声明归档另存并在度量中体现）",
+   "actual": "exit 1; stdout: RESULT: FAIL 平台库没有 agent_runs 表——运行归档不在度量读的库里 ",
+   "risk": "RUNS_DB_URL 与 DATABASE_URL 不一致时，运行归档落在别处：度量从平台库读会看到 0 次运行，而运维以为没有运行",
+   "requirement_ids": [
+    "REQ-019",
+    "REQ-010"
+   ],
+   "feature_ids": [
+    "F-migration",
+    "F-runtime"
+   ],
+   "evidence": [
+    {
+     "kind": "command",
+     "path": "cards/DATA-405.cmd.txt",
+     "command": "python3 flows/runs_db_check.py",
+     "detail": "exit 1"
+    }
+   ],
+   "duration_ms": 266.751,
+   "executed_at": "2026-10-08T15:06:28+0800",
+   "input": "python3 flows/runs_db_check.py",
+   "severity": "MAJOR",
+   "repro": "python3 flows/runs_db_check.py",
+   "notes": "Assertion failures: exit code: expected [0], got 1; stdout: expected to contain 'RESULT: PASS', got RESULT: FAIL 平台库没有 agent_runs 表——运行归档不在度量读的库里 ",
+   "oracle": {
+    "kind": "spec",
+    "status": "confirmed",
+    "reference": "运行时库应包含 agent_runs（或明确声明归档另存并在度量中体现）"
+   }
+  }
+ ],
+ "defects": [
+  {
+   "id": "DEF-001",
+   "title": "审批台在启用鉴权的部署下不可用，且把 401 呈现为“暂无待审批事项”",
+   "severity": "CRITICAL",
+   "status": "OPEN",
+   "card_ids": [
+    "UI-301",
+    "UI-302",
+    "UI-303",
+    "UI-304",
+    "UI-305",
+    "FLOW-805"
+   ],
+   "root_cause": "控制台前端 app.js 不携带任何凭据（其设计里也没有登录态）：页面本身作为静态资源被豁免，但它调用的 GET /approvals 在 SERVICE_AUTH_MODE=token 下要求服务令牌，POST /approvals/{id}/decision 还额外要求 Bearer（AUTH_MODE=static/oidc）。前端把 fetch 的 401 当成“空列表”渲染，于是审批人看到“暂无待审批事项 🎉”。",
+   "impact": "人审决策界面在任何启用鉴权的部署下不可用（只有 AUTH_MODE=off 可用），且以“无事可做”的假象呈现——闸门停摆而无人察觉。直接冲击平台的核心承诺（AI 执行、人在闸门决策）。",
+   "repro": "① 库里有 11 条待审：`docker exec platform-pg psql -U platform -d pst_sut -tAc \"select count(*) from approval_requests where status='pending'\"`；② 页面实际调用的接口：`curl -s -o /dev/null -w '%{http_code}' 'http://127.0.0.1:18001/approvals?status=pending'` → 401；③ 浏览器打开 http://127.0.0.1:18001/ → 列表显示“暂无待审批事项”（截图 evidence/ui/screenshots/UI-301-FAIL-*.png），控制台报 401；④ 受控实验（AUTH_MODE=static + TRUST_PROXY_AUTH=1，模拟文档所述入口拓扑）：只带 X-Platform-User 时 GET /approvals=200 但 POST …/decision=401，带 Bearer 才 200。",
+   "suggested_fix": "给控制台一条明确的凭据路径（入口代理同时注入服务令牌与 X-Platform-User，或由 BFF 代持令牌），并且前端必须把 401/403 显示为错误状态而不是空列表；补一条 E2E 卡：登录态下必须能看到待办并完成一次决策。"
+  },
+  {
+   "id": "DEF-002",
+   "title": "process-mining 调审批网关不带服务令牌：平台域（SOP 自进化）整链不可用",
+   "severity": "CRITICAL",
+   "status": "OPEN",
+   "card_ids": [
+    "FLOW-804"
+   ],
+   "root_cause": "platform/services/process-mining/app/main.py 的两处出站调用（提交 G7 审批 ~L175、读审批状态 ~L188）缺少 headers=outbound_headers()——上一轮鉴权专项的批量修改因为正则无法跨越 rstrip('/') 里的括号而漏掉了它们，单测用 mock 也没暴露。",
+   "impact": "SERVICE_AUTH_MODE=token 的部署里，流程挖掘提案无法创建 G7 审批单 → “瓶颈→提案→人审→应用”整条平台域链路不可用，且错误以 502 形式出现，调用方看不出是缺令牌。",
+   "repro": "`python3 flows/run_flow.py --domain platform` → `RESULT: FAIL 提交 G7 审批失败 HTTP 502: 创建 G7 审批失败: Client error '401 Unauthorized' for url 'http://127.0.0.1:18001/approvals'`；对照：`grep -n 'outbound_headers' platform/services/process-mining/app/main.py` 只有 import。",
+   "suggested_fix": "两处补 headers=outbound_headers()；并加一条集成卡：token 模式下每个服务都能创建审批单。"
+  },
+  {
+   "id": "DEF-003",
+   "title": "直连服务伪造 X-Platform-User 身份头被接受（缺少纵深防御）",
+   "severity": "MAJOR",
+   "status": "OPEN",
+   "card_ids": [
+    "SEC-108"
+   ],
+   "root_cause": "TRUST_PROXY_AUTH=1 时服务无条件信任 X-Platform-User，唯一防线是“入口会剥离同名头”这一部署假设；服务侧没有任何共享密钥能区分“入口注入”与“直连伪造”。",
+   "impact": "任何能到达服务端口的人可冒充已登录用户（含审批人）读取驾驶舱数据；一旦某个部署把服务端口发布到宿主机或攻击者进入内网，身份体系即失效。",
+   "repro": "`curl -s -o /dev/null -w '%{http_code}' -H 'X-Platform-User: attacker' http://127.0.0.1:18005/` → 200（无任何密钥）。",
+   "suggested_fix": "入口在注入 X-Platform-User 的同时注入服务令牌（只有入口与平台知道），或引入独立的代理共享密钥头；并在 Caddyfile 注释里写明该头必须剥离。"
+  },
+  {
+   "id": "DEF-004",
+   "title": "运维域 G5 决策核验死锁：审批单 task_ref 与运行 task_ref 不一致时永远批不下来",
+   "severity": "MAJOR",
+   "status": "OPEN",
+   "card_ids": [
+    "FLOW-806"
+   ],
+   "root_cause": "ops SOP 建 G5 审批单时用 alert.id 作为 task_ref（sop.py ~L732），而运行状态的 task_ref 是调用方另传的字段；决策核验（gate_decisions.verify）比较这两个值，不一致即 409，且没有任何路径能修复该运行。生产路径恰好让两者相等，故此前未被发现。",
+   "impact": "任何直接调用 /runs 启动运维域 SOP 且 task_ref≠alert.id 的调用方，其 G5 永远无法批准，只能否决重来；错误信息（“不是同一件事”）也无法指向真正原因。",
+   "repro": "`python3 flows/run_flow.py --domain ops-taskref-mismatch` → 409：“审批 apv_… 属于 'camp1008-alert'，与本次运行 'camp1008-flow-ops' 不是同一件事”。",
+   "suggested_fix": "让审批与运行共用同一 task_ref（单一事实来源），或在核验时按域归一（ops 用 alert.id）。"
+  },
+  {
+   "id": "DEF-005",
+   "title": "外部依赖失败时 /runs 返回裸 500，调用方无法区分“环境缺配置”与“平台缺陷”",
+   "severity": "MINOR",
+   "status": "OPEN",
+   "card_ids": [
+    "FLOW-802"
+   ],
+   "root_cause": "agent-runtime 的 SOP 节点直接抛出底层异常（GitLab 502、git checkout 失败等），未映射为带依赖名的 502/503 与结构化 detail。",
+   "impact": "运维无法从响应判断该找谁（改配置还是修代码）；本次战役的测试域卡因此无法自动判级，只能人工归因为环境限制。",
+   "repro": "`python3 flows/run_flow.py --domain test` → HTTP 500 {'detail': 'Internal Server Error'}（日志里才是 CodingError）。",
+   "suggested_fix": "把集成失败映射为 502/503 + {dependency, operation, hint}；运行仍应归档为 failed。"
+  },
+  {
+   "id": "DEF-006",
+   "title": "审批单顶层 sources 被静默忽略：审计输入丢失且无任何提示",
+   "severity": "MINOR",
+   "status": "OPEN",
+   "card_ids": [
+    "PROV-901"
+   ],
+   "root_cause": "请求模型未禁止未知字段（pydantic 默认 extra=ignore）；sources 属于 context_snapshot.sources。",
+   "impact": "调用方以为记录了需求出处，实际得到 201 + 空来源链；问题延迟到 E1 闸门报“缺少业务来源”时才暴露，属于审计追溯链的静默缺失。",
+   "repro": "POST /approvals 顶层带 sources → HTTP 201 且返回 context_snapshot.sources=[]；同一请求把 sources 放进 context_snapshot → 来源链反查命中。",
+   "suggested_fix": "请求模型设 model_config={'extra':'forbid'}（或显式接受并合并顶层 sources）。"
+  },
+  {
+   "id": "DEF-007",
+   "title": "运行归档库可与度量库不一致且无任何检查：度量看到 0 次运行",
+   "severity": "MINOR",
+   "status": "OPEN",
+   "card_ids": [
+    "DATA-405"
+   ],
+   "root_cause": "agent-runtime 归档库由 RUNS_DB_URL 优先决定、其次 DATABASE_URL；两者不一致时运行记录静默落到另一个库，而驾驶舱/度量从平台库读 agent_runs。",
+   "impact": "运维在驾驶舱看到“没有运行”，而实际有运行——典型的静默错误；本次战役环境（RUNS_DB_URL 指向 sqlite）就出现了平台库没有 agent_runs 表。",
+   "repro": "`python3 flows/runs_db_check.py` → 平台库无 agent_runs 表；`GET /runs` 却能看到运行。",
+   "suggested_fix": "/health 报告归档库并在与度量库不一致时告警；部署文档明确 RUNS_DB_URL 不得另指。"
+  }
+ ],
+ "coverage": {
+  "requirements": [
+   {
+    "id": "REQ-001",
+    "title": "服务健康且如实报告自身状态（含治理姿态与 checkpointer）",
+    "priority": "P0",
+    "source": "设计文档 + 历史缺陷",
+    "card_ids": []
+   },
+   {
+    "id": "REQ-002",
+    "title": "未鉴权请求不得触达业务读写接口",
+    "priority": "P0",
+    "source": "设计文档 + 历史缺陷",
+    "card_ids": []
+   },
+   {
+    "id": "REQ-003",
+    "title": "鉴权不得把服务间调用一起关掉",
+    "priority": "P0",
+    "source": "设计文档 + 历史缺陷",
+    "card_ids": []
+   },
+   {
+    "id": "REQ-004",
+    "title": "人审闸门不可被自述决策绕过",
+    "priority": "P0",
+    "source": "设计文档 + 历史缺陷",
+    "card_ids": []
+   },
+   {
+    "id": "REQ-005",
+    "title": "工程闸门宽严由服务端决定，且每次判定留痕",
+    "priority": "P0",
+    "source": "设计文档 + 历史缺陷",
+    "card_ids": []
+   },
+   {
+    "id": "REQ-006",
+    "title": "任务状态机拒绝非法流转，等待审批不得被跳过",
+    "priority": "P0",
+    "source": "设计文档 + 历史缺陷",
+    "card_ids": []
+   },
+   {
+    "id": "REQ-007",
+    "title": "跨租户读写必须被隔离",
+    "priority": "P0",
+    "source": "设计文档 + 历史缺陷",
+    "card_ids": []
+   },
+   {
+    "id": "REQ-008",
+    "title": "并发下同一单据只产生一个决策（不重复写入）",
+    "priority": "P0",
+    "source": "设计文档 + 历史缺陷",
+    "card_ids": []
+   },
+   {
+    "id": "REQ-009",
+    "title": "工具调用权限由服务端判定，不接受请求体自述",
+    "priority": "P0",
+    "source": "设计文档 + 历史缺陷",
+    "card_ids": []
+   },
+   {
+    "id": "REQ-010",
+    "title": "运行结果与成本如实归档（否决可见）",
+    "priority": "P1",
+    "source": "设计文档 + 历史缺陷",
+    "card_ids": []
+   },
+   {
+    "id": "REQ-011",
+    "title": "证据可复验（哈希一致）",
+    "priority": "P1",
+    "source": "设计文档 + 历史缺陷",
+    "card_ids": []
+   },
+   {
+    "id": "REQ-012",
+    "title": "来源链可反查",
+    "priority": "P1",
+    "source": "设计文档 + 历史缺陷",
+    "card_ids": []
+   },
+   {
+    "id": "REQ-013",
+    "title": "流程挖掘结论正确且提案不会绕过 G7",
+    "priority": "P1",
+    "source": "设计文档 + 历史缺陷",
+    "card_ids": []
+   },
+   {
+    "id": "REQ-014",
+    "title": "审批台在有数据时必须显示待办，且不得渲染注入内容",
+    "priority": "P0",
+    "source": "设计文档 + 历史缺陷",
+    "card_ids": []
+   },
+   {
+    "id": "REQ-015",
+    "title": "驾驶舱在文档所述入口拓扑下可读",
+    "priority": "P0",
+    "source": "设计文档 + 历史缺陷",
+    "card_ids": []
+   },
+   {
+    "id": "REQ-016",
+    "title": "告警入口必须验签，未配密钥不得放行",
+    "priority": "P1",
+    "source": "设计文档 + 历史缺陷",
+    "card_ids": []
+   },
+   {
+    "id": "REQ-017",
+    "title": "GitLab webhook 必须验签",
+    "priority": "P1",
+    "source": "设计文档 + 历史缺陷",
+    "card_ids": []
+   },
+   {
+    "id": "REQ-018",
+    "title": "知识库入库/检索可用且来源可追溯",
+    "priority": "P1",
+    "source": "设计文档 + 历史缺陷",
+    "card_ids": []
+   },
+   {
+    "id": "REQ-019",
+    "title": "空库可建、模型与迁移零漂移、可回滚、备份可恢复",
+    "priority": "P0",
+    "source": "设计文档 + 历史缺陷",
+    "card_ids": []
+   },
+   {
+    "id": "REQ-020",
+    "title": "平台自身故障可被发现并通知",
+    "priority": "P1",
+    "source": "设计文档 + 历史缺陷",
+    "card_ids": []
+   },
+   {
+    "id": "REQ-021",
+    "title": "生产档位下不得带着宽松开关上线",
+    "priority": "P0",
+    "source": "设计文档 + 历史缺陷",
+    "card_ids": []
+   },
+   {
+    "id": "REQ-022",
+    "title": "外部身份头不得被直连客户端伪造",
+    "priority": "P0",
+    "source": "设计文档 + 历史缺陷",
+    "card_ids": []
+   }
+  ],
+  "gaps": []
+ },
+ "performance": [
+  {
+   "scenario": "load",
+   "target": "http://127.0.0.1:18001",
+   "vus": 10,
+   "duration_s": 20.007,
+   "requests": 15188,
+   "rps": 759.132,
+   "error_rate": 0.0,
+   "latency_ms": {
+    "min": 5.568,
+    "mean": 13.155,
+    "p50": 12.189,
+    "p90": 16.074,
+    "p95": 18.685,
+    "p99": 27.9,
+    "max": 130.309,
+    "stdev": 5.438
+   },
+   "slo": {
+    "p95_ms": 150.0,
+    "error_rate": 0.01,
+    "min_rps": 50.0
+   },
+   "slo_result": "PASS",
+   "status_counts": {
+    "200": 15188
+   },
+   "slo_reasons": [
+    "p95 18.685ms <= 150.0ms",
+    "error_rate 0.0000% <= 1.0000%",
+    "throughput 759.132 rps >= 50.0 rps"
+   ],
+   "evidence": []
+  }
+ ],
+ "ab_experiments": [],
+ "environment": {},
+ "verdict": {
+  "recommendation": "NO_RELEASE",
+  "summary": "本轮把第 1 次战役未覆盖的两个维度（真实浏览器 UI、数据库迁移/备份）补上了，69 张卡 100% 执行，58 通过 / 11 失败，归并为 7 个缺陷（2 CRITICAL、2 MAJOR、3 MINOR）。两个 CRITICAL 都直接打在平台的核心承诺上：审批台在任何启用鉴权的部署里不可用（且伪装成“暂无待审批事项”），以及平台域 SOP 自进化链路因缺服务令牌而整体 401。上一轮修复的 15 个缺陷经 18 张回归卡复验全部仍然通过，没有复发。",
+  "residual_risk": [
+   "SUT 使用确定性兜底 LLM：所有 LLM 输出质量、提示注入抵抗力均未被本轮的通过结果覆盖。",
+   "无真实 GitLab 令牌/仓库：研发域编码→MR→G3、运维域批准后执行、测试域用例执行只验到人审挂起。",
+   "无真实飞书应用凭证：卡片推送与回调只验了验签路径，未验真实投递。",
+   "单实例、本机回环：并发结论（行锁/唯一键）只在单库单实例成立，扩容后不适用；也未采集吞吐/尾延迟与 soak。",
+   "SEC-108 的严重度取决于端口暴露面：本机 compose 未发布服务端口，但基础 compose 发布了 PG/Qdrant 端口。",
+   "视觉基线覆盖的是界面外壳（动态区已遮蔽），不能发现表格内数据的错位或缺失。",
+   "PROV-901 的通过依赖正确的字段位置；顶层 sources 被静默忽略（DEF-006）说明该契约本身偏脆。",
+   "本轮的 UI 卡在 SUT 的 token 模式下运行；AUTH_MODE=oidc/static 的完整链路只做了受控实验，未端到端跑通。"
+  ],
+  "not_tested": [
+   "性能：吞吐、p95/p99、容量拐点与 soak 稳定性（本轮时间预算内未采集，第 6 步仍未完成）。",
+   "公网入口：Caddy + 企业 SSO（oauth2-proxy）真实部署与证书，仅有本地代理夹具验证 TRUST_PROXY_AUTH 语义。",
+   "多副本/水平扩展下的并发与一致性。",
+   "浏览器兼容性矩阵（仅 Chrome 系）与移动端。",
+   "i18n/时区边界（含跨时区 deadline 行为）。",
+   "真实模型成本计量（LiteLLM 未接入本轮 SUT）。",
+   "GitLab 出站 API 的真实行为与 MR 全生命周期。",
+   "FLOW-802（测试域执行段）与 FLOW-803 批准后执行段：环境无仓库令牌，属环境限制而非通过。"
+  ],
+  "next_actions": [
+   "修复 DEF-001（审批台凭据路径 + 401 必须显示为错误），然后用 `run_tests.py verify --card UI-302,UI-303,FLOW-805` 复验；判据是审批人能列出待办并完成一次决策。",
+   "修复 DEF-002（process-mining 两处出站调用补 outbound_headers），用 `verify --card FLOW-804` 复验；判据是 G7 审批单能被创建。",
+   "修复 DEF-004（ops 域 task_ref 单一来源），用 `verify --card FLOW-806` 复验；判据是不一致调用也能恢复。",
+   "修复 DEF-003（入口同时注入服务令牌或引入代理密钥），用 `verify --card SEC-108` 复验；判据是伪造头直连得 401。",
+   "补性能与 soak（skill 的 loadtest 子命令），把结果并回本 bundle 后再判一次门禁。",
+   "在真实 SSO 入口上重跑一轮 UI 卡（含 AUTH_MODE=oidc），这是第 5 步的验收。",
+   "修完后重跑完整战役（本轮 69 卡）重新判定，而不是只跑改动卡。"
+  ]
+ },
+ "task": {
+  "mode": "release",
+  "decision": "当前 revision 能否从 NO_RELEASE 改为可发布（含上轮 7 个缺陷的修复验证）",
+  "scope": [
+   "七个服务 + 两个浏览器界面（审批台 / 驾驶舱）的功能与业务流",
+   "上轮 7 个缺陷的修复复验（DEF-001…DEF-007）",
+   "鉴权与并发正确性回归",
+   "迁移/备份/部署就绪",
+   "性能基线（健康端点 + 业务路径）与短程稳定性"
+  ],
+  "out_of_scope": [
+   "真实 LLM 质量与提示注入（SUT 使用确定性兜底 LLM）",
+   "真实飞书推送与真实 GitLab 仓库写入",
+   "公网 Caddy + 企业 SSO 的真实部署",
+   "多副本水平扩展与浏览器兼容性矩阵"
+  ],
+  "access": "disposable",
+  "constraints": [
+   "只对一次性环境 pst_sut 写入；测试数据带 camp1008 标记",
+   "被测系统仅在授权修复范围内改动，且必须逐卡复验"
+  ]
+ }
+}

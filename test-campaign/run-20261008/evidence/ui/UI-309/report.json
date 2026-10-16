@@ -1,0 +1,169 @@
+{
+  "suite": "审批台（人做决策的界面）",
+  "base_url": "http://127.0.0.1:18001",
+  "started_at": "2026-10-16T11:07:29+0800",
+  "finished_at": "2026-10-16T11:07:32+0800",
+  "headless": true,
+  "environment": {
+    "platform": "macOS-26.7-x86_64-i386-64bit",
+    "python": "3.9.6",
+    "chrome": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "chrome_version": "Google Chrome 155.0.8059.80"
+  },
+  "blocked_reason": null,
+  "tests": [
+    {
+      "id": "UI-309",
+      "title": "在界面上完成一次决策（浏览器端到端）",
+      "layer": "e2e",
+      "priority": "P0",
+      "verdict": "PASS",
+      "expected": "全部步骤通过且页面无控制台错误",
+      "actual": "10 个步骤全部通过",
+      "duration_ms": 1922.1,
+      "steps": [
+        "goto: http://127.0.0.1:18001/",
+        "fill: #access-token = <redacted>",
+        "click: #auth-form button[type=submit]",
+        "wait_for: .row",
+        "eval: \"clicked\"",
+        "wait_for: button[data-action=approve]",
+        "eval: \"stubbed\"",
+        "click: button[data-action=approve]",
+        "wait_ms: Nonems",
+        "assert_text: found '决策已提交'"
+      ],
+      "evidence": [
+        {
+          "kind": "screenshot",
+          "path": "f1f2168f7f8c40f6ba512d7e14731d78/screenshots/UI-309-110731.png",
+          "detail": "UI-309 界面截图",
+          "sha256": "66104dc1ab22cf9fbab499d4b531ee561f9f300c009735ee2967ed13028d3321",
+          "attempt_id": "f1f2168f7f8c40f6ba512d7e14731d78",
+          "run_id": "f1f2168f7f8c40f6ba512d7e14731d78"
+        },
+        {
+          "kind": "log",
+          "path": "f1f2168f7f8c40f6ba512d7e14731d78/logs/UI-309.log",
+          "detail": "逐步操作与页面控制台",
+          "sha256": "55aa7179a46b971c725b0d7e3cad6ee2d46722f3fd189525c35976b7990d6eb0",
+          "attempt_id": "f1f2168f7f8c40f6ba512d7e14731d78",
+          "run_id": "f1f2168f7f8c40f6ba512d7e14731d78"
+        }
+      ],
+      "tags": [],
+      "executed_at": "2026-10-16T11:07:32+0800",
+      "attempt_id": "f1f2168f7f8c40f6ba512d7e14731d78",
+      "run_id": "f1f2168f7f8c40f6ba512d7e14731d78"
+    },
+    {
+      "id": "UI-301",
+      "title": "审批台加载：静态外壳可见、登录后可列出待办且无控制台报错",
+      "priority": "P0",
+      "layer": "e2e",
+      "verdict": "NOT_EXECUTED",
+      "actual": "not selected",
+      "evidence": [],
+      "attempt_id": "f1f2168f7f8c40f6ba512d7e14731d78",
+      "run_id": "f1f2168f7f8c40f6ba512d7e14731d78"
+    },
+    {
+      "id": "UI-302",
+      "title": "待审列表渲染出已存在的审批单（数据链路可用）",
+      "priority": "P0",
+      "layer": "e2e",
+      "verdict": "NOT_EXECUTED",
+      "actual": "not selected",
+      "evidence": [],
+      "attempt_id": "f1f2168f7f8c40f6ba512d7e14731d78",
+      "run_id": "f1f2168f7f8c40f6ba512d7e14731d78"
+    },
+    {
+      "id": "UI-303",
+      "title": "点击审批单后详情渲染三要素（做了什么/依据/风险自评）",
+      "priority": "P0",
+      "layer": "e2e",
+      "verdict": "NOT_EXECUTED",
+      "actual": "not selected",
+      "evidence": [],
+      "attempt_id": "f1f2168f7f8c40f6ba512d7e14731d78",
+      "run_id": "f1f2168f7f8c40f6ba512d7e14731d78"
+    },
+    {
+      "id": "UI-304",
+      "title": "XSS 载荷只作为文本出现：不生成元素、不执行脚本",
+      "priority": "P0",
+      "layer": "e2e",
+      "verdict": "NOT_EXECUTED",
+      "actual": "not selected",
+      "evidence": [],
+      "attempt_id": "f1f2168f7f8c40f6ba512d7e14731d78",
+      "run_id": "f1f2168f7f8c40f6ba512d7e14731d78"
+    },
+    {
+      "id": "UI-305",
+      "title": "审批台可访问性：按钮有可访问名（屏幕阅读器可用）",
+      "priority": "P1",
+      "layer": "e2e",
+      "verdict": "NOT_EXECUTED",
+      "actual": "not selected",
+      "evidence": [],
+      "attempt_id": "f1f2168f7f8c40f6ba512d7e14731d78",
+      "run_id": "f1f2168f7f8c40f6ba512d7e14731d78"
+    },
+    {
+      "id": "UI-306",
+      "title": "视觉基线：审批台外壳（列表为动态区，已遮蔽）",
+      "priority": "P1",
+      "layer": "e2e",
+      "verdict": "NOT_EXECUTED",
+      "actual": "not selected",
+      "evidence": [],
+      "attempt_id": "f1f2168f7f8c40f6ba512d7e14731d78",
+      "run_id": "f1f2168f7f8c40f6ba512d7e14731d78"
+    },
+    {
+      "id": "UI-307",
+      "title": "视觉比对负向控制：注入真实样式缺陷必须被发现",
+      "priority": "P0",
+      "layer": "e2e",
+      "verdict": "NOT_EXECUTED",
+      "actual": "not selected",
+      "evidence": [],
+      "attempt_id": "f1f2168f7f8c40f6ba512d7e14731d78",
+      "run_id": "f1f2168f7f8c40f6ba512d7e14731d78"
+    },
+    {
+      "id": "UI-308",
+      "title": "无令牌时必须显示鉴权错误，不得伪装成空审批队列",
+      "priority": "P0",
+      "layer": "e2e",
+      "verdict": "NOT_EXECUTED",
+      "actual": "not selected",
+      "evidence": [],
+      "attempt_id": "f1f2168f7f8c40f6ba512d7e14731d78",
+      "run_id": "f1f2168f7f8c40f6ba512d7e14731d78"
+    }
+  ],
+  "visual": {
+    "baseline_dir": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008/baselines",
+    "baselines_available": 4,
+    "update_requested": false,
+    "tally": {},
+    "results": []
+  },
+  "accessibility": {
+    "snapshots": 0,
+    "summary": []
+  },
+  "change_checks": {
+    "count": 0,
+    "confirmed": 0,
+    "results": []
+  },
+  "tracing": {
+    "enabled": false,
+    "traces": []
+  },
+  "evidence_base": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008/evidence/ui/UI-309"
+}

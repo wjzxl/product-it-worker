@@ -1,0 +1,248 @@
+{
+  "suite": "运营驾驶舱（决策台）",
+  "base_url": "http://127.0.0.1:18015",
+  "started_at": "2026-10-08T15:08:22+0800",
+  "finished_at": "2026-10-08T15:08:42+0800",
+  "headless": true,
+  "environment": {
+    "platform": "macOS-26.7-x86_64-i386-64bit",
+    "python": "3.9.6",
+    "chrome": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "chrome_version": "Google Chrome 154.0.8037.98"
+  },
+  "blocked_reason": null,
+  "tests": [
+    {
+      "id": "UI-314",
+      "title": "视觉基线：驾驶舱首屏与基线逐像素比对",
+      "layer": "e2e",
+      "priority": "P2",
+      "verdict": "PASS",
+      "expected": "全部步骤通过且页面无控制台错误",
+      "actual": "4 个步骤全部通过",
+      "duration_ms": 18225.8,
+      "steps": [
+        "goto: http://127.0.0.1:18015/",
+        "wait_for_text: 待决策队列",
+        "wait_ms: Nonems",
+        "visual: [MATCH] dashboard-shell: 138 of 1991520 pixels differ (within tolerance) (138 px, 1 处区域) [已屏蔽 3 个动态区域]"
+      ],
+      "evidence": [
+        {
+          "kind": "screenshot",
+          "path": "screenshots/UI-314-150841.png",
+          "detail": "UI-314 界面截图"
+        },
+        {
+          "kind": "visual_current",
+          "path": "evidence/ui/UI-314/visual/dashboard-shell/current.png",
+          "detail": "dashboard-shell 当前截图 — MATCH：138px 差异 (0.007%)"
+        },
+        {
+          "kind": "visual_diff",
+          "path": "evidence/ui/UI-314/visual/dashboard-shell/diff.png",
+          "detail": "dashboard-shell 差异标注图 — MATCH：138px 差异 (0.007%)"
+        },
+        {
+          "kind": "visual_baseline",
+          "path": "evidence/ui/UI-314/visual/dashboard-shell/baseline.png",
+          "detail": "dashboard-shell 基线截图 — MATCH：138px 差异 (0.007%)"
+        },
+        {
+          "kind": "log",
+          "path": "logs/UI-314.log",
+          "detail": "逐步操作与页面控制台"
+        }
+      ],
+      "tags": [],
+      "executed_at": "2026-10-08T15:08:42+0800",
+      "visual": [
+        {
+          "name": "dashboard-shell",
+          "current": "evidence/ui/UI-314/screenshots/visual-dashboard-shell.png",
+          "baseline": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008/baselines/dashboard-shell.png",
+          "pixel_threshold": 0.02,
+          "max_diff_ratio": 0.05,
+          "full_page": true,
+          "masks": [
+            [
+              24,
+              81,
+              1392,
+              88
+            ],
+            [
+              24,
+              226,
+              760,
+              358
+            ],
+            [
+              24,
+              592,
+              1392,
+              17
+            ]
+          ],
+          "checked_at": "2026-10-08T15:08:24+0800",
+          "masks_applied": [
+            [
+              24,
+              81,
+              1392,
+              88
+            ],
+            [
+              24,
+              226,
+              760,
+              358
+            ],
+            [
+              24,
+              592,
+              1392,
+              17
+            ]
+          ],
+          "reason": "138 of 1991520 pixels differ (within tolerance)",
+          "width": 1440,
+          "height": 1383,
+          "total_pixels": 1991520,
+          "diff_pixels": 138,
+          "diff_ratio": 6.929e-05,
+          "max_channel_delta": 107,
+          "mean_channel_delta": 0.0045,
+          "passed": true,
+          "size": [
+            1440,
+            1383
+          ],
+          "baseline_size": [
+            1440,
+            1383
+          ],
+          "verdict": "MATCH",
+          "regions": [
+            {
+              "x": 544,
+              "y": 1344,
+              "width": 32,
+              "height": 16,
+              "changed_pixels": 138
+            }
+          ],
+          "region_count": 1,
+          "diff_image": "evidence/ui/UI-314/visual/dashboard-shell/diff.png",
+          "baseline_image": "evidence/ui/UI-314/visual/dashboard-shell/baseline.png",
+          "current_image": "evidence/ui/UI-314/visual/dashboard-shell/current.png",
+          "test": "UI-314"
+        }
+      ]
+    }
+  ],
+  "visual": {
+    "baseline_dir": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008/baselines",
+    "baselines_available": 2,
+    "update_requested": false,
+    "tally": {
+      "MATCH": 1
+    },
+    "results": [
+      {
+        "name": "dashboard-shell",
+        "current": "evidence/ui/UI-314/screenshots/visual-dashboard-shell.png",
+        "baseline": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008/baselines/dashboard-shell.png",
+        "pixel_threshold": 0.02,
+        "max_diff_ratio": 0.05,
+        "full_page": true,
+        "masks": [
+          [
+            24,
+            81,
+            1392,
+            88
+          ],
+          [
+            24,
+            226,
+            760,
+            358
+          ],
+          [
+            24,
+            592,
+            1392,
+            17
+          ]
+        ],
+        "checked_at": "2026-10-08T15:08:24+0800",
+        "masks_applied": [
+          [
+            24,
+            81,
+            1392,
+            88
+          ],
+          [
+            24,
+            226,
+            760,
+            358
+          ],
+          [
+            24,
+            592,
+            1392,
+            17
+          ]
+        ],
+        "reason": "138 of 1991520 pixels differ (within tolerance)",
+        "width": 1440,
+        "height": 1383,
+        "total_pixels": 1991520,
+        "diff_pixels": 138,
+        "diff_ratio": 6.929e-05,
+        "max_channel_delta": 107,
+        "mean_channel_delta": 0.0045,
+        "passed": true,
+        "size": [
+          1440,
+          1383
+        ],
+        "baseline_size": [
+          1440,
+          1383
+        ],
+        "verdict": "MATCH",
+        "regions": [
+          {
+            "x": 544,
+            "y": 1344,
+            "width": 32,
+            "height": 16,
+            "changed_pixels": 138
+          }
+        ],
+        "region_count": 1,
+        "diff_image": "evidence/ui/UI-314/visual/dashboard-shell/diff.png",
+        "baseline_image": "evidence/ui/UI-314/visual/dashboard-shell/baseline.png",
+        "current_image": "evidence/ui/UI-314/visual/dashboard-shell/current.png",
+        "test": "UI-314"
+      }
+    ]
+  },
+  "accessibility": {
+    "snapshots": 0,
+    "summary": []
+  },
+  "change_checks": {
+    "count": 0,
+    "confirmed": 0,
+    "results": []
+  },
+  "tracing": {
+    "enabled": false,
+    "traces": []
+  }
+}

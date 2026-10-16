@@ -1,0 +1,9 @@
+$ bash test-campaign/probes.sh health-checkpointer
+exit: 0
+duration_ms: 73.2
+--- stdout ---
+health reports checkpointer.configured=memory (instance was started with CHECKPOINTER=memory)
+RESULT: PASS health reports the configured checkpointer
+
+--- stderr ---
+

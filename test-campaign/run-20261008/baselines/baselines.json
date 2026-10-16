@@ -1,0 +1,49 @@
+{
+  "baselines": {
+    "dashboard-home": {
+      "path": "dashboard-home.png",
+      "size": [
+        1440,
+        2549
+      ],
+      "sha256": "8d9d14f9326fb75a9887274ab333ecaa4cd9968546d09506467927e336fa8858",
+      "updated_at": "2026-10-08T14:58:51+0800",
+      "source": "evidence/ui/screenshots/visual-dashboard-home.png",
+      "note": "first capture"
+    },
+    "dashboard-shell": {
+      "path": "dashboard-shell.png",
+      "size": [
+        1440,
+        3803
+      ],
+      "sha256": "05562e8fe3c929984920a7689e5a14216fb747099c766257f800dac1b467e19e",
+      "updated_at": "2026-10-16T10:52:06+0800",
+      "source": "evidence/ui/UI-314/a4ed9e3797ba426a9c1d7adc9770fdf5/screenshots/visual-dashboard-shell.png",
+      "note": "baseline replaced by --update-baselines"
+    },
+    "console-shell": {
+      "path": "console-shell.png",
+      "size": [
+        1440,
+        900
+      ],
+      "sha256": "36ba9637ac59c87331382ed7722c82ac83189609e34277f63314fbd1e0315353",
+      "updated_at": "2026-10-16T10:51:56+0800",
+      "source": "evidence/ui/UI-306/4a6f2d8c73fe47109b16ffae76f1fd37/screenshots/visual-console-shell.png",
+      "note": "baseline replaced by --update-baselines"
+    },
+    "dashboard-title": {
+      "path": "dashboard-title.png",
+      "size": [
+        1392,
+        28
+      ],
+      "sha256": "45571517b3e2657373f19967757883a3fa6c3f0777e6ce5e39d6f5a461721fd2",
+      "updated_at": "2026-10-16T11:01:33+0800",
+      "source": "evidence/ui/UI-314/c41eaf91fc1b401ba941270d2725e3db/screenshots/visual-dashboard-title.png",
+      "note": "first capture"
+    }
+  },
+  "count": 4
+}

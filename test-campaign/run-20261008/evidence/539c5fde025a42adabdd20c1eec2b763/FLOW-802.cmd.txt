@@ -1,0 +1,9 @@
+$ python3 flows/run_flow.py --domain test
+exit: 1
+duration_ms: 2917.1
+--- stdout ---
+RESULT: FAIL 启动测试域运行失败 HTTP 502: {'detail': {'error': '执行依赖失败', 'kind': 'CodingError', 'thread_id': 'run_872bf91d4d2aebf92a204bad0e0f9bc0'}}
+（耗时 2.8s）
+
+--- stderr ---
+

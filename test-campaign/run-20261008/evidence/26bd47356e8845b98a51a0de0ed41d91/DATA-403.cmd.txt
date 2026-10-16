@@ -1,0 +1,14 @@
+$ python3 platform/scripts/backup_restore.py drill --dbs platform
+exit: 0
+duration_ms: 5742.3
+--- stdout ---
+① 备份（platform）→ /var/folders/sn/18dsy4bx4nzb0y2gx65k315h0000gn/T/pg-drill-da2g3od9
+  已备份 platform → /var/folders/sn/18dsy4bx4nzb0y2gx65k315h0000gn/T/pg-drill-da2g3od9/platform-20261016-025746.dump（74.1 KB）
+② 恢复 platform → platform_restore_drill
+   ✅ platform：14 张表，源/恢复库行数一致=True
+
+✅ 恢复演练通过：备份文件可恢复，且行数与源库一致
+报告：reports/backup-restore-drill-20261016-025751.md
+
+--- stderr ---
+

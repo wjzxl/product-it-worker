@@ -1,0 +1,68 @@
+{
+  "tool": "loadtest.py",
+  "generated_at": "2026-10-16T11:06:02+0800",
+  "target": "http://127.0.0.1:18001",
+  "scenario": "soak",
+  "config": {
+    "vus": 5,
+    "duration_s": 150.0,
+    "stages": "",
+    "stage_duration_s": 20.0,
+    "rps_cap": null,
+    "timeout_s": 10.0,
+    "warmup_s": 5.0,
+    "ramp_up_s": 0.0,
+    "keep_alive": true,
+    "slo": {
+      "p95_ms": 200.0,
+      "error_rate": 0.01,
+      "min_rps": 20.0
+    },
+    "seed": null
+  },
+  "environment": {
+    "python": "3.9.6",
+    "platform": "darwin",
+    "cpu_count": 16,
+    "runner": "loadtest.py (stdlib, client-side generation)"
+  },
+  "performance": [
+    {
+      "scenario": "soak",
+      "target": "http://127.0.0.1:18001",
+      "vus": 5,
+      "duration_s": 150.006,
+      "requests": 128840,
+      "rps": 858.897,
+      "error_rate": 0.0,
+      "latency_ms": {
+        "min": 2.887,
+        "mean": 5.807,
+        "p50": 5.388,
+        "p90": 6.834,
+        "p95": 8.058,
+        "p99": 13.247,
+        "max": 127.157,
+        "stdev": 2.599
+      },
+      "latency_sample_count": 128840,
+      "latency_sampling": "all requests",
+      "latency_sample_limit": 2000000,
+      "slo": {
+        "p95_ms": 200.0,
+        "error_rate": 0.01,
+        "min_rps": 20.0
+      },
+      "slo_result": "PASS",
+      "status_counts": {
+        "200": 128840
+      },
+      "slo_reasons": [
+        "p95 8.058ms <= 200.0ms",
+        "error_rate 0.0000% <= 1.0000%",
+        "throughput 858.897 rps >= 20.0 rps"
+      ],
+      "evidence": []
+    }
+  ]
+}

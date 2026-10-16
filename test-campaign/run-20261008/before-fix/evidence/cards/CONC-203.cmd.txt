@@ -1,0 +1,9 @@
+$ bash probes-concurrency.sh decide-vs-sweep
+exit: 0
+duration_ms: 529.8
+--- stdout ---
+decisions_inserted=1 final_status=rejected
+RESULT: PASS decide and sweep do not double-decide
+
+--- stderr ---
+

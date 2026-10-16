@@ -1,0 +1,8 @@
+$ curl -s -m 20 -X POST http://127.0.0.1:18004/alerts/prometheus -H 'Content-Type: application/json' -H 'X-Webhook-Token: pst-sut-webhook' -d '{"status":"firing","alerts":[{"status":"firing","labels":{"alertname":"Camp1008Probe","severity":"P1","fingerprint":"camp1008"},"annotations":{"summary":"战役探针","description":"camp1008 告警链路验证"}}]}' >/dev/null; sleep 1; docker exec platform-pg psql -U platform -d pst_sut -tAc "select count(*) from tasks where sop='ops-domain/alert-to-postmortem'"
+exit: 0
+duration_ms: 11535.6
+--- stdout ---
+3
+
+--- stderr ---
+

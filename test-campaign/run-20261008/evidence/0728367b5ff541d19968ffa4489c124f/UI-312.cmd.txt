@@ -1,0 +1,19 @@
+$ python3 /Users/edy/.dsh/skills/full-system-testing/scripts/browser_test.py --suite ui/dashboard-suite.json --out-dir evidence/ui --only UI-312 --baselines baselines
+exit: 0
+duration_ms: 1881.7
+--- stdout ---
+套件      : 运营驾驶舱（决策台）  (http://127.0.0.1:18015)
+  UI-312     PASS   队列渲染出真实待决策事项（含深链动作按钮）
+  UI-311     NONE   经入口代理后驾驶舱可读，并渲染待决策队列与 KPI
+             ! not selected
+  UI-313     NONE   驾驶舱可访问性树可用（表格与标题可被读出）
+             ! not selected
+  UI-314     NONE   视觉基线：驾驶舱首屏与基线逐像素比对
+             ! not selected
+
+结果      : {'NOT_EXECUTED': 3, 'PASS': 1}
+截图      : 1 张 -> evidence/ui/screenshots
+报告      : evidence/ui/browser-report.json
+
+--- stderr ---
+

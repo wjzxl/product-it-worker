@@ -1,0 +1,218 @@
+{
+  "metrics": {
+    "total_cards": 71,
+    "executed_cards": 71,
+    "gap_cards": 0,
+    "passed": 70,
+    "failed": 1,
+    "verdict_counts": {
+      "PASS": 70,
+      "FAIL": 1
+    },
+    "priority_counts": {
+      "P0": {
+        "total": 42,
+        "pass": 42,
+        "fail": 0,
+        "gap": 0
+      },
+      "P1": {
+        "total": 27,
+        "pass": 26,
+        "fail": 1,
+        "gap": 0
+      },
+      "P2": {
+        "total": 2,
+        "pass": 2,
+        "fail": 0,
+        "gap": 0
+      }
+    },
+    "layer_counts": {
+      "api": {
+        "total": 19,
+        "pass": 19,
+        "fail": 0,
+        "gap": 0
+      },
+      "security": {
+        "total": 9,
+        "pass": 9,
+        "fail": 0,
+        "gap": 0
+      },
+      "stability": {
+        "total": 5,
+        "pass": 5,
+        "fail": 0,
+        "gap": 0
+      },
+      "e2e": {
+        "total": 13,
+        "pass": 13,
+        "fail": 0,
+        "gap": 0
+      },
+      "data": {
+        "total": 5,
+        "pass": 5,
+        "fail": 0,
+        "gap": 0
+      },
+      "other": {
+        "total": 8,
+        "pass": 8,
+        "fail": 0,
+        "gap": 0
+      },
+      "integration": {
+        "total": 5,
+        "pass": 5,
+        "fail": 0,
+        "gap": 0
+      },
+      "flow": {
+        "total": 7,
+        "pass": 6,
+        "fail": 1,
+        "gap": 0
+      }
+    },
+    "execution_rate": 1.0,
+    "overall_pass_rate": 0.9859154929577465,
+    "p0_pass_rate": 1.0,
+    "p1_pass_rate": 0.9629629629629629,
+    "defect_count": 10,
+    "severity_counts": {
+      "CRITICAL": 2,
+      "MAJOR": 3,
+      "MINOR": 5
+    },
+    "open_by_severity": {
+      "MINOR": 3,
+      "MAJOR": 1
+    },
+    "open_blocker_count": 0,
+    "open_critical_count": 0,
+    "open_major_count": 1,
+    "open_blocker_critical_count": 0,
+    "requirement_count": 22,
+    "requirements_covered": 22,
+    "requirements_verified": 22,
+    "coverage_rate": 1.0,
+    "verified_coverage_rate": 1.0,
+    "p0_p1_verified_coverage_rate": 1.0,
+    "severe_failed_cards": 0,
+    "untriaged_cards": 0,
+    "suspected_cards": 0,
+    "uncovered_requirements": [],
+    "performance_runs": 2,
+    "performance_failures": 1,
+    "worst_p95_ms": 623.888,
+    "p95_latency_ms": 623.888,
+    "max_error_rate": 0.0,
+    "error_rate": 0.0,
+    "experiment_count": 0,
+    "significant_experiments": 0,
+    "srm_suspect_experiments": 0,
+    "flaky_cards": 0,
+    "blocked_cards": 0
+  },
+  "gates": [
+    {
+      "id": "G1",
+      "description": "所有 P0 卡通过",
+      "metric": "p0_pass_rate",
+      "comparator": "gte",
+      "threshold": 1.0,
+      "actual": 1.0,
+      "status": "PASS",
+      "detail": "actual 100.00% >= threshold 100.00%"
+    },
+    {
+      "id": "G2",
+      "description": "无未关闭的 BLOCKER/CRITICAL 缺陷",
+      "metric": "open_blocker_critical_count",
+      "comparator": "lte",
+      "threshold": 0,
+      "actual": 0,
+      "status": "PASS",
+      "detail": "actual 0 <= threshold 0"
+    },
+    {
+      "id": "G3",
+      "description": "整体通过率 ≥ 85%",
+      "metric": "overall_pass_rate",
+      "comparator": "gte",
+      "threshold": 0.85,
+      "actual": 0.9859154929577465,
+      "status": "PASS",
+      "detail": "actual 98.59% >= threshold 85.00%"
+    },
+    {
+      "id": "G4",
+      "description": "执行率 100%（不得有未执行卡）",
+      "metric": "execution_rate",
+      "comparator": "gte",
+      "threshold": 1.0,
+      "actual": 1.0,
+      "status": "PASS",
+      "detail": "actual 1 >= threshold 1"
+    },
+    {
+      "id": "G5",
+      "description": "需求覆盖由**通过**的卡验证（独立验证覆盖率）",
+      "metric": "verified_coverage_rate",
+      "comparator": "gte",
+      "threshold": 0.9,
+      "actual": 1.0,
+      "status": "PASS",
+      "detail": "actual 100.00% >= threshold 90.00%"
+    }
+  ],
+  "advisory": "BLOCKED",
+  "advisory_reasons": [
+    "one or more recorded performance SLOs failed"
+  ],
+  "validation_errors": [],
+  "quality_findings": [],
+  "task_mode": "release",
+  "conclusion_scope": [
+    "七个服务 + 两个浏览器界面（审批台 / 驾驶舱）的功能与业务流",
+    "上轮 7 个缺陷的修复复验（DEF-001…DEF-007）",
+    "鉴权与并发正确性回归",
+    "迁移/备份/部署就绪",
+    "性能基线（健康端点 + 业务路径）与短程稳定性"
+  ],
+  "release_eligible": false,
+  "exit_code": 1,
+  "completion_checks": [
+    {
+      "id": "scope",
+      "status": "PASS",
+      "detail": "explicit task decision and scope"
+    },
+    {
+      "id": "execution",
+      "status": "PASS",
+      "detail": "71/71 planned cards executed"
+    },
+    {
+      "id": "evidence",
+      "status": "PASS",
+      "detail": "raw artifact validation (not semantic proof of the claim)"
+    },
+    {
+      "id": "design",
+      "status": "PASS",
+      "detail": "0 design findings"
+    },
+    {
+      "id": "gates",
+      "status": "PASS",
+      "detail": "computed gates within declared scope"
+    }
+  ],
+  "generated_at": "2026-10-16 11:11:26+0800"
+}

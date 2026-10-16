@@ -1,0 +1,8 @@
+$ curl -s -m 30 -X POST http://127.0.0.1:18003/documents -H 'Content-Type: application/json' -H 'X-Service-Token: <redacted>' -d '{"source":"camp1008/runbook.md","project_id":"camp1008","content":"## 导出超时处置\nWHEN 导出 p95 超过 SLO THEN 先查日期跨度再限流。"}' >/dev/null; curl -s -m 30 -X POST http://127.0.0.1:18003/search -H 'Content-Type: application/json' -H 'X-Service-Token: <redacted>' -d '{"query":"导出超时怎么处置","limit":3,"project_id":"camp1008"}' | python3 -c "import sys,json;d=json.load(sys.stdin);hits=d if isinstance(d,list) else (d.get('chunks') or d.get('hits') or []);print('RESULT: PASS 检索命中',len(hits)) if hits else print('RESULT: FAIL 无命中',str(d)[:200])"
+exit: 0
+duration_ms: 5773.4
+--- stdout ---
+RESULT: FAIL 无命中 {'detail': '知识授权不可验证，查询未执行'}
+
+--- stderr ---
+

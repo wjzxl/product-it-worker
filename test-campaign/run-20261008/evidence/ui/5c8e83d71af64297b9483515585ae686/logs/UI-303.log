@@ -1,0 +1,20 @@
+# UI-303 点击审批单后详情渲染三要素（做了什么/依据/风险自评）
+started 2026-10-16T11:00:35+0800
+
+step 1 goto ok  [http://127.0.0.1:18001/]
+step 2 fill ok  [#access-token = <redacted>
+step 3 click ok  [#auth-form button[type=submit]]
+step 4 wait_for ok  [.row]
+step 5 eval ok  ["clicked"]
+step 6 wait_for ok  [#detail .field]
+step 7 assert_text ok  [found '① 做了什么']
+step 8 assert_text ok  [found '② 依据']
+step 9 assert_text ok  [found '③ 风险自评']
+step 10 assert_visible ok  [button[data-action=approve]]
+step 11 assert_visible ok  [button[data-action=reject]]
+
+## console
+[error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[error] Failed to load resource: the server responded with a status of 404 (Not Found)
+
+screenshot: screenshots/UI-303-110036.png

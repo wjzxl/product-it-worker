@@ -1,0 +1,12 @@
+# UI-313 驾驶舱可访问性树可用（表格与标题可被读出）
+started 2026-10-16T10:48:15+0800
+
+step 1 goto ok  [http://127.0.0.1:18015/]
+step 2 wait_for_text ok  [待决策队列]
+step 3 snapshot ok  [231 个可访问性节点 -> accessibility/UI-313-step03-ax.json]
+step 4 assert_visible ok  [role=table]
+
+## console
+[error] Failed to load resource: the server responded with a status of 404 (Not Found)
+
+screenshot: screenshots/UI-313-104816.png

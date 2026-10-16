@@ -1,0 +1,9 @@
+$ python3 flows/run_flow.py --domain ops
+exit: 1
+duration_ms: 241.1
+--- stdout ---
+RESULT: FAIL 人审决策未落到审批单：status=pending
+（耗时 0.1s）
+
+--- stderr ---
+

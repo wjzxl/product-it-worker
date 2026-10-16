@@ -1,0 +1,401 @@
+{
+ "suite": "审批台（人做决策的界面）",
+ "base_url": "http://127.0.0.1:18001",
+ "tests": [
+  {
+   "id": "UI-301",
+   "title": "审批台加载：静态外壳可见、登录后可列出待办且无控制台报错",
+   "priority": "P0",
+   "screenshot": "always",
+   "steps": [
+    {
+     "action": "goto",
+     "url": "/"
+    },
+    {
+     "action": "fill",
+     "selector": "#access-token",
+     "value": "pst-sut-personal-token"
+    },
+    {
+     "action": "click",
+     "selector": "#auth-form button[type=submit]"
+    },
+    {
+     "action": "wait_for",
+     "selector": "header h1",
+     "timeout": 10
+    },
+    {
+     "action": "assert_text",
+     "value": "平台审批台"
+    },
+    {
+     "action": "assert_visible",
+     "selector": "#list"
+    },
+    {
+     "action": "assert_visible",
+     "selector": "#detail"
+    },
+    {
+     "action": "wait_for",
+     "selector": ".row",
+     "timeout": 10
+    },
+    {
+     "action": "assert_js",
+     "js": "document.getElementById('request-error').hidden === true"
+    }
+   ]
+  },
+  {
+   "id": "UI-302",
+   "title": "待审列表渲染出已存在的审批单（数据链路可用）",
+   "priority": "P0",
+   "screenshot": "always",
+   "steps": [
+    {
+     "action": "goto",
+     "url": "/"
+    },
+    {
+     "action": "fill",
+     "selector": "#access-token",
+     "value": "pst-sut-personal-token"
+    },
+    {
+     "action": "click",
+     "selector": "#auth-form button[type=submit]"
+    },
+    {
+     "action": "wait_for",
+     "selector": ".row",
+     "timeout": 10
+    },
+    {
+     "action": "assert_count",
+     "selector": ".row",
+     "min": 1
+    },
+    {
+     "action": "assert_text",
+     "value": "待审批"
+    },
+    {
+     "action": "assert_no_text",
+     "value": "加载中"
+    }
+   ]
+  },
+  {
+   "id": "UI-303",
+   "title": "点击审批单后详情渲染三要素（做了什么/依据/风险自评）",
+   "priority": "P0",
+   "screenshot": "always",
+   "steps": [
+    {
+     "action": "goto",
+     "url": "/"
+    },
+    {
+     "action": "fill",
+     "selector": "#access-token",
+     "value": "pst-sut-personal-token"
+    },
+    {
+     "action": "click",
+     "selector": "#auth-form button[type=submit]"
+    },
+    {
+     "action": "wait_for",
+     "selector": ".row",
+     "timeout": 10
+    },
+    {
+     "action": "eval",
+     "js": "[].slice.call(document.querySelectorAll('.row')).filter(function(r){return r.textContent.indexOf('UI 夹具')>=0;})[0].click(); 'clicked'"
+    },
+    {
+     "action": "wait_for",
+     "selector": "#detail .field",
+     "timeout": 10
+    },
+    {
+     "action": "assert_text",
+     "value": "① 做了什么"
+    },
+    {
+     "action": "assert_text",
+     "value": "② 依据"
+    },
+    {
+     "action": "assert_text",
+     "value": "③ 风险自评"
+    },
+    {
+     "action": "assert_visible",
+     "selector": "button[data-action=approve]"
+    },
+    {
+     "action": "assert_visible",
+     "selector": "button[data-action=reject]"
+    }
+   ]
+  },
+  {
+   "id": "UI-304",
+   "title": "XSS 载荷只作为文本出现：不生成元素、不执行脚本",
+   "priority": "P0",
+   "screenshot": "always",
+   "steps": [
+    {
+     "action": "goto",
+     "url": "/"
+    },
+    {
+     "action": "fill",
+     "selector": "#access-token",
+     "value": "pst-sut-personal-token"
+    },
+    {
+     "action": "click",
+     "selector": "#auth-form button[type=submit]"
+    },
+    {
+     "action": "wait_for",
+     "selector": ".row",
+     "timeout": 10
+    },
+    {
+     "action": "assert_js",
+     "js": "document.querySelectorAll('#list img, #detail img, #list script, #detail script').length === 0"
+    },
+    {
+     "action": "assert_js",
+     "js": "!document.querySelector('#list').innerHTML.includes('<img src=x')"
+    },
+    {
+     "action": "assert_js",
+     "js": "document.querySelector('meta[http-equiv=\"Content-Security-Policy\"]') !== null"
+    },
+    {
+     "action": "click",
+     "selector": ".row"
+    },
+    {
+     "action": "wait_for",
+     "selector": "#detail .field",
+     "timeout": 10
+    },
+    {
+     "action": "assert_js",
+     "js": "document.body.innerText.includes('<img src=x onerror=')"
+    },
+    {
+     "action": "assert_js",
+     "js": "document.querySelectorAll('#detail img, #detail script').length === 0"
+    },
+    {
+     "action": "assert_js",
+     "js": "document.getElementById('request-error').hidden === true"
+    }
+   ]
+  },
+  {
+   "id": "UI-305",
+   "title": "审批台可访问性：按钮有可访问名（屏幕阅读器可用）",
+   "priority": "P1",
+   "screenshot": "always",
+   "steps": [
+    {
+     "action": "goto",
+     "url": "/"
+    },
+    {
+     "action": "fill",
+     "selector": "#access-token",
+     "value": "pst-sut-personal-token"
+    },
+    {
+     "action": "click",
+     "selector": "#auth-form button[type=submit]"
+    },
+    {
+     "action": "wait_for",
+     "selector": ".row",
+     "timeout": 10
+    },
+    {
+     "action": "click",
+     "selector": ".row"
+    },
+    {
+     "action": "wait_for",
+     "selector": "button[data-action=approve]",
+     "timeout": 10
+    },
+    {
+     "action": "snapshot"
+    },
+    {
+     "action": "assert_visible",
+     "selector": "role=button[name=\"批准\"]"
+    },
+    {
+     "action": "assert_visible",
+     "selector": "role=button[name=\"拒绝\"]"
+    }
+   ]
+  },
+  {
+   "id": "UI-306",
+   "title": "视觉基线：审批台外壳（列表为动态区，已遮蔽）",
+   "priority": "P1",
+   "screenshot": "always",
+   "steps": [
+    {
+     "action": "goto",
+     "url": "/"
+    },
+    {
+     "action": "wait_for",
+     "selector": ".panel",
+     "timeout": 10
+    },
+    {
+     "action": "wait_ms",
+     "value": 800
+    },
+    {
+     "action": "visual",
+     "name": "console-shell",
+     "max_diff_ratio": 0.03,
+     "mask": [
+      "#list",
+      "#detail"
+     ],
+     "mask_dynamic": true
+    }
+   ]
+  },
+  {
+   "id": "UI-307",
+   "title": "视觉比对负向控制：注入真实样式缺陷必须被发现",
+   "priority": "P0",
+   "screenshot": "always",
+   "steps": [
+    {
+     "action": "goto",
+     "url": "/"
+    },
+    {
+     "action": "wait_for",
+     "selector": ".panel",
+     "timeout": 10
+    },
+    {
+     "action": "change_baseline",
+     "name": "console-negative-control"
+    },
+    {
+     "action": "eval",
+     "js": "document.body.style.background='#ff0000';document.querySelectorAll('.panel').forEach(function(p){p.style.border='8px solid #00ff00';});document.querySelector('h1').style.fontSize='64px'; 'injected'"
+    },
+    {
+     "action": "wait_ms",
+     "value": 400
+    },
+    {
+     "action": "assert_visual_changed",
+     "name": "console-negative-control",
+     "min_diff_ratio": 0.01
+    }
+   ]
+  },
+  {
+   "id": "UI-308",
+   "title": "无令牌时必须显示鉴权错误，不得伪装成空审批队列",
+   "priority": "P0",
+   "screenshot": "always",
+   "steps": [
+    {
+     "action": "goto",
+     "url": "/"
+    },
+    {
+     "action": "wait_for",
+     "selector": "#request-error:not([hidden])",
+     "timeout": 15
+    },
+    {
+     "action": "assert_visible",
+     "selector": "#request-error"
+    },
+    {
+     "action": "assert_js",
+     "js": "document.getElementById('request-error').textContent.includes('身份验证失败')"
+    },
+    {
+     "action": "assert_no_text",
+     "value": "暂无待审批事项"
+    },
+    {
+     "action": "assert_text",
+     "value": "审批列表加载失败"
+    }
+   ]
+  },
+  {
+   "id": "UI-309",
+   "title": "在界面上完成一次决策（浏览器端到端）",
+   "priority": "P0",
+   "screenshot": "always",
+   "steps": [
+    {
+     "action": "goto",
+     "url": "/"
+    },
+    {
+     "action": "fill",
+     "selector": "#access-token",
+     "value": "pst-sut-personal-token"
+    },
+    {
+     "action": "click",
+     "selector": "#auth-form button[type=submit]"
+    },
+    {
+     "action": "wait_for",
+     "selector": ".row",
+     "timeout": 10
+    },
+    {
+     "action": "eval",
+     "js": "[].slice.call(document.querySelectorAll('.row')).filter(function(r){return r.textContent.indexOf('UI 夹具')>=0;})[0].click(); 'clicked'"
+    },
+    {
+     "action": "wait_for",
+     "selector": "button[data-action=approve]",
+     "timeout": 10
+    },
+    {
+     "action": "eval",
+     "js": "window.prompt = function(){return '自动化决策人';}; 'stubbed'"
+    },
+    {
+     "action": "click",
+     "selector": "button[data-action=approve]"
+    },
+    {
+     "action": "wait_ms",
+     "value": 1500
+    },
+    {
+     "action": "assert_text",
+     "value": "决策已提交"
+    }
+   ]
+  }
+ ]
+}

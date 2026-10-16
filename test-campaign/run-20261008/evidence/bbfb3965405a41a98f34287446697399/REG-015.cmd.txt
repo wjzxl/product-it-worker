@@ -1,0 +1,9 @@
+$ bash test-campaign/probes.sh dfg-conformance
+exit: 0
+duration_ms: 73.4
+--- stdout ---
+min_support=1: fitness=0.75 deviations=1
+RESULT: PASS dfg conformance detects the unique anomaly
+
+--- stderr ---
+

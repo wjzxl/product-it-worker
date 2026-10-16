@@ -1,0 +1,8 @@
+$ curl -s -o /dev/null -w 'no_sig=%{http_code} ' -X POST http://127.0.0.1:18006/webhooks/gitlab -H 'Content-Type: application/json' -d '{"object_kind":"issue"}'; curl -s -o /dev/null -w 'signed=%{http_code}\n' -X POST http://127.0.0.1:18006/webhooks/gitlab -H 'Content-Type: application/json' -H 'X-Gitlab-Token: pst-sut-webhook' -d '{"object_kind":"issue","project":{"id":1,"path_with_namespace":"a/b"},"object_attributes":{"iid":1,"title":"t","action":"open","labels":[]}}'
+exit: 0
+duration_ms: 112.3
+--- stdout ---
+no_sig=401 signed=200
+
+--- stderr ---
+

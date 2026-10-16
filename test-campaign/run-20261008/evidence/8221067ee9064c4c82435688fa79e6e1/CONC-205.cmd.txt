@@ -1,0 +1,8 @@
+$ bash probes-concurrency.sh evidence-race 2>&1 | iconv -f utf-8 -t utf-8 -c
+exit: 0
+duration_ms: 36.4
+--- stdout ---
+probes-concurrency.sh: line 145: probe_code: unbound variable
+
+--- stderr ---
+

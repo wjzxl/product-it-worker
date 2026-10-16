@@ -1,0 +1,10 @@
+$ bash test-campaign/probes.sh evidence
+exit: 0
+duration_ms: 159.2
+--- stdout ---
+upload={"id":"evd_f8c3c3e181ef","tenant":"default","task_ref":"EVD-001","acceptance_item":"A1","kind":"log","filename":"evd.txt","sha256":"82b8530193cb9baf074c6f06aa5c8eeeca1c1bd6c5c4b320a9fe773a2944bf66","size":27,"created_by":"anonymous","note":"","created_at":"2026-10-08T06:59:05.914147+00:00","d
+verify={"task_ref":"EVD-001","total":2,"verified":2,"broken":[]}
+RESULT: PASS evidence upload and hash verification round-trip
+
+--- stderr ---
+

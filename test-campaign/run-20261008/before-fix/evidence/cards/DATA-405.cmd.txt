@@ -1,0 +1,8 @@
+$ python3 flows/runs_db_check.py
+exit: 1
+duration_ms: 266.8
+--- stdout ---
+RESULT: FAIL 平台库没有 agent_runs 表——运行归档不在度量读的库里
+
+--- stderr ---
+

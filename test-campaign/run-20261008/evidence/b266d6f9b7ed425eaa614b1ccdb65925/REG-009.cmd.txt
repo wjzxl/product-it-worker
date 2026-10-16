@@ -1,0 +1,9 @@
+$ bash test-campaign/probes.sh task-tenant
+exit: 0
+duration_ms: 130.7
+--- stdout ---
+task=tsk_be0ab30c4b3d created; tenantB read http=404 tenantB transition http=404
+RESULT: PASS task detail is tenant-scoped
+
+--- stderr ---
+

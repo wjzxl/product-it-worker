@@ -1,0 +1,26 @@
+$ python3 platform/scripts/audit_endpoint_auth.py --strict
+exit: 0
+duration_ms: 767.7
+--- stdout ---
+服务                写接口  无鉴权写接口  读接口  覆盖方式
+------------------------------------------------------------------------------------
+agent-runtime           4            0       9  中间件 + 
+approval-gateway        8            0      15  中间件 + principal
+gitlab-bridge           9            0       7  中间件 + 
+knowledge-base          2            0       1  中间件 + 
+metrics-dashboard       2            0       4  中间件 + 
+process-mining          3            0       8  中间件 + 
+task-center             9            0      10  中间件 + principal
+
+豁免清单（这些路径不走服务令牌，必须是「自带签名校验」的入站入口）：
+  approval-gateway: /callbacks/im, /
+  gitlab-bridge: /webhooks/gitlab
+  task-center: /alerts/prometheus
+  默认: /health, /docs, /openapi.json, /redoc, /favicon.ico（模块默认，所有服务）
+
+无鉴权的写接口明细：
+
+合计：写接口 37 个，其中无鉴权 0 个。
+
+--- stderr ---
+

@@ -1,0 +1,14 @@
+# UI-314 视觉基线：驾驶舱标题区（数据区为动态，已排除）
+started 2026-10-16T11:01:40+0800
+
+step 1 goto ok  [http://127.0.0.1:18015/]
+step 2 wait_for_text ok  [待决策队列]
+step 3 wait_ms ok  [Nonems]
+step 4 visual ok  [[MATCH] dashboard-title: 0 of 38976 pixels differ (within tolerance)]
+
+## console
+[error] Failed to load resource: the server responded with a status of 404 (Not Found)
+
+visual: [MATCH] dashboard-title: 0 of 38976 pixels differ (within tolerance)
+
+screenshot: screenshots/UI-314-110141.png

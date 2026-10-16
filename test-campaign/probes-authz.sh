@@ -13,6 +13,7 @@ GW=${GW:-http://127.0.0.1:18001}
 RT=${RT:-http://127.0.0.1:18002}
 TC=${TC:-http://127.0.0.1:18004}
 TOKEN=${SERVICE_AUTH_TOKEN:-pst-sut-token}
+HUMAN_TOKEN=${AUTH_STATIC_TOKEN:-pst-sut-personal-token}
 ALERT_SECRET=${ALERT_WEBHOOK_SECRET:-${WEBHOOK_SECRET:-pst-sut-webhook}}
 D=/tmp/pst-sut
 mkdir -p "$D"
@@ -72,7 +73,7 @@ probe_with_token() {
   [ -z "$id" ] && { echo "INVALID: 带令牌创建审批失败（服务是否在 token 模式？）"; return 2; }
   local got
   # 注意：必须带同一个租户头——单据是按租户隔离的，不带就是 404（隔离本身是对的）
-  got=$(code -X POST "$GW/approvals/$id/decision" -H "X-Service-Token: $TOKEN" -H 'X-Tenant: authz' \
+  got=$(code -X POST "$GW/approvals/$id/decision" -H "Authorization: Bearer $HUMAN_TOKEN" -H 'X-Tenant: authz' \
         -H 'Content-Type: application/json' -d '{"decision":"approve","decided_by":"probe","comment":"带令牌"}')
   if [ "$got" != "200" ]; then echo "FINDING: 带正确令牌的决策被拒（${got}）——鉴权把功能也关掉了"; return 1; fi
   echo "RESULT: PASS 带服务令牌的审批与决策链路正常（approval=${id}）"

@@ -1,0 +1,15 @@
+# UI-306 视觉基线：审批台外壳（列表为动态区，已遮蔽）
+started 2026-10-16T10:47:52+0800
+
+step 1 goto ok  [http://127.0.0.1:18001/]
+step 2 wait_for ok  [.panel]
+step 3 wait_ms ok  [Nonems]
+step 4 visual FAILED: 视觉回归：108815 of 1296000 pixels differ (8.396% > 3.000% allowed)
+
+## console
+[error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[error] Failed to load resource: the server responded with a status of 404 (Not Found)
+
+visual: [DIFF] console-shell: 108815 of 1296000 pixels differ (8.396% > 3.000% allowed) (108815 px, 3 处区域) [已屏蔽 3 个动态区域]
+
+screenshot: screenshots/UI-306-FAIL-104800.png

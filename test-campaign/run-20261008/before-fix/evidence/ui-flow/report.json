@@ -1,0 +1,63 @@
+{
+  "suite": "审批台决策闭环",
+  "base_url": "http://127.0.0.1:18001",
+  "started_at": "2026-10-08T15:12:38+0800",
+  "finished_at": "2026-10-08T15:12:50+0800",
+  "headless": true,
+  "environment": {
+    "platform": "macOS-26.7-x86_64-i386-64bit",
+    "python": "3.9.6",
+    "chrome": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "chrome_version": "Google Chrome 154.0.8037.98"
+  },
+  "blocked_reason": null,
+  "tests": [
+    {
+      "id": "FLOW-UI",
+      "title": "审批人在界面上批准一条待审单据",
+      "layer": "e2e",
+      "priority": "P0",
+      "verdict": "BLOCKED",
+      "expected": "全部步骤通过且页面无控制台错误",
+      "actual": "浏览器驱动失败：element not found or not visible within 10s: .row",
+      "duration_ms": 10289.1,
+      "steps": [
+        "goto: http://127.0.0.1:18001/"
+      ],
+      "evidence": [
+        {
+          "kind": "screenshot",
+          "path": "screenshots/FLOW-UI-FAIL-151249.png",
+          "detail": "FLOW-UI 界面截图"
+        },
+        {
+          "kind": "log",
+          "path": "logs/FLOW-UI.log",
+          "detail": "逐步操作与页面控制台"
+        }
+      ],
+      "tags": [],
+      "executed_at": "2026-10-08T15:12:49+0800"
+    }
+  ],
+  "visual": {
+    "baseline_dir": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008/baselines",
+    "baselines_available": 3,
+    "update_requested": false,
+    "tally": {},
+    "results": []
+  },
+  "accessibility": {
+    "snapshots": 0,
+    "summary": []
+  },
+  "change_checks": {
+    "count": 0,
+    "confirmed": 0,
+    "results": []
+  },
+  "tracing": {
+    "enabled": false,
+    "traces": []
+  }
+}

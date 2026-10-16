@@ -1,0 +1,210 @@
+{
+  "suite": "审批台（人做决策的界面）",
+  "base_url": "http://127.0.0.1:18001",
+  "started_at": "2026-10-16T11:07:35+0800",
+  "finished_at": "2026-10-16T11:07:46+0800",
+  "headless": true,
+  "environment": {
+    "platform": "macOS-26.7-x86_64-i386-64bit",
+    "python": "3.9.6",
+    "chrome": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "chrome_version": "Google Chrome 155.0.8059.80"
+  },
+  "blocked_reason": null,
+  "tests": [
+    {
+      "id": "UI-307",
+      "title": "视觉比对负向控制：注入真实样式缺陷必须被发现",
+      "layer": "e2e",
+      "priority": "P0",
+      "verdict": "PASS",
+      "expected": "全部步骤通过且页面无控制台错误",
+      "actual": "6 个步骤全部通过",
+      "duration_ms": 9960.2,
+      "steps": [
+        "goto: http://127.0.0.1:18001/",
+        "wait_for: .panel",
+        "change_baseline: 变更前截图：change-probe/UI-307/console-negative-control.png",
+        "eval: \"injected\"",
+        "wait_ms: Nonems",
+        "assert_visual_changed: [DIFF] console-negative-control: 1086151 of 1296000 pixels differ (83.808% > 0.200% allowed) (1086151 px, 1 处区域)"
+      ],
+      "evidence": [
+        {
+          "kind": "screenshot",
+          "path": "27bc402697af48ad8ccd222d4e98df0c/screenshots/UI-307-110746.png",
+          "detail": "UI-307 界面截图",
+          "sha256": "2a1d6293dd5254f280613e6d42203a8984e8e73a3b6d196bfba39d3014512402",
+          "attempt_id": "27bc402697af48ad8ccd222d4e98df0c",
+          "run_id": "27bc402697af48ad8ccd222d4e98df0c"
+        },
+        {
+          "kind": "log",
+          "path": "27bc402697af48ad8ccd222d4e98df0c/logs/UI-307.log",
+          "detail": "逐步操作与页面控制台",
+          "sha256": "569527b4e9cce291518e74466aaff94196f1e216b7ee755a5c53e475b21e6404",
+          "attempt_id": "27bc402697af48ad8ccd222d4e98df0c",
+          "run_id": "27bc402697af48ad8ccd222d4e98df0c"
+        }
+      ],
+      "tags": [],
+      "executed_at": "2026-10-16T11:07:46+0800",
+      "attempt_id": "27bc402697af48ad8ccd222d4e98df0c",
+      "run_id": "27bc402697af48ad8ccd222d4e98df0c"
+    },
+    {
+      "id": "UI-301",
+      "title": "审批台加载：静态外壳可见、登录后可列出待办且无控制台报错",
+      "priority": "P0",
+      "layer": "e2e",
+      "verdict": "NOT_EXECUTED",
+      "actual": "not selected",
+      "evidence": [],
+      "attempt_id": "27bc402697af48ad8ccd222d4e98df0c",
+      "run_id": "27bc402697af48ad8ccd222d4e98df0c"
+    },
+    {
+      "id": "UI-302",
+      "title": "待审列表渲染出已存在的审批单（数据链路可用）",
+      "priority": "P0",
+      "layer": "e2e",
+      "verdict": "NOT_EXECUTED",
+      "actual": "not selected",
+      "evidence": [],
+      "attempt_id": "27bc402697af48ad8ccd222d4e98df0c",
+      "run_id": "27bc402697af48ad8ccd222d4e98df0c"
+    },
+    {
+      "id": "UI-303",
+      "title": "点击审批单后详情渲染三要素（做了什么/依据/风险自评）",
+      "priority": "P0",
+      "layer": "e2e",
+      "verdict": "NOT_EXECUTED",
+      "actual": "not selected",
+      "evidence": [],
+      "attempt_id": "27bc402697af48ad8ccd222d4e98df0c",
+      "run_id": "27bc402697af48ad8ccd222d4e98df0c"
+    },
+    {
+      "id": "UI-304",
+      "title": "XSS 载荷只作为文本出现：不生成元素、不执行脚本",
+      "priority": "P0",
+      "layer": "e2e",
+      "verdict": "NOT_EXECUTED",
+      "actual": "not selected",
+      "evidence": [],
+      "attempt_id": "27bc402697af48ad8ccd222d4e98df0c",
+      "run_id": "27bc402697af48ad8ccd222d4e98df0c"
+    },
+    {
+      "id": "UI-305",
+      "title": "审批台可访问性：按钮有可访问名（屏幕阅读器可用）",
+      "priority": "P1",
+      "layer": "e2e",
+      "verdict": "NOT_EXECUTED",
+      "actual": "not selected",
+      "evidence": [],
+      "attempt_id": "27bc402697af48ad8ccd222d4e98df0c",
+      "run_id": "27bc402697af48ad8ccd222d4e98df0c"
+    },
+    {
+      "id": "UI-306",
+      "title": "视觉基线：审批台外壳（列表为动态区，已遮蔽）",
+      "priority": "P1",
+      "layer": "e2e",
+      "verdict": "NOT_EXECUTED",
+      "actual": "not selected",
+      "evidence": [],
+      "attempt_id": "27bc402697af48ad8ccd222d4e98df0c",
+      "run_id": "27bc402697af48ad8ccd222d4e98df0c"
+    },
+    {
+      "id": "UI-308",
+      "title": "无令牌时必须显示鉴权错误，不得伪装成空审批队列",
+      "priority": "P0",
+      "layer": "e2e",
+      "verdict": "NOT_EXECUTED",
+      "actual": "not selected",
+      "evidence": [],
+      "attempt_id": "27bc402697af48ad8ccd222d4e98df0c",
+      "run_id": "27bc402697af48ad8ccd222d4e98df0c"
+    },
+    {
+      "id": "UI-309",
+      "title": "在界面上完成一次决策（浏览器端到端）",
+      "priority": "P0",
+      "layer": "e2e",
+      "verdict": "NOT_EXECUTED",
+      "actual": "not selected",
+      "evidence": [],
+      "attempt_id": "27bc402697af48ad8ccd222d4e98df0c",
+      "run_id": "27bc402697af48ad8ccd222d4e98df0c"
+    }
+  ],
+  "visual": {
+    "baseline_dir": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008/baselines",
+    "baselines_available": 4,
+    "update_requested": false,
+    "tally": {},
+    "results": []
+  },
+  "accessibility": {
+    "snapshots": 0,
+    "summary": []
+  },
+  "change_checks": {
+    "count": 1,
+    "confirmed": 1,
+    "results": [
+      {
+        "name": "console-negative-control",
+        "current": "evidence/ui/UI-307/27bc402697af48ad8ccd222d4e98df0c/screenshots/changed-console-negative-control.png",
+        "baseline": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008/evidence/ui/UI-307/27bc402697af48ad8ccd222d4e98df0c/change-probe/UI-307/console-negative-control.png",
+        "pixel_threshold": 0.02,
+        "max_diff_ratio": 0.002,
+        "full_page": false,
+        "masks": [],
+        "checked_at": "2026-10-16T11:07:37+0800",
+        "masks_applied": [],
+        "reason": "1086151 of 1296000 pixels differ (83.808% > 0.200% allowed)",
+        "width": 1440,
+        "height": 900,
+        "total_pixels": 1296000,
+        "diff_pixels": 1086151,
+        "diff_ratio": 0.83807948,
+        "max_channel_delta": 255,
+        "mean_channel_delta": 179.3313,
+        "passed": false,
+        "size": [
+          1440,
+          900
+        ],
+        "baseline_size": [
+          1440,
+          900
+        ],
+        "verdict": "DIFF",
+        "regions": [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1440,
+            "height": 900,
+            "changed_pixels": 1086151
+          }
+        ],
+        "region_count": 1,
+        "diff_image": "evidence/ui/UI-307/27bc402697af48ad8ccd222d4e98df0c/visual-changed/negative-control/visual/console-negative-control/diff.png",
+        "baseline_image": "evidence/ui/UI-307/27bc402697af48ad8ccd222d4e98df0c/visual-changed/negative-control/visual/console-negative-control/baseline.png",
+        "current_image": "evidence/ui/UI-307/27bc402697af48ad8ccd222d4e98df0c/visual-changed/negative-control/visual/console-negative-control/current.png",
+        "test": "UI-307",
+        "negative_control": true
+      }
+    ]
+  },
+  "tracing": {
+    "enabled": false,
+    "traces": []
+  },
+  "evidence_base": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008/evidence/ui/UI-307"
+}

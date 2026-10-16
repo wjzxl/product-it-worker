@@ -1,0 +1,9 @@
+$ python3 flows/run_flow.py --domain ops-taskref-mismatch
+exit: 1
+duration_ms: 589.6
+--- stdout ---
+RESULT: FAIL 运维域 G5 恢复被核验层拒绝（HTTP 409）：{'detail': "审批 apv_949225214bf7 属于 'camp1008-alert'，与本次运行 'camp1008-flow-ops' 不是同一件事"}
+（耗时 0.4s）
+
+--- stderr ---
+

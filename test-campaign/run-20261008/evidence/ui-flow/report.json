@@ -1,0 +1,82 @@
+{
+  "suite": "审批台决策闭环",
+  "base_url": "http://127.0.0.1:18001",
+  "started_at": "2026-10-16T11:08:32+0800",
+  "finished_at": "2026-10-16T11:08:36+0800",
+  "headless": true,
+  "environment": {
+    "platform": "macOS-26.7-x86_64-i386-64bit",
+    "python": "3.9.6",
+    "chrome": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "chrome_version": "Google Chrome 155.0.8059.80"
+  },
+  "blocked_reason": null,
+  "tests": [
+    {
+      "id": "FLOW-UI",
+      "title": "审批人在界面上批准一条待审单据",
+      "layer": "e2e",
+      "priority": "P0",
+      "verdict": "PASS",
+      "expected": "全部步骤通过且页面无控制台错误",
+      "actual": "11 个步骤全部通过",
+      "duration_ms": 1543.1,
+      "steps": [
+        "goto: http://127.0.0.1:18001/",
+        "fill: #access-token = <redacted>",
+        "click: #auth-form button[type=submit]",
+        "wait_for: .row",
+        "eval: \"clicked\"",
+        "wait_for: button[data-action=approve]",
+        "eval: \"stubbed\"",
+        "click: button[data-action=approve]",
+        "wait_ms: Nonems",
+        "assert_no_text: absent '操作失败'",
+        "assert_text: found '决策已提交'"
+      ],
+      "evidence": [
+        {
+          "kind": "screenshot",
+          "path": "a39f94150bd242989f2a4099e252e6e1/screenshots/FLOW-UI-110835.png",
+          "detail": "FLOW-UI 界面截图",
+          "sha256": "51237b3238185ebe3fcd30ee1ddb95c62e8cacb76682d43428bbfea75c1d5ac9",
+          "attempt_id": "a39f94150bd242989f2a4099e252e6e1",
+          "run_id": "a39f94150bd242989f2a4099e252e6e1"
+        },
+        {
+          "kind": "log",
+          "path": "a39f94150bd242989f2a4099e252e6e1/logs/FLOW-UI.log",
+          "detail": "逐步操作与页面控制台",
+          "sha256": "1af1f6cf278cd7ffb856c12c850799f95eaea6dd18b627f8e7386147320a893f",
+          "attempt_id": "a39f94150bd242989f2a4099e252e6e1",
+          "run_id": "a39f94150bd242989f2a4099e252e6e1"
+        }
+      ],
+      "tags": [],
+      "executed_at": "2026-10-16T11:08:36+0800",
+      "attempt_id": "a39f94150bd242989f2a4099e252e6e1",
+      "run_id": "a39f94150bd242989f2a4099e252e6e1"
+    }
+  ],
+  "visual": {
+    "baseline_dir": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008/baselines",
+    "baselines_available": 4,
+    "update_requested": false,
+    "tally": {},
+    "results": []
+  },
+  "accessibility": {
+    "snapshots": 0,
+    "summary": []
+  },
+  "change_checks": {
+    "count": 0,
+    "confirmed": 0,
+    "results": []
+  },
+  "tracing": {
+    "enabled": false,
+    "traces": []
+  },
+  "evidence_base": "/Users/edy/Desktop/ds-harness/产品研发智能化平台/test-campaign/run-20261008/evidence/ui-flow"
+}

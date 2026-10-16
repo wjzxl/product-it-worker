@@ -16,7 +16,12 @@ J() { python3 -c "import sys,json;d=json.load(sys.stdin);print(d$1)" 2>/dev/null
 # 鉴权专项后 SUT 默认以 SERVICE_AUTH_MODE=token 运行：所有请求统一带上服务令牌。
 # 用函数包装而不是逐个 curl 加参数——漏一处就会得到一个"看似 401 其实是探针写错"的假结论。
 SERVICE_TOKEN=${SERVICE_AUTH_TOKEN:-pst-sut-token}
+# 新契约：决策类接口要求**人类凭据**（服务身份只能建单/推进，不能替人决策）。
+# 探针同时带两者：服务令牌过中间件，Bearer 过主体校验。
+HUMAN_TOKEN=${AUTH_STATIC_TOKEN:-pst-sut-personal-token}
 curl() { command curl -H "X-Service-Token: ${SERVICE_TOKEN}" "$@"; }
+# 人类动作（决策 / 管理扫描）：新契约要求人类凭据，且**不能与服务令牌同时出现**
+curlh() { command curl -H "Authorization: Bearer ${HUMAN_TOKEN}" "$@"; }
 
 # A valid approval body. RiskSnapshot requires score (0-100), level and factors.
 # Named arguments keep the call sites readable and prevent positional mistakes.
@@ -120,8 +125,15 @@ probe_gate_persist() {
   local before after
   before=$(curl -s -H 'X-Tenant: default' "$GW/eng-gates/checks?task_ref=GATE-001&limit=100" | J "['__len__']()" 2>/dev/null)
   [ -z "$before" ] && before=$(curl -s -H 'X-Tenant: default' "$GW/eng-gates/checks?task_ref=GATE-001&limit=100" | python3 -c 'import sys,json;print(len(json.load(sys.stdin)))')
-  curl -s -o /dev/null -X POST "$GW/eng-gates/E1/check" -H 'Content-Type: application/json' \
-    -H 'X-Tenant: default' -d '{"task_ref":"GATE-001","persist":false,"context":{}}'
+  # 用人类凭据调用工程闸门（服务身份已不被接受）；**先确认调用成功**，
+  # 否则"没有新行"会被误判成"留痕被抑制"——这正是本轮踩到的假发现。
+  local code
+  code=$(curlh -s -o /tmp/gp.json -w '%{http_code}' -X POST "$GW/eng-gates/E1/check" \
+    -H 'Content-Type: application/json' -H 'X-Tenant: default' \
+    -d '{"task_ref":"GATE-001","persist":false,"context":{}}')
+  if [ "$code" != "200" ]; then
+    echo "INVALID: 工程闸门检查调用失败（HTTP $code）——无法判断留痕行为"; return 2
+  fi
   after=$(curl -s -H 'X-Tenant: default' "$GW/eng-gates/checks?task_ref=GATE-001&limit=100" | python3 -c 'import sys,json;print(len(json.load(sys.stdin)))')
   echo "audit rows before=$before after_a_persist_false_check=$after"
   if [ "$after" = "$before" ]; then
@@ -138,7 +150,7 @@ probe_timeout_autoapprove() {
   body=$(printf '{"type":"GATE_REQUIREMENT_REVIEW","stage":"probe","requester":"campaign","task_ref":"GATE-002","context_snapshot":{"artifact_ref":"GATE-002","diff_summary":"d","evidence":["e"],"risk":{"score":5,"level":"L1","factors":["self declared"]},"self_review":""},"deadline":"%s","escalation_policy":{"timeout_action":"auto_approve_l1_only"}}' "$past")
   id=$(curl -s -X POST "$GW/approvals" -H 'Content-Type: application/json' -H 'X-Tenant: default' -d "$body" | J "['id']")
   [ -z "$id" ] && { echo "INVALID: could not create overdue approval"; return 2; }
-  curl -s -o /dev/null -X POST "$GW/admin/sweep"
+  curlh -s -o /dev/null -X POST "$GW/admin/sweep"
   status=$(curl -s -H 'X-Tenant: default' "$GW/approvals/$id" | J "['status']")
   echo "overdue approval with caller-declared level=L1: status after sweep=$status"
   if [ "$status" = "approved" ]; then
@@ -215,14 +227,14 @@ probe_task_dup_ref() {
 probe_reject_archive() {
   local tid state archived apv decision_code
   tid=$(curl -s -X POST "$RT/runs" -H 'Content-Type: application/json' \
-    -d '{"sop":"product-domain/prd-flow","requirement_text":"probe requirement","task_ref":"RT-001"}' | J "['thread_id']")
+    -d "{\"sop\":\"product-domain/prd-flow\",\"requirement_text\":\"probe requirement\",\"task_ref\":\"RT-001-$$-$(date +%s)\"}" | J "['thread_id']")
   [ -z "$tid" ] && { echo "INVALID: could not start a run"; return 2; }
   # 鉴权专项后 /resume 必须出示真实人审决策（GATE_DECISION_VERIFY=block），
   # 所以这里先在审批台上真做一次 reject，再拿着 approval_id 恢复运行——
   # 这比原来"直接自述 reject"更接近真实链路。
   apv=$(curl -s "$RT/runs/$tid/state" | J "['interrupts'][0]['approval_id']")
   [ -z "$apv" ] && { echo "INVALID: run did not expose an approval_id to decide on"; return 2; }
-  decision_code=$(curl -s -o "$D/ra.json" -w '%{http_code}' -X POST "$GW/approvals/$apv/decision" \
+  decision_code=$(curlh -s -o "$D/ra.json" -w '%{http_code}' -X POST "$GW/approvals/$apv/decision" \
     -H 'Content-Type: application/json' -d '{"decision":"reject","decided_by":"probe","comment":"not acceptable"}')
   [ "$decision_code" != "200" ] && { echo "INVALID: could not record the human decision (HTTP $decision_code)"; return 2; }
   state=$(curl -s -X POST "$RT/runs/$tid/resume" -H 'Content-Type: application/json' \

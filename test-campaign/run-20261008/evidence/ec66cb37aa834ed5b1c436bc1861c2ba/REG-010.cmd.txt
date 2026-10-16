@@ -1,0 +1,9 @@
+$ bash test-campaign/probes.sh task-dup-ref
+exit: 0
+duration_ms: 92.6
+--- stdout ---
+second create with empty external_ref http=201
+RESULT: PASS duplicate external_ref handled without a 500
+
+--- stderr ---
+

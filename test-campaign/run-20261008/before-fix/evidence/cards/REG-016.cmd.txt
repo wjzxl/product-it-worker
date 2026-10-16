@@ -1,0 +1,12 @@
+$ bash test-campaign/probes.sh llm-fallback
+exit: 0
+duration_ms: 245.8
+--- stdout ---
+non-JSON body: fell back to 1 rule-based proposal(s)
+no choices key: fell back to 1 rule-based proposal(s)
+RESULT: PASS malformed LLM responses fall back to rule-based proposals
+
+--- stderr ---
+LLM 提案生成失败（ValueError: Expecting value: line 1 column 1 (char 0)），回退规则化提案
+LLM 提案生成失败（KeyError: 'choices'），回退规则化提案
+

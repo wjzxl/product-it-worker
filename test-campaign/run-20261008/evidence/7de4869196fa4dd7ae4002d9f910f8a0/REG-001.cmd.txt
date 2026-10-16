@@ -1,0 +1,9 @@
+$ bash test-campaign/probes.sh im-callback
+exit: 0
+duration_ms: 192.9
+--- stdout ---
+callback_http=503 status_after=pending (no signature, no auth, tenant header absent)
+RESULT: PASS IM callback cannot decide a gate without authentication
+
+--- stderr ---
+
